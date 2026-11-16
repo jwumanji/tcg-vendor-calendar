@@ -1,0 +1,104 @@
+import type { Event } from "./model";
+const nullableStrings = [
+  "games_note",
+  "date_note",
+  "city",
+  "country",
+  "country_code",
+  "venue",
+  "region_group",
+  "organizer",
+  "expected_size",
+  "size_note",
+  "size_tier",
+  "previous_editions",
+  "first_year",
+  "vendor_booths",
+  "vendor_application",
+  "vendor_deadline",
+  "vendor_cost",
+  "booth_detail",
+  "contact",
+  "priority_market_level",
+  "website",
+  "instagram",
+  "description",
+  "audience",
+  "fit",
+  "logo",
+  "logo_kind",
+] as const;
+const nullableNumbers = [
+  "visitors",
+  "vendor_count",
+  "previous_editions_count",
+  "vendor_score",
+  "shortlist_priority",
+  "instagram_followers",
+] as const;
+export function validDate(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+    Number.isFinite(Date.parse(value + "T00:00:00Z")) &&
+    new Date(value + "T00:00:00Z").toISOString().slice(0, 10) === value
+  );
+}
+export function normalizeEvents(value: unknown): Event[] {
+  if (!Array.isArray(value)) throw new Error("Event data must be an array.");
+  const ids = new Set<string>();
+  return value.map((v) => {
+    if (
+      !v ||
+      typeof v !== "object" ||
+      typeof v.id !== "string" ||
+      !v.id ||
+      typeof v.name !== "string" ||
+      ids.has(v.id)
+    )
+      throw new Error("Event data contains an invalid or duplicate identity.");
+    ids.add(v.id);
+    const e: Record<string, unknown> = {
+      id: v.id,
+      name: v.name,
+      event_type: typeof v.event_type === "string" ? v.event_type : "Unknown",
+      section: ["timeline", "recurring_sg", "watchlist"].includes(v.section)
+        ? v.section
+        : "watchlist",
+      date_status: ["confirmed", "estimated", "tba"].includes(v.date_status)
+        ? v.date_status
+        : "tba",
+    };
+    for (const key of nullableStrings)
+      e[key] = typeof v[key] === "string" ? v[key] : null;
+    for (const key of nullableNumbers)
+      e[key] =
+        typeof v[key] === "number" && Number.isFinite(v[key]) ? v[key] : null;
+    for (const key of ["games", "source_urls"])
+      e[key] = Array.isArray(v[key])
+        ? [...new Set(v[key].filter((s: unknown) => typeof s === "string"))]
+        : [];
+    for (const key of ["priority_market", "size_tier_estimated"])
+      e[key] = v[key] === true;
+    e.start_date = validDate(v.start_date) ? v.start_date : null;
+    e.end_date =
+      validDate(v.end_date) && e.start_date && v.end_date >= e.start_date
+        ? v.end_date
+        : e.start_date;
+    e.estimated_month =
+      typeof v.estimated_month === "string" &&
+      /^\d{4}-(0[1-9]|1[0-2])$/.test(v.estimated_month)
+        ? v.estimated_month
+        : null;
+    e.occurrences = Array.isArray(v.occurrences)
+      ? v.occurrences.filter(
+          (r: { start_date?: unknown; end_date?: unknown } | null) =>
+            r &&
+            validDate(r.start_date) &&
+            validDate(r.end_date) &&
+            r.end_date >= r.start_date,
+        )
+      : undefined;
+    return e as unknown as Event;
+  });
+}

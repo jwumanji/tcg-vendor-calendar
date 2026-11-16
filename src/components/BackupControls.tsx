@@ -1,9 +1,118 @@
-import { useState } from 'react';
-import { backup, validateBackup, importEntries, unknownIds, type Entries } from '../storage';
-import { download } from '../utils';
-export function BackupControls({ entries, ids, apply }: { entries: Entries; ids: string[]; apply: (entries: Entries) => void }) {
+import { useState } from "react";
+import {
+  backup,
+  stashBeforeReplace,
+  validateBackup,
+  importEntries,
+  unknownIds,
+  type Entries,
+} from "../storage";
+import { download } from "../utils";
+export function BackupControls({
+  entries,
+  ids,
+  apply,
+}: {
+  entries: Entries;
+  ids: string[];
+  apply: (entries: Entries) => void;
+}) {
   const [preview, setPreview] = useState<Entries | null>(null);
-  const [error, setError] = useState('');
-  const [mode, setMode] = useState<'merge' | 'replace'>('merge');
-  return <div className="backup-controls"><button className="button" onClick={() => download(JSON.stringify(backup(entries), null, 2), 'tcg-pipeline-backup.json', 'application/json')}>Export notes + stages</button><label className="button">Import JSON<input type="file" accept="application/json,.json" onChange={async e => { const file = e.target.files?.[0]; e.target.value = ''; if (!file) return; setPreview(null); try { setPreview(validateBackup(JSON.parse(await file.text())).entries); setError(''); } catch (err) { setError(err instanceof Error ? err.message : 'Could not read backup'); } }} /></label>{error && <p role="alert">{error}</p>}{preview && <section className="import-preview" aria-label="Import preview"><strong>Preview: {Object.keys(preview).length} entries</strong><p>{unknownIds(preview, ids).length} IDs absent from current data (kept): {unknownIds(preview, ids).join(', ') || 'none'}</p><label>Import mode <select value={mode} onChange={e => setMode(e.target.value as typeof mode)}><option value="merge">Merge — imported entries overwrite matching IDs</option><option value="replace">Replace — discard all existing entries, including absent IDs</option></select></label><p>{mode === 'replace' ? 'Only entries in this backup will remain.' : 'Other saved entries will remain, including absent IDs.'}</p><button className="button" onClick={() => { apply(importEntries(entries, preview, mode)); setPreview(null); }}>Confirm import</button><button className="button" onClick={() => setPreview(null)}>Cancel</button></section>}</div>;
+  const [error, setError] = useState("");
+  const [status, setStatus] = useState("");
+  const [mode, setMode] = useState<"merge" | "replace">("merge");
+  const absent = preview ? unknownIds(preview, ids) : [];
+  return (
+    <div className="backup-controls">
+      <button
+        className="button"
+        onClick={() =>
+          download(
+            JSON.stringify(backup(entries), null, 2),
+            "tcg-pipeline-backup.json",
+            "application/json",
+          )
+        }
+      >
+        Export notes + stages
+      </button>
+      <label className="button">
+        Import JSON
+        <input
+          type="file"
+          accept="application/json,.json"
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (!file) return;
+            setPreview(null);
+            try {
+              if (file.size > 5 * 1024 * 1024)
+                throw new Error("Backup is too large (maximum 5 MB).");
+              setPreview(validateBackup(JSON.parse(await file.text())).entries);
+              setError("");
+            } catch (err) {
+              setError(
+                err instanceof Error ? err.message : "Could not read backup",
+              );
+            }
+          }}
+        />
+      </label>
+      <p role="status">{status}</p>
+      {error && <p role="alert">{error}</p>}
+      {preview && (
+        <section className="import-preview" aria-label="Import preview">
+          <strong>Preview: {Object.keys(preview).length} entries</strong>
+          <p>
+            {absent.length} IDs absent from current data (kept):{" "}
+            {absent.slice(0, 20).join(", ") || "none"}
+            {absent.length > 20 && ` … and ${absent.length - 20} more`}
+          </p>
+          <label>
+            Import mode{" "}
+            <select
+              value={mode}
+              onChange={(e) => setMode(e.target.value as typeof mode)}
+            >
+              <option value="merge">
+                Merge — keep the newest stage and note for each ID
+              </option>
+              <option value="replace">
+                Replace — discard all existing entries, including absent IDs
+              </option>
+            </select>
+          </label>
+          <p>
+            {mode === "replace"
+              ? "Only imported entries will remain. Your current entries will be backed up on this device first."
+              : "Other saved entries will remain, including absent IDs."}
+          </p>
+          <button
+            className="button"
+            onClick={() => {
+              try {
+                if (mode === "replace") stashBeforeReplace(entries);
+                apply(importEntries(entries, preview, mode));
+                setStatus(
+                  `Imported ${Object.keys(preview).length} entries (${mode}).`,
+                );
+                setError("");
+                setPreview(null);
+              } catch {
+                setError(
+                  "Could not preserve the current entries. Export a backup and free device storage before replacing.",
+                );
+              }
+            }}
+          >
+            Confirm import
+          </button>
+          <button className="button" onClick={() => setPreview(null)}>
+            Cancel
+          </button>
+        </section>
+      )}
+    </div>
+  );
 }

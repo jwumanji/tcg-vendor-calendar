@@ -67,3 +67,12 @@ Unknown values are `null`; nothing is invented.
   - `logo_kind`: `logo` or `poster_or_photo`
 
 Thumbnails can be shared, so one file may serve several events (for example CAPS and NEXUS).
+
+## App metadata and publishing
+
+`meta.json` records the source data's `updatedAt` date (ISO `YYYY-MM-DD`).
+Update it alongside `events.json` on each data refresh; it drives the displayed
+last-updated date and calendar `LAST-MODIFIED` values. It is the source snapshot
+date, not the build date or an event's future date. The current value comes from
+the export date above. The app deploys on pushes to `main` or a manual workflow
+run. There is no scheduled data fetch or rebuild in this repository.

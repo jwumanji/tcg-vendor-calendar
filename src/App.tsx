@@ -1,84 +1,77 @@
+import { CalendarView } from "./components/CalendarView";
 import { EventCard } from "./components/EventCard";
-import { Logo, Status } from "./components/EventIdentity";
+import { Logo, CountryFlag } from "./components/EventIdentity";
 import { Detail } from "./components/Detail";
 import { Pipeline, StageBadge } from "./components/Pipeline";
 import { BackupControls } from "./components/BackupControls";
-import { stages, emptyEntry, loadEntries, saveValue, backup, STORAGE_KEY, type Entries, type Stage } from "./storage";
-import { useState, useEffect, useCallback } from "react";
+import { stages, emptyEntry, saveValue, type Stage } from "./storage";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 
 import {
   ArrowUpRight,
   CalendarDays,
-  ChevronLeft,
-  ChevronRight,
   SlidersHorizontal,
   Search,
   X,
   Download,
   Sun,
   Moon,
-  MapPin,
   Bookmark,
   Layers,
   LayoutList,
   Clock,
 } from "lucide-react";
 import raw from "../data/events.json";
-import type { Event, Filters } from "./model";
+import { useEntries } from "./hooks/useEntries";
+import { useFilters, stored } from "./hooks/useFilters";
+import { useToday } from "./hooks/useToday";
+import { normalizeEvents } from "./data";
+import meta from "../data/meta.json";
+import type { Event } from "./model";
 import { emptyFilters } from "./model";
 import {
-  games,
+  compareText,
+  dateSortKey,
+  nextMonth,
+  upcoming,
+  timelineGroups,
   gameRules,
   ranges,
   matches,
   monthLabel,
-  monthEnd,
   prettyDate,
   dateLabel,
-  flag,
   deadlineDate,
-  safeUrl,
   ics,
   csv,
   download,
 } from "./utils";
 import "./style.css";
-const events = raw as Event[];
-function stored<T>(key: string, fallback: T): T {
-  try {
-    return JSON.parse(localStorage.getItem(key) || "null") ?? fallback;
-  } catch {
-    return fallback;
-  }
-}
-const today = new Date().toLocaleDateString("en-CA");
-const upcoming = (e: Event) =>
-  e.date_status === "tba" ||
-  (e.estimated_month
-    ? monthEnd(e.estimated_month) >= today
-    : ranges(e).some((r) => r.end_date >= today));
-const initialMonth = events.some((e) =>
-  ranges(e).some((r) => r.start_date.slice(0, 7) === today.slice(0, 7)),
-)
-  ? today.slice(0, 7)
-  : "2027-01";
 export default function App() {
-  const [filters, setFilters] = useState<Filters>(() => ({
-    ...emptyFilters,
-    ...stored("tcg-filters", {}),
-  }));
-  const [loaded] = useState(() => { try { return loadEntries(localStorage); } catch { return { entries: {}, error: "Storage is unavailable. Export a backup to keep your changes." }; } });
-  const [entries, setEntries] = useState<Entries>(loaded.entries);
-  const [storageError, setStorageError] = useState(loaded.error);
-  const [saved, setSaved] = useState(false);
-  const [canSave, setCanSave] = useState(!loaded.error);
-  const [showPassed, setShowPassed] = useState(() => stored<boolean>("tcg-show-passed-v1", false));
-  function update(id: string, field: 'stage' | 'note', value: string) {
-    setSaved(false);
-    setCanSave(true);
-    setEntries(current => ({ ...current, [id]: { ...(current[id] || emptyEntry), [field]: value, [field === 'stage' ? 'stageUpdatedAt' : 'noteUpdatedAt']: new Date().toISOString() } }));
-  }
-  const visible = (e: Event) => showPassed || !['Pass', 'Too expensive'].includes((entries[e.id] || emptyEntry).stage);
+  const events = useMemo(() => normalizeEvents(raw), []);
+  const today = useToday();
+  const initialMonth = nextMonth(events, today);
+  const {
+    entries,
+    update,
+    applyEntries,
+    saved,
+    storageError,
+    setStorageError,
+    canSave,
+    acknowledgeRecovery,
+  } = useEntries();
+  const { filters, setFilters, set } = useFilters(setStorageError);
+  const [showPassed, setShowPassed] = useState(
+    () => stored("tcg-show-passed-v1") === true,
+  );
+  const visible = useCallback(
+    (e: Event) =>
+      showPassed ||
+      filters.stages.includes((entries[e.id] || emptyEntry).stage) ||
+      !["Pass", "Too expensive"].includes((entries[e.id] || emptyEntry).stage),
+    [showPassed, filters.stages, entries],
+  );
   const closeDetail = useCallback(() => setSelected(null), []);
   const [view, setView] = useState("Calendar");
   const [month, setMonth] = useState(initialMonth);
@@ -87,45 +80,59 @@ export default function App() {
   const [sort, setSort] = useState("date");
   const [groupByStage, setGroupByStage] = useState(false);
   const [theme, setTheme] = useState(() =>
-    stored<string>("tcg-theme", "system"),
+    ["light", "dark"].includes(String(stored("tcg-theme")))
+      ? String(stored("tcg-theme"))
+      : "system",
   );
   useEffect(() => {
-    const error = saveValue("tcg-filters", filters); if (error) setStorageError(error);
-  }, [filters]);
-  useEffect(() => {
-    if (!canSave) return;
-    const error = saveValue(STORAGE_KEY, backup(entries));
-    setSaved(!error); if (error) setStorageError(error);
-  }, [entries, canSave]);
-  useEffect(() => { const error = saveValue("tcg-show-passed-v1", showPassed); if (error) setStorageError(error); }, [showPassed]);
+    const error = saveValue("tcg-show-passed-v1", showPassed);
+    if (error) setStorageError(error);
+  }, [showPassed]);
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
-    const error = saveValue("tcg-theme", theme); if (error) setStorageError(error);
+    const error = saveValue("tcg-theme", theme);
+    if (error) setStorageError(error);
   }, [theme]);
-  const set = <K extends keyof Filters>(key: K, value: Filters[K]) =>
-    setFilters((f) => ({ ...f, [key]: value }));
-  const filtered = events.filter((e) => matches(e, filters, entries) && (view === "Pipeline" || visible(e)));
-  const top = events
-    .filter((e) => visible(e) && upcoming(e) && e.vendor_score !== null)
-    .sort((a, b) => (b.vendor_score || 0) - (a.vendor_score || 0));
-  const deadlines = events
-    .filter((e) => visible(e) && e.vendor_deadline && upcoming(e))
-    .sort((a, b) =>
-      (deadlineDate(a.vendor_deadline) || "9999").localeCompare(
-        deadlineDate(b.vendor_deadline) || "9999",
+  const filtered = useMemo(
+    () =>
+      events.filter(
+        (e) =>
+          matches(e, filters, entries) && (view === "Pipeline" || visible(e)),
       ),
-    )
-    .filter(
-      (e) =>
-        !deadlineDate(e.vendor_deadline) ||
-        deadlineDate(e.vendor_deadline)! >= today,
-    );
+    [events, filters, entries, view, visible],
+  );
+  const top = useMemo(
+    () =>
+      events
+        .filter(
+          (e) => visible(e) && upcoming(e, today) && e.vendor_score !== null,
+        )
+        .sort((a, b) => (b.vendor_score || 0) - (a.vendor_score || 0)),
+    [events, visible, today],
+  );
+  const deadlines = useMemo(
+    () =>
+      events
+        .filter((e) => visible(e) && e.vendor_deadline && upcoming(e, today))
+        .sort((a, b) =>
+          (deadlineDate(a.vendor_deadline) || "9999").localeCompare(
+            deadlineDate(b.vendor_deadline) || "9999",
+          ),
+        )
+        .filter(
+          (e) =>
+            !deadlineDate(e.vendor_deadline) ||
+            deadlineDate(e.vendor_deadline)! >= today,
+        ),
+    [events, visible, today],
+  );
   const datedDeadlines = deadlines.filter((e) =>
     deadlineDate(e.vendor_deadline),
   );
-  const chips: { label: string; clear: () => void }[] = [];
+  const chips: { id: string; label: string; clear: () => void }[] = [];
   for (const c of filters.countries)
     chips.push({
+      id: `country:${c}`,
       label: c,
       clear: () =>
         set(
@@ -135,6 +142,7 @@ export default function App() {
     });
   for (const c of filters.games)
     chips.push({
+      id: `game:${c}`,
       label: c,
       clear: () =>
         set(
@@ -143,92 +151,104 @@ export default function App() {
         ),
     });
   if (filters.search)
-    chips.push({ label: filters.search, clear: () => set("search", "") });
+    chips.push({
+      id: "search",
+      label: filters.search,
+      clear: () => set("search", ""),
+    });
   for (const k of ["priority", "size", "from", "to", "status"] as const)
     if (filters[k] && filters[k] !== "any")
       chips.push({
-        label: `${k}: ${filters[k]}`,
+        id: k,
+        label:
+          k === "from"
+            ? `From ${prettyDate(filters.from)}`
+            : k === "to"
+              ? `Until ${prettyDate(filters.to)}`
+              : k === "priority"
+                ? filters.priority === "top"
+                  ? "Top priority markets"
+                  : "High or top priority markets"
+                : `${k === "size" ? "Size" : "Date status"}: ${filters[k]}`,
         clear: () => set(k, emptyFilters[k]),
       });
-  for (const stage of filters.stages) chips.push({ label: stage, clear: () => set("stages", filters.stages.filter(s => s !== stage)) });
+  for (const stage of filters.stages)
+    chips.push({
+      id: `stage:${stage}`,
+      label: stage,
+      clear: () =>
+        set(
+          "stages",
+          filters.stages.filter((s) => s !== stage),
+        ),
+    });
   if (filters.score)
     chips.push({
+      id: "score",
       label: `Score ≥ ${filters.score}`,
       clear: () => set("score", 0),
     });
   if (!filters.tba)
-    chips.push({ label: "TBA excluded", clear: () => set("tba", true) });
-  const sorted = [...filtered].sort((a, b) =>
-    sort === "stage"
-      ? stages.indexOf((entries[a.id] || emptyEntry).stage) - stages.indexOf((entries[b.id] || emptyEntry).stage) || a.name.localeCompare(b.name)
-      : sort === "name"
-      ? a.name.localeCompare(b.name)
-      : sort === "score"
-        ? (b.vendor_score ?? -1) - (a.vendor_score ?? -1)
-        : sort === "country"
-          ? (a.country || "ZZZ").localeCompare(b.country || "ZZZ")
-          : sort === "size"
-            ? ["S", "M", "L", "XL"].indexOf(b.size_tier || "") -
-              ["S", "M", "L", "XL"].indexOf(a.size_tier || "")
-            : (a.start_date || a.estimated_month || "9999").localeCompare(
-                b.start_date || b.estimated_month || "9999",
-              ),
+    chips.push({
+      id: "tba",
+      label: "TBA excluded",
+      clear: () => set("tba", true),
+    });
+  const sorted = useMemo(
+    () =>
+      [...filtered].sort((a, b) =>
+        sort === "stage"
+          ? stages.indexOf((entries[a.id] || emptyEntry).stage) -
+              stages.indexOf((entries[b.id] || emptyEntry).stage) ||
+            compareText(a.name, b.name)
+          : sort === "name"
+            ? compareText(a.name, b.name)
+            : sort === "score"
+              ? (b.vendor_score ?? -1) - (a.vendor_score ?? -1)
+              : sort === "country"
+                ? a.country && b.country
+                  ? compareText(a.country, b.country)
+                  : a.country
+                    ? -1
+                    : b.country
+                      ? 1
+                      : compareText(a.name, b.name)
+                : sort === "size"
+                  ? ["S", "M", "L", "XL"].indexOf(b.size_tier || "") -
+                    ["S", "M", "L", "XL"].indexOf(a.size_tier || "")
+                  : compareText(dateSortKey(a, today), dateSortKey(b, today)) ||
+                    compareText(a.name, b.name),
+      ),
+    [filtered, sort, entries, today],
   );
   function card(e: Event, occurrence?: string) {
-    return <EventCard key={e.id + (occurrence || '')} e={e} entry={entries[e.id] || emptyEntry} occurrence={occurrence} open={() => setSelected(e)} />;
+    return (
+      <EventCard
+        key={e.id + (occurrence || "")}
+        e={e}
+        entry={entries[e.id] || emptyEntry}
+        occurrence={occurrence}
+        open={setSelected}
+      />
+    );
   }
-  const monthEvents = filtered.filter(
-    (e) =>
-      e.date_status === "confirmed" &&
-      ranges(e).some(
-        (r) => r.start_date <= monthEnd(month) && r.end_date >= month + "-01",
-      ),
+  const groups = useMemo(
+    () => timelineGroups(sorted, filters, entries, groupByStage),
+    [sorted, filters, entries, groupByStage],
   );
-  const estimated = filtered.filter(
-    (e) => e.date_status === "estimated" && e.estimated_month === month,
-  );
-  const tba = filtered.filter((e) => e.date_status === "tba");
-  const shift = (n: number) => {
-    const d = new Date(month + "-02T12:00:00");
-    d.setMonth(d.getMonth() + n);
-    setMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
-  };
-  const groups = new Map<string, { e: Event; label?: string }[]>();
-  for (const e of sorted) {
-    const keys =
-      groupByStage ? [(entries[e.id] || emptyEntry).stage] : e.date_status === "confirmed"
-        ? Array.from(new Set(ranges(e).map((r) => r.start_date.slice(0, 7))))
-        : [e.estimated_month || "9999"];
-    for (const k of keys) {
-      if (
-        !groupByStage && ((filters.from && k !== "9999" && k < filters.from.slice(0, 7)) ||
-        (filters.to && k !== "9999" && k > filters.to.slice(0, 7)))
-      )
-        continue;
-      groups.set(k, [
-        ...(groups.get(k) || []),
-        {
-          e,
-          label: !groupByStage && e.occurrences
-            ? ranges(e)
-                .filter((r) => r.start_date.startsWith(k))
-                .map(
-                  (r) =>
-                    prettyDate(r.start_date) +
-                    (r.end_date !== r.start_date
-                      ? "–" + prettyDate(r.end_date)
-                      : ""),
-                )
-                .join(" · ")
-            : undefined,
-        },
-      ]);
-    }
-  }
+  const filterTrigger = useRef<HTMLButtonElement>(null);
+  const filterPanel = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!filterOpen) return;
+    filterPanel.current?.focus();
+    return () => {
+      filterTrigger.current?.focus();
+    };
+  }, [filterOpen]);
   return (
     <>
       <header className="header">
-        <a className="brand" href="#">
+        <a className="brand" href="#main">
           <span className="brand-mark">
             <Layers size={23} />
           </span>
@@ -255,9 +275,31 @@ export default function App() {
           <span className="avatar">J</span>
         </div>
       </header>
-      <main>
-        {storageError && <p role="alert" className="storage-warning">{storageError}</p>}
-        <section className="stage-overview" aria-label="Pipeline overview">{stages.map(stage => <span key={stage}><StageBadge stage={stage} /> <strong>{events.filter(e => (entries[e.id] || emptyEntry).stage === stage).length}</strong></span>)}</section>
+      <main id="main" tabIndex={-1}>
+        {storageError && (
+          <div role="alert" className="storage-warning">
+            <p>{storageError}</p>
+            {!canSave && (
+              <button className="button" onClick={acknowledgeRecovery}>
+                Preserve original and resume saving
+              </button>
+            )}
+          </div>
+        )}
+        <section className="stage-overview" aria-label="Pipeline overview">
+          {stages.map((stage) => (
+            <span key={stage}>
+              <StageBadge stage={stage} />{" "}
+              <strong>
+                {
+                  events.filter(
+                    (e) => (entries[e.id] || emptyEntry).stage === stage,
+                  ).length
+                }
+              </strong>
+            </span>
+          ))}
+        </section>
         <section className="intro">
           <div>
             <div className="eyebrow">
@@ -308,11 +350,7 @@ export default function App() {
             </div>
             <div className="pick-grid">
               {top.slice(0, 3).map((e) => (
-                <button
-                  className="pick"
-                  key={e.id}
-                  onClick={() => setSelected(e)}
-                >
+                <article className="pick" key={e.id}>
                   <div className="pick-meta">
                     <Logo e={e} />
                     <span className="pick-score">
@@ -321,12 +359,25 @@ export default function App() {
                     </span>
                     <ArrowUpRight size={18} />
                   </div>
-                  <h3>{e.name}</h3><StageBadge stage={(entries[e.id] || emptyEntry).stage} />{entries[e.id]?.note.trim() && <span> 📝 Notes</span>}
+                  <h3>
+                    <button
+                      className="stretched-button"
+                      onClick={() => setSelected(e)}
+                    >
+                      {e.name}
+                      <span className="sr-only">
+                        {" "}
+                        · {dateLabel(e)} · {(entries[e.id] || emptyEntry).stage}
+                      </span>
+                    </button>
+                  </h3>
+                  <StageBadge stage={(entries[e.id] || emptyEntry).stage} />
+                  {entries[e.id]?.note.trim() && <span> 📝 Notes</span>}
                   <p>
-                    {flag(e.country_code)} {e.city || e.country}{" "}
+                    <CountryFlag code={e.country_code} /> {e.city || e.country}{" "}
                     <span>· {dateLabel(e)}</span>
                   </p>
-                </button>
+                </article>
               ))}
             </div>
           </div>
@@ -343,7 +394,9 @@ export default function App() {
                     ? prettyDate(deadlineDate(e.vendor_deadline)!)
                     : "CHECK DETAILS"}
                 </span>
-                <strong>{e.name}</strong><StageBadge stage={(entries[e.id] || emptyEntry).stage} />{entries[e.id]?.note.trim() && <span>📝 Notes</span>}
+                <strong>{e.name}</strong>
+                <StageBadge stage={(entries[e.id] || emptyEntry).stage} />
+                {entries[e.id]?.note.trim() && <span>📝 Notes</span>}
                 <span className="deadline-copy">{e.vendor_deadline}</span>
                 <ArrowUpRight size={15} />
               </button>
@@ -357,7 +410,7 @@ export default function App() {
           <div className="workspace-heading">
             <div>
               <div className="eyebrow">BUILD YOUR 2027 CIRCUIT</div>
-              <h2>
+              <h2 id="workspace-title" tabIndex={-1}>
                 Explore the calendar<span>.</span>
               </h2>
             </div>
@@ -376,6 +429,11 @@ export default function App() {
               </button>
               <button
                 className="button"
+                disabled={
+                  !filtered.some(
+                    (e) => e.date_status === "confirmed" && ranges(e).length,
+                  )
+                }
                 onClick={() =>
                   download(
                     ics(filtered),
@@ -384,13 +442,29 @@ export default function App() {
                   )
                 }
               >
-                <Download size={16} /> Export filtered .ics
+                <Download size={16} /> Export .ics (confirmed only)
               </button>
             </div>
           </div>
-          <BackupControls entries={entries} ids={events.map(e => e.id)} apply={value => { setCanSave(true); setSaved(false); setEntries(value); }} />
-          <label className="passed-toggle"><input type="checkbox" checked={showPassed} onChange={e => setShowPassed(e.target.checked)} /> Show passed / too expensive</label>
-          {view === 'Pipeline' && <p>Pipeline includes passed / too expensive events. Search and filters still apply.</p>}
+          <BackupControls
+            entries={entries}
+            ids={events.map((e) => e.id)}
+            apply={applyEntries}
+          />
+          <label className="passed-toggle">
+            <input
+              type="checkbox"
+              checked={showPassed}
+              onChange={(e) => setShowPassed(e.target.checked)}
+            />{" "}
+            Show passed / too expensive
+          </label>
+          {view === "Pipeline" && (
+            <p>
+              Pipeline includes passed / too expensive events. Search and
+              filters still apply.
+            </p>
+          )}
           <nav className="tabs" aria-label="Event views">
             {[
               "Calendar",
@@ -403,6 +477,7 @@ export default function App() {
               <button
                 key={v}
                 className={view === v ? "active" : ""}
+                aria-current={view === v ? "page" : undefined}
                 onClick={() => setView(v)}
               >
                 {i === 0 ? (
@@ -413,7 +488,6 @@ export default function App() {
                   <Bookmark size={16} />
                 ) : null}
                 {v}
-
               </button>
             ))}
           </nav>
@@ -432,18 +506,29 @@ export default function App() {
               onClick={() => setFilterOpen(!filterOpen)}
               aria-expanded={filterOpen}
               aria-controls="filters"
+              ref={filterTrigger}
             >
               <SlidersHorizontal size={16} /> Filters{" "}
               {chips.length > 0 && (
                 <span className="count">{chips.length}</span>
               )}
             </button>
-            <span className="result-count">{filtered.length} events</span>
+            <span className="result-count" role="status" aria-live="polite">
+              {filtered.length} events
+            </span>
           </div>
           {filterOpen && (
             <section
               className="filters"
               id="filters"
+              ref={filterPanel}
+              tabIndex={-1}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  e.stopPropagation();
+                  setFilterOpen(false);
+                }
+              }}
               aria-label="Event filters"
             >
               <div className="filter-heading">
@@ -579,7 +664,26 @@ export default function App() {
                       onChange={(e) => set("score", +e.target.value)}
                     />
                   </label>
-                  <fieldset><legend>Pipeline stages</legend>{stages.map(stage => <label className="check" key={stage}><input type="checkbox" checked={filters.stages.includes(stage)} onChange={() => set("stages", filters.stages.includes(stage) ? filters.stages.filter(s => s !== stage) : [...filters.stages, stage])} />{stage}</label>)}</fieldset>
+                  <fieldset>
+                    <legend>Pipeline stages</legend>
+                    {stages.map((stage) => (
+                      <label className="check" key={stage}>
+                        <input
+                          type="checkbox"
+                          checked={filters.stages.includes(stage)}
+                          onChange={() =>
+                            set(
+                              "stages",
+                              filters.stages.includes(stage)
+                                ? filters.stages.filter((s) => s !== stage)
+                                : [...filters.stages, stage],
+                            )
+                          }
+                        />
+                        {stage}
+                      </label>
+                    ))}
+                  </fieldset>
                   <button
                     className="text-button"
                     onClick={() => setFilters(emptyFilters)}
@@ -593,7 +697,11 @@ export default function App() {
           {chips.length > 0 && (
             <div className="chips">
               {chips.map((c) => (
-                <button key={c.label} onClick={c.clear}>
+                <button
+                  key={c.id}
+                  onClick={c.clear}
+                  aria-label={`Remove filter ${c.label}`}
+                >
                   {c.label}
                   <X size={12} />
                 </button>
@@ -606,157 +714,49 @@ export default function App() {
               </button>
             </div>
           )}
-          {view === "Timeline" && <label className="passed-toggle"><input type="checkbox" checked={groupByStage} onChange={e => setGroupByStage(e.target.checked)} />Group by pipeline stage</label>}
-          {view === "Pipeline" ? <Pipeline events={filtered} entries={entries} open={setSelected} change={(e, stage) => { update(e.id, 'stage', stage); if (stage === 'Too expensive') setSelected(e); }} /> : view === "Calendar" ? (
-            <>
-              <div className="month-header">
-                <div>
-                  <h3>{monthLabel(month)}</h3>
-                  <span>
-                    {monthEvents.length} confirmed shows · {estimated.length}{" "}
-                    estimated
-                  </span>
-                </div>
-                <div className="month-controls">
-                  <button
-                    className="button"
-                    onClick={() => setMonth(initialMonth)}
-                  >
-                    Season start
-                  </button>
-                  <button
-                    className="icon-button"
-                    onClick={() => shift(-1)}
-                    aria-label="Previous month"
-                  >
-                    <ChevronLeft size={20} />
-                  </button>
-                  <button
-                    className="icon-button"
-                    onClick={() => shift(1)}
-                    aria-label="Next month"
-                  >
-                    <ChevronRight size={20} />
-                  </button>
-                </div>
-              </div>
-              <div className="calendar-grid">
-                <div className="weekdays">
-                  {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(
-                    (d) => (
-                      <span key={d}>{d}</span>
-                    ),
-                  )}
-                </div>
-                <div className="days">
-                  {Array.from(
-                    {
-                      length:
-                        (new Date(month + "-01T12:00:00").getDay() + 6) % 7,
-                    },
-                    (_, i) => (
-                      <div className="day outside" key={"pad" + i} />
-                    ),
-                  )}
-                  {Array.from(
-                    { length: +monthEnd(month).slice(-2) },
-                    (_, i) => {
-                      const date = month + "-" + String(i + 1).padStart(2, "0");
-                      return (
-                        <div
-                          className={"day " + (date === today ? "today" : "")}
-                          key={date}
-                        >
-                          <span className="day-number">{i + 1}</span>
-                          {monthEvents
-                            .filter((e) =>
-                              ranges(e).some(
-                                (r) =>
-                                  r.start_date <= date && r.end_date >= date,
-                              ),
-                            )
-                            .map((e) => (
-                              <button
-                                key={e.id}
-                                className={
-                                  "calendar-event " +
-                                  (e.section === "recurring_sg"
-                                    ? "recurring"
-                                    : "")
-                                }
-                                onClick={() => setSelected(e)}
-                              >
-                                <span>●</span> {e.name} <StageBadge stage={(entries[e.id] || emptyEntry).stage} />{entries[e.id]?.note.trim() && <span title="Has notes">📝</span>}
-                              </button>
-                            ))}
-                        </div>
-                      );
-                    },
-                  )}
-                </div>
-              </div>
-              <div className="mobile-agenda">
-                {monthEvents.length ? (
-                  monthEvents.map((e) =>
-                    card(
-                      e,
-                      ranges(e)
-                        .filter(
-                          (r) =>
-                            r.start_date <= monthEnd(month) &&
-                            r.end_date >= month + "-01",
-                        )
-                        .map(
-                          (r) =>
-                            prettyDate(r.start_date) +
-                            (r.end_date !== r.start_date
-                              ? " – " + prettyDate(r.end_date)
-                              : ""),
-                        )
-                        .join(" · "),
-                    ),
-                  )
-                ) : (
-                  <div className="empty">
-                    No confirmed shows this month. Try another month or adjust
-                    your filters.
-                  </div>
-                )}
-              </div>
-              {estimated.length > 0 && (
-                <section className="estimated-strip">
-                  <h4>
-                    ◷ Estimated this month{" "}
-                    <span>Dates are not booking-ready</span>
-                  </h4>
-                  <div className="cards">{estimated.map((e) => card(e))}</div>
-                </section>
-              )}
-              {tba.length > 0 && (
-                <section className="tba-section">
-                  <h4>
-                    ◇ Dates to be announced{" "}
-                    <span>{tba.length} on your radar</span>
-                  </h4>
-                  <div className="tba-links">
-                    {tba.map((e) => (
-                      <button key={e.id} onClick={() => setSelected(e)}>
-                        {e.name}<StageBadge stage={(entries[e.id] || emptyEntry).stage} />{entries[e.id]?.note.trim() && <span>📝 Notes</span>}
-                        <ArrowUpRight size={14} />
-                      </button>
-                    ))}
-                  </div>
-                </section>
-              )}
-            </>
+          {view === "Timeline" && (
+            <label className="passed-toggle">
+              <input
+                type="checkbox"
+                checked={groupByStage}
+                onChange={(e) => setGroupByStage(e.target.checked)}
+              />
+              Group by pipeline stage
+            </label>
+          )}
+          {view === "Pipeline" ? (
+            <Pipeline
+              events={filtered}
+              entries={entries}
+              open={setSelected}
+              change={(e, stage) => update(e.id, "stage", stage)}
+            />
+          ) : view === "Calendar" ? (
+            <CalendarView
+              filtered={filtered}
+              entries={entries}
+              month={month}
+              setMonth={setMonth}
+              initialMonth={initialMonth}
+              today={today}
+              setSelected={setSelected}
+            />
           ) : view === "Timeline" ? (
             <div className="timeline">
               {[...groups]
-                .sort(([a], [b]) => groupByStage ? stages.indexOf(a as Stage) - stages.indexOf(b as Stage) : a.localeCompare(b))
+                .sort(([a], [b]) =>
+                  groupByStage
+                    ? stages.indexOf(a as Stage) - stages.indexOf(b as Stage)
+                    : a.localeCompare(b),
+                )
                 .map(([m, items]) => (
                   <section key={m}>
                     <h3>
-                      {groupByStage ? m : m === "9999" ? "Dates to be announced" : monthLabel(m)}
+                      {groupByStage
+                        ? m
+                        : m === "9999"
+                          ? "Dates to be announced"
+                          : monthLabel(m)}
                       <span>{items.length} events</span>
                     </h3>
                     <div className="cards">
@@ -798,8 +798,7 @@ export default function App() {
                     (e) =>
                       view === "List" ||
                       (view === "Watchlist" && e.section === "watchlist") ||
-                      (view === "Recurring SG" &&
-                        e.section === "recurring_sg"),
+                      (view === "Recurring SG" && e.section === "recurring_sg"),
                   )
                   .map((e) => (
                     <div key={e.id}>
@@ -827,12 +826,8 @@ export default function App() {
               ) && (
                 <div className="empty">
                   <Bookmark size={30} />
-                  <h3>
-No matching events
-                  </h3>
-                  <p>
-Try broadening your filters.
-                  </p>
+                  <h3>No matching events</h3>
+                  <p>Try broadening your filters.</p>
                 </div>
               )}
             </>
@@ -854,7 +849,7 @@ Try broadening your filters.
             <Layers size={16} /> FIELDNOTES{" "}
             <span>Built for your next move.</span>
           </span>
-          <span>Data last updated 16 Nov 2026</span>
+          <span>Data last updated {prettyDate(meta.updatedAt)}</span>
           <small>
             Verify dates and vendor terms with organizers before booking.
           </small>
@@ -867,8 +862,8 @@ Try broadening your filters.
           key={selected.id}
           entry={entries[selected.id] || emptyEntry}
           saved={saved}
-          onStage={stage => update(selected.id, 'stage', stage)}
-          onNote={note => update(selected.id, 'note', note)}
+          onStage={(stage) => update(selected.id, "stage", stage)}
+          onNote={(note) => update(selected.id, "note", note)}
         />
       )}
     </>

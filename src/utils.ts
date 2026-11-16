@@ -1,4 +1,5 @@
 import { emptyEntry, type Entries } from "./storage";
+import meta from "../data/meta.json";
 import type { Event, Filters } from "./model";
 export const gameRules: [string, RegExp][] = [
   ["Pokémon", /pok[eé]mon/i],
@@ -27,14 +28,29 @@ export function ranges(e: Event) {
       ? [{ start_date: e.start_date, end_date: e.end_date || e.start_date }]
       : [];
 }
+const normalizeSearch = (s: string) =>
+  s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 export function matches(e: Event, f: Filters, p: Entries) {
   if (
     f.search &&
-    ![e.name, e.city, e.venue, e.organizer, e.description, ...e.games]
-      .filter(Boolean)
-      .join(" ")
-      .toLowerCase()
-      .includes(f.search.toLowerCase())
+    !normalizeSearch(
+      [
+        e.name,
+        e.city,
+        e.country,
+        e.country_code,
+        e.country_code === "AE" ? "UAE" : "",
+        e.venue,
+        e.organizer,
+        e.description,
+        e.fit,
+        e.audience,
+        e.games_note,
+        ...e.games,
+      ]
+        .filter(Boolean)
+        .join(" "),
+    ).includes(normalizeSearch(f.search))
   )
     return false;
   if (f.countries.length && !f.countries.includes(e.country || "Unknown"))
@@ -57,6 +73,7 @@ export function matches(e: Event, f: Filters, p: Entries) {
   if (f.score > 0 && (e.vendor_score === null || e.vendor_score < f.score))
     return false;
   if (e.date_status === "tba") return f.tba;
+  if (!f.from && !f.to) return true;
   const rr =
     e.date_status === "estimated" && e.estimated_month
       ? [
@@ -84,6 +101,7 @@ export function prettyDate(d: string) {
   return new Date(d + "T12:00:00").toLocaleDateString("en-GB", {
     day: "numeric",
     month: "short",
+    year: "numeric",
   });
 }
 export function dateLabel(e: Event) {
@@ -104,19 +122,65 @@ export function flag(code: string | null) {
 }
 export function deadlineDate(s: string | null) {
   if (!s) return null;
-  const match =
-    s.match(
-      /\b(\d{1,2})\s+(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(20\d{2})\b/i,
-    ) || s.match(/\b(20\d{2})-(\d{2})-(\d{2})\b/);
-  if (!match) return null;
-  const t = Date.parse(match[0] + " UTC");
-  return Number.isNaN(t) ? null : new Date(t).toISOString().slice(0, 10);
+  const months = [
+    "jan",
+    "feb",
+    "mar",
+    "apr",
+    "may",
+    "jun",
+    "jul",
+    "aug",
+    "sep",
+    "oct",
+    "nov",
+    "dec",
+  ];
+  const pattern =
+    /\b(?:(\d{1,2})\s+(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(20\d{2})|(20\d{2})-(\d{2})-(\d{2}))\b/gi;
+  const found = [...s.matchAll(pattern)];
+  const candidates = found.flatMap((match, position) => {
+    const y = Number(match[3] || match[4]);
+    const m = match[2]
+      ? months.indexOf(match[2].slice(0, 3).toLowerCase())
+      : Number(match[5]) - 1;
+    const d = Number(match[1] || match[6]);
+    const date = new Date(Date.UTC(y, m, d));
+    if (
+      date.getUTCFullYear() !== y ||
+      date.getUTCMonth() !== m ||
+      date.getUTCDate() !== d
+    )
+      return [];
+    const index = match.index!;
+    const previous = found[position - 1];
+    const next = found[position + 1];
+    const before =
+      s
+        .slice(previous ? previous.index! + previous[0].length : 0, index)
+        .split(/[;,\n.]/)
+        .at(-1) || "";
+    const after = s
+      .slice(index + match[0].length, next?.index)
+      .split(/[;,\n.]/)[0];
+    const label =
+      /\b(vendors?|booths?|exhibitors?|deadline|apply|application|closes?|due|players?)\b/i;
+    // Labels normally precede a date. Limit context to adjacent dates so a
+    // later vendor label cannot turn an earlier player date into a deadline.
+    const context = label.test(before) ? before : after;
+    const score =
+      (/\b(vendors?|booths?|exhibitors?)\b/i.test(context) ? 10 : 0) +
+      (/\b(deadline|apply|application|closes?|due)\b/i.test(context) ? 3 : 0) -
+      (/\bplayers?\b/i.test(context) ? 5 : 0);
+    return [{ date: date.toISOString().slice(0, 10), score }];
+  });
+  return candidates.sort((a, b) => b.score - a.score)[0]?.date || null;
 }
 export const safeUrl = (s: string | null) => !!s && /^https?:\/\//i.test(s);
 const escapeICS = (s: string) =>
   s
     .replace(/\\/g, "\\\\")
-    .replace(/\r?\n/g, "\\n")
+    .replace(/\r\n?|\n/g, "\\n")
     .replace(/;/g, "\\;")
     .replace(/,/g, "\\,");
 export function foldLine(s: string) {
@@ -136,6 +200,8 @@ export function foldLine(s: string) {
   return lines + part;
 }
 export function ics(events: Event[]) {
+  if (!events.some((e) => e.date_status === "confirmed" && ranges(e).length))
+    throw new Error("No confirmed dates to export.");
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
@@ -156,8 +222,18 @@ export function ics(events: Event[]) {
         `DTSTART;VALUE=DATE:${r.start_date.replaceAll("-", "")}`,
         `DTEND;VALUE=DATE:${next.toISOString().slice(0, 10).replaceAll("-", "")}`,
         `SUMMARY:${escapeICS(e.name)}`,
-        `LOCATION:${escapeICS([e.venue, e.city, e.country].filter(Boolean).join(", "))}`,
-        `DESCRIPTION:${escapeICS(e.description || "")}`,
+        `LAST-MODIFIED:${meta.updatedAt.replaceAll("-", "")}T000000Z`,
+        ...([e.venue, e.city, e.country].some(Boolean)
+          ? [
+              `LOCATION:${escapeICS([e.venue, e.city, e.country].filter(Boolean).join(", "))}`,
+            ]
+          : []),
+        ...([e.description, e.vendor_deadline].some(Boolean)
+          ? [
+              `DESCRIPTION:${escapeICS([e.description, e.vendor_deadline ? `Vendor deadline: ${e.vendor_deadline}` : null].filter(Boolean).join("\n"))}`,
+            ]
+          : []),
+        ...(safeUrl(e.website) ? [`URL:${escapeICS(e.website!)}`] : []),
         "END:VEVENT",
       );
     }
@@ -169,8 +245,10 @@ export function download(content: string, name: string, type: string) {
   const a = document.createElement("a");
   a.href = url;
   a.download = name;
+  document.body.append(a);
   a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
 }
 export function csv(events: Event[], entries: Entries = {}) {
   return (
@@ -207,9 +285,110 @@ export function csv(events: Event[], entries: Entries = {}) {
     ]
       .map((row) =>
         row
-          .map((v) => '"' + String(v ?? "").replaceAll('"', '""') + '"')
+          .map(
+            (v) =>
+              '"' +
+              (typeof v === "string" && /^[=+\-@\t\r]/.test(v)
+                ? "'" + v
+                : String(v ?? "")
+              ).replaceAll('"', '""') +
+              '"',
+          )
           .join(","),
       )
       .join("\r\n")
   );
+}
+
+export const compareText = (a: string, b: string) =>
+  a.localeCompare(b, "en", { numeric: true, sensitivity: "base" });
+export function isUndated(e: Event) {
+  return (
+    e.date_status === "tba" ||
+    (e.date_status === "estimated" ? !e.estimated_month : !ranges(e).length)
+  );
+}
+export function upcoming(e: Event, today: string) {
+  return (
+    isUndated(e) ||
+    (e.estimated_month
+      ? monthEnd(e.estimated_month) >= today
+      : ranges(e).some((r) => r.end_date >= today))
+  );
+}
+export function localDate(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+export function nextMonth(events: Event[], today: string) {
+  return (
+    events
+      .flatMap((e) =>
+        e.estimated_month && monthEnd(e.estimated_month) >= today
+          ? [e.estimated_month]
+          : ranges(e)
+              .filter((r) => r.end_date >= today)
+              .map((r) =>
+                r.start_date < today
+                  ? today.slice(0, 7)
+                  : r.start_date.slice(0, 7),
+              ),
+      )
+      .sort()[0] || today.slice(0, 7)
+  );
+}
+export function dateSortKey(e: Event, today: string) {
+  if (e.date_status === "estimated" && e.estimated_month)
+    return e.estimated_month + "-32";
+  const dates = ranges(e)
+    .slice()
+    .sort((a, b) => compareText(a.start_date, b.start_date));
+  return (
+    dates.find((r) => r.end_date >= today)?.start_date ||
+    dates[0]?.start_date ||
+    "9999"
+  );
+}
+export function timelineGroups(
+  events: Event[],
+  filters: Filters,
+  entries: Entries,
+  byStage: boolean,
+) {
+  const groups = new Map<string, { e: Event; label?: string }[]>();
+  for (const e of events) {
+    const rr = ranges(e).filter(
+      (r) =>
+        (!filters.from || r.end_date >= filters.from) &&
+        (!filters.to || r.start_date <= filters.to),
+    );
+    const keys = byStage
+      ? [(entries[e.id] || emptyEntry).stage]
+      : isUndated(e)
+        ? ["9999"]
+        : e.date_status === "estimated"
+          ? [e.estimated_month!]
+          : [...new Set(rr.map((r) => r.start_date.slice(0, 7)))];
+    for (const key of keys) {
+      groups.set(key, [
+        ...(groups.get(key) || []),
+        {
+          e,
+          label:
+            !byStage && e.occurrences
+              ? rr
+                  .filter((r) => r.start_date.startsWith(key))
+                  .map(
+                    (r) =>
+                      prettyDate(r.start_date) +
+                      (r.end_date !== r.start_date
+                        ? " – " + prettyDate(r.end_date)
+                        : ""),
+                  )
+                  .join(" · ")
+              : undefined,
+        },
+      ]);
+    }
+  }
+  return groups;
 }

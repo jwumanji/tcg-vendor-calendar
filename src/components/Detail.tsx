@@ -1,50 +1,121 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState, useCallback } from "react";
 import { ArrowUpRight, CalendarDays, MapPin, X, Download } from "lucide-react";
 import type { Event } from "../model";
-import { dateLabel, flag, safeUrl, ranges, prettyDate, ics, download } from "../utils";
-import { Logo, Status } from "./EventIdentity";
+import {
+  dateLabel,
+  safeUrl,
+  ranges,
+  prettyDate,
+  ics,
+  download,
+} from "../utils";
+import { Logo, Status, CountryFlag } from "./EventIdentity";
 import { StageBadge, StagePicker } from "./Pipeline";
 import type { Entry, Stage } from "../storage";
 export function Detail({
   e,
   close,
-  entry, onStage, onNote, saved,
+  entry,
+  onStage,
+  onNote,
+  saved,
 }: {
   e: Event;
   close: () => void;
-  entry: Entry; onStage: (s: Stage) => void; onNote: (s: string) => void; saved: boolean;
+  entry: Entry;
+  onStage: (s: Stage) => void;
+  onNote: (s: string) => void;
+  saved: boolean;
 }) {
   const noteRef = useRef<HTMLTextAreaElement>(null);
   const ref = useRef<HTMLDivElement>(null);
+  const [draft, setDraft] = useState(entry.note);
+  const draftRef = useRef(draft);
+  const committed = useRef(entry.note);
+  const onNoteRef = useRef(onNote);
+  onNoteRef.current = onNote;
+  const flush = useCallback(() => {
+    if (draftRef.current !== committed.current) {
+      committed.current = draftRef.current;
+      onNoteRef.current(draftRef.current);
+    }
+  }, []);
   useEffect(() => {
-    const old = document.activeElement as HTMLElement;
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    if (entry.stage === "Too expensive") noteRef.current?.focus();
-    else ref.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    const timer = window.setTimeout(flush, 400);
+    return () => clearTimeout(timer);
+  }, [draft, flush]);
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", flush);
+      flush();
+    };
+  }, [flush]);
+  useEffect(() => {
+    const old = document.activeElement as HTMLElement | null;
+    const background = [
+      ...document.querySelectorAll<HTMLElement>("#root > header, #root > main"),
+    ];
+    const previousInert = background.map((node) => node.inert);
+    background.forEach((node) => {
+      node.inert = true;
+    });
+    const y = window.scrollY;
+    const bodyStyle = document.body.getAttribute("style");
+    Object.assign(document.body.style, {
+      position: "fixed",
+      top: `-${y}px`,
+      width: "100%",
+      overflow: "hidden",
+    });
+    (ref.current?.querySelector<HTMLElement>("button") || ref.current)?.focus();
     function key(ev: KeyboardEvent) {
-      if (ev.key === "Escape") close();
-      if (ev.key === "Tab") {
-        const nodes = ref.current?.querySelectorAll<HTMLElement>(
-          'button,a[href],select,input,textarea,[tabindex="0"]',
-        );
-        if (!nodes?.length) return;
-        const first = nodes[0],
-          last = nodes[nodes.length - 1];
-        if (ev.shiftKey && document.activeElement === first) {
-          ev.preventDefault();
-          last.focus();
-        } else if (!ev.shiftKey && document.activeElement === last) {
-          ev.preventDefault();
-          first.focus();
-        }
+      if (ev.key === "Escape") {
+        ev.preventDefault();
+        close();
+      }
+      if (ev.key !== "Tab") return;
+      const nodes = [
+        ...(ref.current?.querySelectorAll<HTMLElement>(
+          'button:not(:disabled),a[href],select:not(:disabled),input:not(:disabled),textarea,[tabindex="0"]',
+        ) || []),
+      ];
+      const first = nodes[0],
+        last = nodes.at(-1);
+      if (!first) {
+        ev.preventDefault();
+        ref.current?.focus();
+      } else if (
+        !ref.current?.contains(document.activeElement) ||
+        (ev.shiftKey &&
+          (document.activeElement === first ||
+            document.activeElement === ref.current))
+      ) {
+        ev.preventDefault();
+        last?.focus();
+      } else if (!ev.shiftKey && document.activeElement === last) {
+        ev.preventDefault();
+        first.focus();
       }
     }
     document.addEventListener("keydown", key);
     return () => {
-      document.body.style.overflow = overflow;
+      background.forEach((node, i) => {
+        node.inert = previousInert[i];
+      });
+      if (bodyStyle === null) document.body.removeAttribute("style");
+      else document.body.setAttribute("style", bodyStyle);
+      window.scrollTo(0, y);
       document.removeEventListener("keydown", key);
-      old?.focus();
+      const fallback = document.getElementById("workspace-title");
+      (old?.isConnected ? old : fallback)?.focus({ preventScroll: true });
+      if (document.activeElement === document.body)
+        fallback?.focus({ preventScroll: true });
     };
   }, [close]);
   const row = (label: string, v: React.ReactNode) =>
@@ -74,6 +145,7 @@ export function Detail({
         aria-modal="true"
         aria-labelledby="detail-title"
         ref={ref}
+        tabIndex={-1}
       >
         <div className="drawer-top">
           <span>EVENT FIELDNOTES</span>
@@ -91,7 +163,8 @@ export function Detail({
             <Status e={e} />
             {e.priority_market && (
               <span className="badge priority">
-                ✦ {e.priority_market_level} priority market
+                ✦ {e.priority_market_level ? `${e.priority_market_level} ` : ""}
+                priority market
               </span>
             )}
           </div>
@@ -99,7 +172,6 @@ export function Detail({
           <p className="detail-date">
             <CalendarDays size={18} />
             {dateLabel(e)}
-            {e.start_date ? " · " + e.start_date.slice(0, 4) : ""}
           </p>
           {e.date_note && <p className="note">{e.date_note}</p>}
           {e.date_status === "estimated" && (
@@ -109,17 +181,61 @@ export function Detail({
             </p>
           )}
           <p>
-            <MapPin size={16} /> {flag(e.country_code)}{" "}
+            <MapPin size={16} /> <CountryFlag code={e.country_code} />{" "}
             {[e.city, e.country].filter(Boolean).join(", ") || "Location TBA"}
           </p>
           <div className="planning">
-            <label>PIPELINE STAGE</label>
+            <label htmlFor="detail-stage">PIPELINE STAGE</label>
             <StageBadge stage={entry.stage} />
-            <p className="stage-help">{({ New: "Choose a stage when you review this event.", Pass: "Keep for later; hidden by default.", "Too expensive": "Record the quoted booth price below.", Interested: "Next step: find out the booth price.", Contacted: "Waiting for information from the organizer.", "Need to pay": "Arrange payment for the booth.", "Paid / attending": "Booth paid — ready to attend." })[entry.stage]}</p>
-            <StagePicker stage={entry.stage} onChange={(stage) => { onStage(stage); if (stage === "Too expensive") noteRef.current?.focus(); }} />
+            <p className="stage-help">
+              {
+                {
+                  New: "Choose a stage when you review this event.",
+                  Pass: "Keep for later; hidden by default.",
+                  "Too expensive": "Record the quoted booth price below.",
+                  Interested: "Next step: find out the booth price.",
+                  Contacted: "Waiting for information from the organizer.",
+                  "Need to pay": "Arrange payment for the booth.",
+                  "Paid / attending": "Booth paid — ready to attend.",
+                }[entry.stage]
+              }
+            </p>
+            <StagePicker
+              name={e.name}
+              id="detail-stage"
+              stage={entry.stage}
+              onChange={onStage}
+            />
             <label htmlFor="event-note">Justin’s notes</label>
-            <textarea id="event-note" ref={noteRef} value={entry.note} placeholder={entry.stage === "Too expensive" ? "Booth price quoted…" : "Add event notes…"} onChange={(ev) => onNote(ev.target.value)} />
-            <small role="status">{saved ? "Saved on this device" : "Not saved to this device — export a backup"}{entry.noteUpdatedAt && ` · Last edited ${new Date(entry.noteUpdatedAt).toLocaleString()}`}</small>
+            <textarea
+              id="event-note"
+              ref={noteRef}
+              value={draft}
+              placeholder={
+                entry.stage === "Too expensive"
+                  ? "Booth price quoted…"
+                  : "Add event notes…"
+              }
+              onChange={(ev) => {
+                draftRef.current = ev.target.value;
+                setDraft(ev.target.value);
+              }}
+              onBlur={flush}
+            />
+            <small>
+              {draft !== entry.note
+                ? "Saving…"
+                : saved
+                  ? "Saved on this device"
+                  : "Not saved to this device — export a backup"}
+              {entry.noteUpdatedAt &&
+                ` · Last edited ${new Date(entry.noteUpdatedAt).toLocaleString()}`}
+            </small>
+            <span className="sr-only" role="status">
+              {saved && draft === entry.note
+                ? "Notes saved on this device"
+                : ""}
+            </span>
           </div>
           {e.vendor_score !== null && (
             <div className="vendor-meter">
@@ -133,7 +249,7 @@ export function Detail({
               <meter min="0" max="100" value={e.vendor_score} />
             </div>
           )}
-          <p className="description">{e.description}</p>
+          {e.description && <p className="description">{e.description}</p>}
           <div className="game-pills">
             {e.games.map((g) => (
               <span key={g}>{g}</span>
@@ -171,8 +287,7 @@ export function Detail({
                     {prettyDate(r.start_date)}
                     {r.end_date !== r.start_date
                       ? " – " + prettyDate(r.end_date)
-                      : ""}{" "}
-                    2027
+                      : ""}
                   </span>
                 ))}
               </div>
@@ -201,7 +316,7 @@ export function Detail({
           <div className="source-links">
             {link(e.website, "Official website")}
             {link(e.instagram, "Instagram")}
-            {e.source_urls.filter(safeUrl).map((s, i) => (
+            {[...new Set(e.source_urls)].filter(safeUrl).map((s, i) => (
               <React.Fragment key={s}>
                 {link(s, `Source ${i + 1}`)}
               </React.Fragment>
@@ -210,7 +325,7 @@ export function Detail({
           {e.instagram_followers !== null && (
             <p>Instagram followers: {e.instagram_followers.toLocaleString()}</p>
           )}
-          {e.date_status === "confirmed" && (
+          {e.date_status === "confirmed" && ranges(e).length > 0 && (
             <button
               className="button primary full"
               onClick={() =>

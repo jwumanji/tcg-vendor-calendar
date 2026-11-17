@@ -2,7 +2,14 @@ import { useMemo } from "react";
 import { ArrowUpRight, ChevronLeft, ChevronRight } from "lucide-react";
 import type { Event } from "../model";
 import { emptyEntry, type Entries } from "../storage";
-import { ranges, monthEnd, monthLabel, prettyDate, isUndated } from "../utils";
+import {
+  ranges,
+  monthEnd,
+  monthLabel,
+  prettyDate,
+  isUndated,
+  primaryGameKey,
+} from "../utils";
 import { EventCard } from "./EventCard";
 import { StageBadge } from "./Pipeline";
 export function CalendarView({
@@ -124,13 +131,15 @@ export function CalendarView({
                 {(dayEvents.get(date) || []).map((e) => (
                   <button
                     key={e.id}
+                    data-game={primaryGameKey(e)}
                     className={
                       "calendar-event " +
                       (e.section === "recurring_sg" ? "recurring" : "")
                     }
                     onClick={() => setSelected(e)}
                   >
-                    <span>●</span> {e.name}{" "}
+                    <span aria-hidden="true">●</span>
+                    <span className="calendar-event-name">{e.name}</span>{" "}
                     <StageBadge stage={(entries[e.id] || emptyEntry).stage} />
                     {entries[e.id]?.note.trim() && (
                       <span title="Has notes">📝</span>

@@ -1,8 +1,45 @@
+import { useEffect, useRef, useState } from "react";
+import {
+  Ban,
+  BadgeCheck,
+  CircleDollarSign,
+  CreditCard,
+  Send,
+  Sparkles,
+  Star,
+  type LucideIcon,
+} from "lucide-react";
 import type { Event } from "../model";
 import { stages, emptyEntry, type Stage, type Entries } from "../storage";
+
+/** Every stage has an icon as well as a label, so stages never rely on colour alone. */
+const stageIcons: Record<Stage, LucideIcon> = {
+  New: Sparkles,
+  Pass: Ban,
+  "Too expensive": CircleDollarSign,
+  Interested: Star,
+  Contacted: Send,
+  "Need to pay": CreditCard,
+  "Paid / attending": BadgeCheck,
+};
 export function StageBadge({ stage }: { stage: Stage }) {
+  const Icon = stageIcons[stage];
+  // Plays a small "pop" when the stage changes (alternating names re-trigger the animation).
+  const previous = useRef(stage);
+  const [bump, setBump] = useState(0);
+  useEffect(() => {
+    if (previous.current !== stage) {
+      previous.current = stage;
+      setBump((n) => n + 1);
+    }
+  }, [stage]);
   return (
-    <span className={`badge stage stage-${stages.indexOf(stage)}`}>
+    <span
+      className={`badge stage stage-${stages.indexOf(stage)}${
+        bump ? ` bump-${bump % 2 ? "a" : "b"}` : ""
+      }`}
+    >
+      <Icon size={13} strokeWidth={2.4} />
       {stage}
     </span>
   );
@@ -49,7 +86,10 @@ export function Pipeline({
           (e) => (entries[e.id] || emptyEntry).stage === stage,
         );
         return (
-          <section className="pipeline-column" key={stage}>
+          <section
+            className={`pipeline-column stage-col-${stages.indexOf(stage)}`}
+            key={stage}
+          >
             <h3>
               <StageBadge stage={stage} /> <span>{items.length}</span>
             </h3>

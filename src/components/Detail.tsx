@@ -8,8 +8,11 @@ import {
   prettyDate,
   ics,
   download,
+  gameKeyOf,
+  primaryGameKey,
+  rarity,
 } from "../utils";
-import { Logo, Status, CountryFlag } from "./EventIdentity";
+import { Logo, Status, CountryFlag, ScoreGem } from "./EventIdentity";
 import { StageBadge, StagePicker } from "./Pipeline";
 import type { Entry, Stage } from "../storage";
 export function Detail({
@@ -141,6 +144,7 @@ export function Detail({
     >
       <div
         className="drawer"
+        data-game={primaryGameKey(e)}
         role="dialog"
         aria-modal="true"
         aria-labelledby="detail-title"
@@ -148,6 +152,7 @@ export function Detail({
         tabIndex={-1}
       >
         <div className="drawer-top">
+          <span className="drawer-grip" aria-hidden="true" />
           <span>EVENT FIELDNOTES</span>
           <button
             className="icon-button"
@@ -238,13 +243,10 @@ export function Detail({
             </span>
           </div>
           {e.vendor_score !== null && (
-            <div className="vendor-meter">
+            <div className={`vendor-meter gem-${rarity(e.vendor_score).tier}`}>
               <span>
                 Vendor fit score
-                <strong>
-                  {e.vendor_score}
-                  <small>/100</small>
-                </strong>
+                <ScoreGem score={e.vendor_score} large />
               </span>
               <meter min="0" max="100" value={e.vendor_score} />
             </div>
@@ -252,7 +254,9 @@ export function Detail({
           {e.description && <p className="description">{e.description}</p>}
           <div className="game-pills">
             {e.games.map((g) => (
-              <span key={g}>{g}</span>
+              <span key={g} className="game-tag" data-game={gameKeyOf(g)}>
+                {g}
+              </span>
             ))}
           </div>
           <h3>The essentials</h3>

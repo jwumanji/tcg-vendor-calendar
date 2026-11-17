@@ -19,6 +19,10 @@ import {
   deadlineDate,
   monthEnd,
   ranges,
+  rarity,
+  gameKey,
+  gameKeyOf,
+  primaryGameKey,
 } from "./utils";
 const event = raw[0] as Event;
 describe("all-day calendar exports", () => {
@@ -312,5 +316,29 @@ describe("audit regressions", () => {
     );
     expect(result).toContain("URL:https://example.com");
     expect(result).toContain("LAST-MODIFIED:20261116T000000Z");
+  });
+});
+
+describe("rarity tiers and game accents", () => {
+  it("maps vendor scores to rarity tiers at the boundaries", () => {
+    expect(rarity(0).tier).toBe("common");
+    expect(rarity(29).tier).toBe("common");
+    expect(rarity(30).tier).toBe("uncommon");
+    expect(rarity(49).tier).toBe("uncommon");
+    expect(rarity(50).tier).toBe("rare");
+    expect(rarity(64).tier).toBe("rare");
+    expect(rarity(65).tier).toBe("ultra");
+    expect(rarity(79).tier).toBe("ultra");
+    expect(rarity(80).tier).toBe("secret");
+    expect(rarity(100).label).toBe("Secret rare");
+  });
+  it("slugs game names for accent colours", () => {
+    expect(gameKey("Pokémon")).toBe("pokemon");
+    expect(gameKey("Yu-Gi-Oh!")).toBe("yugioh");
+    expect(gameKey("Flesh and Blood")).toBe("fleshandblood");
+    expect(gameKeyOf("Pokémon-led")).toBe("pokemon");
+    expect(gameKeyOf("Disney Lorcana")).toBe("lorcana");
+    expect(gameKeyOf("sports cards")).toBe("other");
+    expect(primaryGameKey({ ...event, games: ["Toys"] })).toBe("other");
   });
 });

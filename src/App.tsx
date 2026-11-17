@@ -1,6 +1,6 @@
 import { CalendarView } from "./components/CalendarView";
 import { EventCard } from "./components/EventCard";
-import { Logo, CountryFlag } from "./components/EventIdentity";
+import { Logo, CountryFlag, ScoreGem } from "./components/EventIdentity";
 import { Detail } from "./components/Detail";
 import { Pipeline, StageBadge } from "./components/Pipeline";
 import { BackupControls } from "./components/BackupControls";
@@ -20,6 +20,7 @@ import {
   Layers,
   LayoutList,
   Clock,
+  Gem,
 } from "lucide-react";
 import raw from "../data/events.json";
 import { useEntries } from "./hooks/useEntries";
@@ -45,7 +46,10 @@ import {
   ics,
   csv,
   download,
+  primaryGameKey,
+  rarity,
 } from "./utils";
+import { holo } from "./holo";
 import "./style.css";
 export default function App() {
   const events = useMemo(() => normalizeEvents(raw), []);
@@ -82,7 +86,7 @@ export default function App() {
   const [theme, setTheme] = useState(() =>
     ["light", "dark"].includes(String(stored("tcg-theme")))
       ? String(stored("tcg-theme"))
-      : "system",
+      : "dark", // dark is the default look; an explicit saved choice always wins
   );
   useEffect(() => {
     const error = saveValue("tcg-show-passed-v1", showPassed);
@@ -90,6 +94,9 @@ export default function App() {
   }, [showPassed]);
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
+    document
+      .getElementById("theme-color")
+      ?.setAttribute("content", theme === "light" ? "#f2ead9" : "#0a0914");
     const error = saveValue("tcg-theme", theme);
     if (error) setStorageError(error);
   }, [theme]);
@@ -250,27 +257,26 @@ export default function App() {
       <header className="header">
         <a className="brand" href="#main">
           <span className="brand-mark">
-            <Layers size={23} />
+            <Layers size={20} />
           </span>
-          FIELDNOTES<span className="brand-sub"> / TCG VENDOR CALENDAR</span>
+          <span className="brand-word">FIELDNOTES</span>
+          <span className="brand-sub"> / TCG VENDOR CALENDAR</span>
         </a>
         <div className="header-right">
-          <span className="live-dot" />
-          2027 SEASON
+          <span className="season-chip">
+            <span className="live-dot" />
+            2027 SEASON
+          </span>
           <button
             className="icon-button"
             aria-label="Toggle light and dark theme"
             onClick={() =>
-              setTheme(
-                theme === "dark" ||
-                  (theme === "system" &&
-                    matchMedia("(prefers-color-scheme: dark)").matches)
-                  ? "light"
-                  : "dark",
-              )
+              setTheme(theme === "dark" ? "light" : "dark")
             }
           >
-            {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+            <span className="theme-icon" key={theme}>
+              {theme === "dark" ? <Sun size={19} /> : <Moon size={19} />}
+            </span>
           </button>
           <span className="avatar">J</span>
         </div>
@@ -287,6 +293,9 @@ export default function App() {
           </div>
         )}
         <section className="stage-overview" aria-label="Pipeline overview">
+          <span className="tray-label" aria-hidden="true">
+            YOUR PIPELINE
+          </span>
           {stages.map((stage) => (
             <span key={stage}>
               <StageBadge stage={stage} />{" "}
@@ -300,26 +309,45 @@ export default function App() {
             </span>
           ))}
         </section>
-        <section className="intro">
-          <div>
+        <section className="hero">
+          <div className="hero-copy">
             <div className="eyebrow">
+              <Gem size={15} aria-hidden="true" />
               2027 TCG VENDOR CALENDAR · SEA + HK + GCC
             </div>
             <h1>
-              Your next great
-              <br />
-              <span>vendor opportunity.</span>
+              Your next great <span className="foil-text">vendor opportunity.</span>
             </h1>
             <p>
               A clearer view of the circuit. Find your shows, plan your season,
-              <br className="desktop" /> and make every table count.
+              and make every table count.
             </p>
+            <div className="hero-cta">
+              <a className="button primary" href="#workspace-title">
+                Explore the calendar
+              </a>
+              <a className="button" href="#top-picks">
+                See top picks
+              </a>
+            </div>
           </div>
-          <div className="season-stamp">
-            <span>THE VENDOR</span>
-            <CalendarDays size={38} strokeWidth={1.25} />
-            <strong>2027</strong>
-            <span>SEASON PLANNER</span>
+          <div className="season-stage" aria-hidden="true">
+            <div className="season-card holo" {...holo}>
+              <div className="season-card-face">
+                <div className="season-card-head">
+                  <span>THE VENDOR</span>
+                  <span>❖ SECRET RARE</span>
+                </div>
+                <div className="season-card-art">
+                  <CalendarDays size={34} strokeWidth={1.4} />
+                  <strong>2027</strong>
+                </div>
+                <div className="season-card-foot">
+                  <span>SEASON PLANNER</span>
+                  <span>SEA·HK·GCC</span>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
         <section className="stats" aria-label="Calendar statistics">
@@ -335,7 +363,7 @@ export default function App() {
               "Top picks · score 80+",
             ],
           ].map(([n, label], i) => (
-            <div key={label}>
+            <div key={label} className={i === 3 ? "stat-secret" : undefined}>
               <span className="stat-index">0{i + 1}</span>
               <strong>{n}</strong>
               <span>{label}</span>
@@ -343,21 +371,27 @@ export default function App() {
           ))}
         </section>
         <section className="overview">
-          <div className="picks">
+          <div className="picks" id="top-picks">
             <div className="section-label">
               <span>✦ TOP VENDOR PICKS</span>
               <span>CURATED BY VENDOR SCORE</span>
             </div>
             <div className="pick-grid">
-              {top.slice(0, 3).map((e) => (
-                <article className="pick" key={e.id}>
+              {top.slice(0, 3).map((e, i) => (
+                <article
+                  className="pick holo"
+                  key={e.id}
+                  data-game={primaryGameKey(e)}
+                  data-tier={rarity(e.vendor_score || 0).tier}
+                  {...holo}
+                >
+                  <span className="pick-rank" aria-hidden="true">
+                    0{i + 1}
+                  </span>
                   <div className="pick-meta">
                     <Logo e={e} />
-                    <span className="pick-score">
-                      {e.vendor_score}
-                      <small> / 100</small>
-                    </span>
-                    <ArrowUpRight size={18} />
+                    <ScoreGem score={e.vendor_score || 0} />
+                    <ArrowUpRight size={18} className="pick-arrow" />
                   </div>
                   <h3>
                     <button
@@ -380,6 +414,21 @@ export default function App() {
                 </article>
               ))}
             </div>
+            <ul className="rarity-legend" aria-label="Vendor score rarity tiers">
+              {[
+                [0, "under 30"],
+                [30, "30–49"],
+                [50, "50–64"],
+                [65, "65–79"],
+                [80, "80+"],
+              ].map(([n, range]) => (
+                <li key={n} className={`gem-${rarity(n as number).tier}`}>
+                  <i aria-hidden="true" />
+                  {rarity(n as number).label}
+                  <span> {range}</span>
+                </li>
+              ))}
+            </ul>
           </div>
           <div className="deadline-box">
             <div className="section-label">

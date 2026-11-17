@@ -23,6 +23,7 @@ The development and preview URLs include `/tcg-vendor-calendar/`.
 - Confirmed, estimated and TBA dates have distinct labels and styling. Estimates never become booking dates or calendar exports.
 - Top vendor picks and application radar with original deadline notes. Notices can describe player registration, booking openings or historical dates; verify vendor terms with the organizer.
 - Accessible event detail drawer, source links, all recurring occurrences, autosaved notes with edit times, stage picker and light/dark themes.
+- "Holo Vault" visual design: dark-first (default when no theme is saved; a saved light/dark choice is respected), vendor scores shown as card-rarity tiers (Common <30, Uncommon 30–49, Rare 50–64, Ultra 65–79, Secret 80+) with the numeric score always visible, per-game colour accents, foil/tilt hover effects that are disabled under `prefers-reduced-motion`. Fonts (Unbounded, Figtree, Space Mono) are self-hosted latin subsets under `src/fonts/` (SIL OFL licences included).
 - Individual or filtered ICS export, exclusive all-day end dates, UTF-8 line folding and CSV export. Filtered export includes all occurrences of matching recurring shows.
 
 Filters, theme, notes, stages and the passed-event visibility toggle are stored in this browser’s localStorage. They do not sync between devices. Exports use the complete filtered set across views; a view tab or calendar month does not further narrow the export. Use the date filters to narrow the set. Unknown scores stay visible until a positive minimum score is selected.

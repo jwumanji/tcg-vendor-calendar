@@ -15,6 +15,34 @@ export const gameRules: [string, RegExp][] = [
   ["Flesh and Blood", /flesh and blood/i],
   ["Gundam", /gundam/i],
 ];
+/** Slug used for the per-game colour accent (`data-game` attribute). */
+export function gameKey(name: string) {
+  return (
+    name
+      .normalize("NFD")
+      .replace(/\p{M}/gu, "")
+      .toLowerCase()
+      .replace(/[^a-z]+/g, "") || "other"
+  );
+}
+/** Accent key for a raw game string from the data (e.g. "Pokémon-led"). */
+export function gameKeyOf(raw: string) {
+  const hit = gameRules.find(([, r]) => r.test(raw));
+  return hit ? gameKey(hit[0]) : "other";
+}
+/** Accent key for an event's primary (first recognised) game. */
+export function primaryGameKey(e: Event) {
+  return gameKey(games(e)[0]);
+}
+export type Rarity = "common" | "uncommon" | "rare" | "ultra" | "secret";
+/** Card-rarity style tier for a 0-100 vendor score. */
+export function rarity(score: number): { tier: Rarity; label: string } {
+  if (score >= 80) return { tier: "secret", label: "Secret rare" };
+  if (score >= 65) return { tier: "ultra", label: "Ultra rare" };
+  if (score >= 50) return { tier: "rare", label: "Rare" };
+  if (score >= 30) return { tier: "uncommon", label: "Uncommon" };
+  return { tier: "common", label: "Common" };
+}
 export function games(e: Event) {
   const found = gameRules
     .filter(([, r]) => e.games.some((g) => r.test(g)))

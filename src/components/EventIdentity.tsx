@@ -1,4 +1,4 @@
-import { flag } from "../utils";
+import { flag, rarity, type Rarity } from "../utils";
 import type { Event } from "../model";
 export function Logo({ e }: { e: Event }) {
   return e.logo ? (
@@ -37,6 +37,35 @@ export function CountryFlag({ code }: { code: string | null }) {
     <span>
       <span aria-hidden="true">{flag(code)}</span>
       {code && ` ${code}`}
+    </span>
+  );
+}
+
+const tierMark: Record<Rarity, string> = {
+  common: "●",
+  uncommon: "◆",
+  rare: "★",
+  ultra: "✦",
+  secret: "❖",
+};
+/** Vendor score shown as a rarity "gem": numeric score + tier label + shape (never colour alone). */
+export function ScoreGem({
+  score,
+  large = false,
+}: {
+  score: number;
+  large?: boolean;
+}) {
+  const r = rarity(score);
+  return (
+    <span className={`gem gem-${r.tier}${large ? " gem-lg" : ""}`}>
+      <span className="gem-num">
+        {score}
+        <small>/100</small>
+      </span>
+      <span className="gem-tier">
+        <span aria-hidden="true">{tierMark[r.tier]}</span> {r.label}
+      </span>
     </span>
   );
 }

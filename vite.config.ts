@@ -1,5 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+const base = `/${(process.env.VITE_BASE ?? "/vendor-planner/").replace(/^\/+|\/+$/g, "")}/`.replace(/^\/\/$/, "/");
+
 export default defineConfig({
   plugins: [
     react(),
@@ -15,5 +17,5 @@ export default defineConfig({
         ),
     },
   ],
-  base: "/tcg-vendor-calendar/",
+  base,
 });

@@ -54,7 +54,7 @@ All requested High and Medium findings, and the selected Low findings, are addre
 
 - `npm test`: **166 tests passed**, including checks for every one of the 97 source events.
 - `npm run build`: passed; `git diff --check`: passed.
-- Built app served at `/tcg-vendor-calendar/`: no JavaScript errors, failed requests, CSP violations, or external requests during mobile smoke checks.
+- Historical GitHub Pages check (now superseded by `/vendor-planner/`): built app served at `/tcg-vendor-calendar/`: no JavaScript errors, failed requests, CSP violations, or external requests during mobile smoke checks.
 - Chromium with iPhone emulation: no page overflow at widths 320, 375, 390, 430, 1024 and 1440; filter focus/Escape, modal isolation, note-close flushing, storage recovery lock, imports/replacement backups, and downloads passed.
 - Automated axe checks: no WCAG A/AA violations in all six views and details under light/dark themes. This is automated Chromium verification, not a physical iPhone/VoiceOver test.
 - Development rendering and Vite refresh initialization passed with the development-only CSP exception.

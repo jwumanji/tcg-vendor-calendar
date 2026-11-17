@@ -14,7 +14,7 @@ npm run build
 npm run preview
 ```
 
-The development and preview URLs include `/tcg-vendor-calendar/`.
+The development and preview URLs include `/vendor-planner/` (or the configured `VITE_BASE`).
 
 ## Features
 
@@ -39,8 +39,32 @@ Read [the data guide](data/DATA_README.md) before editing. Replace `data/events.
 
 Update the visible “Data last updated” note in `src/App.tsx` when refreshing. Run `npm test` and `npm run build` after changes. The app reads the JSON at build time; redeploy to publish new data. No live scraping occurs.
 
-## Deploy
+## Deploying to grailfoxtcg.com/vendor-planner
 
-The Vite base is `/tcg-vendor-calendar/`, targeting https://jwumanji.github.io/tcg-vendor-calendar/. In the repository’s **Settings → Pages**, select **GitHub Actions** as the source. The included `.github/workflows/deploy.yml` runs `npm ci`, tests and the production build on pushes to `main`, uploads `dist`, then deploys with GitHub Pages. Manual workflow dispatch is also supported. No client-side path routing or server rewrites are needed.
+The planner lives at https://www.grailfoxtcg.com/vendor-planner/. It is unlisted: a noindex meta tag and an X-Robots-Tag header discourage indexing, and it is not added to the sitemap, robots.txt or navigation. Anyone with the link can reach it; this is not access control.
+
+With Node.js/npm, Python 3, curl and an authenticated Vercel CLI installed, run from this checkout:
+
+```sh
+scripts/deploy-grailfox.sh        # preview deployment
+scripts/deploy-grailfox.sh --prod # production deployment
+```
+
+The script first re-syncs the current production site's Build Output files, verifying their SHA-1 hashes, so newer changes to other site pages are preserved. It then runs tests, builds the planner, replaces only its static directory, adds scoped routes and deploys the prebuilt site. It keeps the site's Vercel project link and does not edit robots.txt, sitemap.xml or other site pages. A final smoke check verifies the planner response and indexing header; protected previews returning 401, 302 or 403 produce a warning. Production checks use the real www host and retry briefly for alias propagation. The script prints the current production deployment ID and rollback command, and aborts if production changes between sync and deploy.
+
+Configuration is available through environment variables:
+
+| Variable | Default |
+| --- | --- |
+| `GRAILFOX_SITE` | `/workspace/grailfox-site` |
+| `VERCEL_SCOPE` | `justin-9436s-projects` |
+| `VERCEL_TEAM_ID` | `team_E7PuNgRyzGwto2cmIFZZcrUX` |
+| `VERCEL_PROJECT` | `grailfoxtcg` (project label) |
+| `VERCEL_PROJECT_ID` | `prj_7k0k6RI7FbvlSAYGrNcLsM8vzroU` |
+| `PLANNER_PATH` | `vendor-planner` (relative URL path, without surrounding slashes) |
+
+The planner only exists in deployments made by this script. If the main Grailfox site is deployed another way (another CLI upload or a Git-connected pipeline), the planner disappears until this script is re-run. The script always re-syncs the live site first to preserve other site changes.
+
+Vite defaults to `/vendor-planner/`; set `VITE_BASE` to override it for local builds. The deployment script sets `VITE_BASE` from `PLANNER_PATH`. Bases are normalized to start and end with `/`.
 
 Application code lives in `src/App.tsx`, `src/components/`, `src/storage.ts`, `src/style.css`, `src/model.ts` and `src/utils.ts`; `src/main.tsx` is the bootstrap; the original event dataset remains in `data/`.

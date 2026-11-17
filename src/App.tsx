@@ -1,11 +1,25 @@
 import { CalendarView } from "./components/CalendarView";
 import { EventCard } from "./components/EventCard";
-import { Logo, CountryFlag, ScoreGem } from "./components/EventIdentity";
+import {
+  Logo,
+  CountryFlag,
+  ScoreGem,
+  NoteTag,
+} from "./components/EventIdentity";
+import { BrandLockup, BrandMark } from "./components/Brand";
+import { EmptyState } from "./components/EmptyState";
 import { Detail } from "./components/Detail";
 import { Pipeline, StageBadge } from "./components/Pipeline";
 import { BackupControls } from "./components/BackupControls";
 import { stages, emptyEntry, saveValue, type Stage } from "./storage";
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+  type CSSProperties,
+} from "react";
 
 import {
   ArrowUpRight,
@@ -17,10 +31,13 @@ import {
   Sun,
   Moon,
   Bookmark,
-  Layers,
+  Info,
+  SearchX,
+  TriangleAlert,
   LayoutList,
   Clock,
   Gem,
+  RotateCcw,
 } from "lucide-react";
 import raw from "../data/events.json";
 import { useEntries } from "./hooks/useEntries";
@@ -83,10 +100,11 @@ export default function App() {
   const [selected, setSelected] = useState<Event | null>(null);
   const [sort, setSort] = useState("date");
   const [groupByStage, setGroupByStage] = useState(false);
-  const [theme, setTheme] = useState(() =>
-    ["light", "dark"].includes(String(stored("tcg-theme")))
-      ? String(stored("tcg-theme"))
-      : "dark", // dark is the default look; an explicit saved choice always wins
+  const [theme, setTheme] = useState(
+    () =>
+      ["light", "dark"].includes(String(stored("tcg-theme")))
+        ? String(stored("tcg-theme"))
+        : "dark", // dark is the default look; an explicit saved choice always wins
   );
   useEffect(() => {
     const error = saveValue("tcg-show-passed-v1", showPassed);
@@ -135,6 +153,14 @@ export default function App() {
   );
   const datedDeadlines = deadlines.filter((e) =>
     deadlineDate(e.vendor_deadline),
+  );
+  const countryCount = useMemo(
+    () => new Set(events.map((e) => e.country).filter(Boolean)).size,
+    [events],
+  );
+  const confirmedCount = useMemo(
+    () => events.filter((e) => e.date_status === "confirmed").length,
+    [events],
   );
   const chips: { id: string; label: string; clear: () => void }[] = [];
   for (const c of filters.countries)
@@ -252,39 +278,66 @@ export default function App() {
       filterTrigger.current?.focus();
     };
   }, [filterOpen]);
+  const visibleList = useMemo(
+    () =>
+      sorted.filter(
+        (e) =>
+          view === "List" ||
+          (view === "Watchlist" && e.section === "watchlist") ||
+          (view === "Recurring SG" && e.section === "recurring_sg"),
+      ),
+    [sorted, view],
+  );
+  const noResults = (
+    <EmptyState
+      icon={SearchX}
+      title="No matching events"
+      action={
+        chips.length > 0 ? (
+          <button className="button" onClick={() => setFilters(emptyFilters)}>
+            <RotateCcw size={16} aria-hidden="true" /> Clear all filters
+          </button>
+        ) : undefined
+      }
+    >
+      {chips.length > 0
+        ? "Try broadening or clearing your filters."
+        : "Nothing is listed here yet."}
+    </EmptyState>
+  );
   return (
     <>
       <header className="header">
-        <a className="brand" href="#main">
-          <span className="brand-mark">
-            <Layers size={20} />
-          </span>
-          <span className="brand-word">FIELDNOTES</span>
-          <span className="brand-sub"> / TCG VENDOR CALENDAR</span>
+        <a
+          className="brand"
+          href="#main"
+          aria-label="Holo Vault, TCG Vendor Calendar"
+        >
+          <BrandLockup />
         </a>
         <div className="header-right">
           <span className="season-chip">
             <span className="live-dot" />
-            2027 SEASON
+            2027<span className="chip-extra"> SEASON</span>
           </span>
           <button
             className="icon-button"
             aria-label="Toggle light and dark theme"
-            onClick={() =>
-              setTheme(theme === "dark" ? "light" : "dark")
-            }
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
           >
             <span className="theme-icon" key={theme}>
               {theme === "dark" ? <Sun size={19} /> : <Moon size={19} />}
             </span>
           </button>
-          <span className="avatar">J</span>
         </div>
       </header>
       <main id="main" tabIndex={-1}>
         {storageError && (
           <div role="alert" className="storage-warning">
-            <p>{storageError}</p>
+            <p>
+              <TriangleAlert size={18} aria-hidden="true" />
+              <span>{storageError}</span>
+            </p>
             {!canSave && (
               <button className="button" onClick={acknowledgeRecovery}>
                 Preserve original and resume saving
@@ -313,21 +366,38 @@ export default function App() {
           <div className="hero-copy">
             <div className="eyebrow">
               <Gem size={15} aria-hidden="true" />
-              2027 TCG VENDOR CALENDAR · SEA + HK + GCC
+              2027 vendor season · SEA + HK + GCC
             </div>
             <h1>
-              Your next great <span className="foil-text">vendor opportunity.</span>
+              Plan your{" "}
+              <span className="foil-underline">2027 vendor season</span> across
+              Southeast Asia, Hong Kong &amp; the Gulf.
             </h1>
             <p>
-              A clearer view of the circuit. Find your shows, plan your season,
-              and make every table count.
+              <strong>{events.length}</strong> TCG events in{" "}
+              <strong>{countryCount}</strong> countries
+              {confirmedCount > 0 && (
+                <>
+                  , <strong>{confirmedCount}</strong> with confirmed dates
+                </>
+              )}
+              {datedDeadlines.length > 0 && (
+                <>
+                  {" "}
+                  and <strong>{datedDeadlines.length}</strong> vendor{" "}
+                  {datedDeadlines.length === 1 ? "deadline" : "deadlines"} still
+                  open
+                </>
+              )}
+              . Compare vendor scores, track every booth application and commit
+              to the tables worth paying for.
             </p>
             <div className="hero-cta">
               <a className="button primary" href="#workspace-title">
-                Explore the calendar
+                <CalendarDays size={18} aria-hidden="true" /> Open the calendar
               </a>
               <a className="button" href="#top-picks">
-                See top picks
+                <Gem size={18} aria-hidden="true" /> See top picks
               </a>
             </div>
           </div>
@@ -335,16 +405,16 @@ export default function App() {
             <div className="season-card holo" {...holo}>
               <div className="season-card-face">
                 <div className="season-card-head">
-                  <span>THE VENDOR</span>
-                  <span>❖ SECRET RARE</span>
+                  <span>SEASON</span>
+                  <span>SEA·HK·GCC</span>
                 </div>
                 <div className="season-card-art">
                   <CalendarDays size={34} strokeWidth={1.4} />
                   <strong>2027</strong>
                 </div>
                 <div className="season-card-foot">
-                  <span>SEASON PLANNER</span>
-                  <span>SEA·HK·GCC</span>
+                  <span>{events.length} EVENTS</span>
+                  <span>{countryCount} COUNTRIES</span>
                 </div>
               </div>
             </div>
@@ -353,10 +423,7 @@ export default function App() {
         <section className="stats" aria-label="Calendar statistics">
           {[
             [events.length, "Events on the radar"],
-            [
-              events.filter((e) => e.date_status === "confirmed").length,
-              "Confirmed events",
-            ],
+            [confirmedCount, "Confirmed events"],
             [datedDeadlines.length, "Upcoming deadline notices"],
             [
               top.filter((e) => (e.vendor_score || 0) >= 80).length,
@@ -371,11 +438,17 @@ export default function App() {
           ))}
         </section>
         <section className="overview">
-          <div className="picks" id="top-picks">
+          <div className="picks" id="top-picks" tabIndex={-1}>
             <div className="section-label">
               <span>✦ TOP VENDOR PICKS</span>
               <span>CURATED BY VENDOR SCORE</span>
             </div>
+            {top.length === 0 && (
+              <EmptyState icon={Gem} title="No scored events to show">
+                Upcoming events with a vendor score appear here. Check the “Show
+                passed / too expensive” toggle below.
+              </EmptyState>
+            )}
             <div className="pick-grid">
               {top.slice(0, 3).map((e, i) => (
                 <article
@@ -406,7 +479,7 @@ export default function App() {
                     </button>
                   </h3>
                   <StageBadge stage={(entries[e.id] || emptyEntry).stage} />
-                  {entries[e.id]?.note.trim() && <span> 📝 Notes</span>}
+                  {entries[e.id]?.note.trim() && <NoteTag />}
                   <p>
                     <CountryFlag code={e.country_code} /> {e.city || e.country}{" "}
                     <span>· {dateLabel(e)}</span>
@@ -414,7 +487,10 @@ export default function App() {
                 </article>
               ))}
             </div>
-            <ul className="rarity-legend" aria-label="Vendor score rarity tiers">
+            <ul
+              className="rarity-legend"
+              aria-label="Vendor score rarity tiers"
+            >
               {[
                 [0, "under 30"],
                 [30, "30–49"],
@@ -436,6 +512,11 @@ export default function App() {
                 <Clock size={14} /> UPCOMING DEADLINES
               </span>
             </div>
+            {deadlines.length === 0 && (
+              <p className="deadline-empty">
+                No open vendor deadlines right now.
+              </p>
+            )}
             {deadlines.slice(0, 2).map((e) => (
               <button key={e.id} onClick={() => setSelected(e)}>
                 <span className="deadline-date">
@@ -445,7 +526,7 @@ export default function App() {
                 </span>
                 <strong>{e.name}</strong>
                 <StageBadge stage={(entries[e.id] || emptyEntry).stage} />
-                {entries[e.id]?.note.trim() && <span>📝 Notes</span>}
+                {entries[e.id]?.note.trim() && <NoteTag />}
                 <span className="deadline-copy">{e.vendor_deadline}</span>
                 <ArrowUpRight size={15} />
               </button>
@@ -509,7 +590,8 @@ export default function App() {
             Show passed / too expensive
           </label>
           {view === "Pipeline" && (
-            <p>
+            <p className="view-note">
+              <Info size={16} aria-hidden="true" />
               Pipeline includes passed / too expensive events. Search and
               filters still apply.
             </p>
@@ -581,7 +663,15 @@ export default function App() {
               aria-label="Event filters"
             >
               <div className="filter-heading">
-                <h3>Find your fit</h3>
+                <div>
+                  <span className="filter-kicker">
+                    <SlidersHorizontal size={13} aria-hidden="true" />{" "}
+                    {chips.length
+                      ? `${chips.length} active`
+                      : "No filters active"}
+                  </span>
+                  <h3>Find your fit</h3>
+                </div>
                 <button
                   className="icon-button"
                   aria-label="Close filters"
@@ -710,6 +800,7 @@ export default function App() {
                       min="0"
                       max="100"
                       value={filters.score}
+                      style={{ "--fill": `${filters.score}%` } as CSSProperties}
                       onChange={(e) => set("score", +e.target.value)}
                     />
                   </label>
@@ -733,13 +824,23 @@ export default function App() {
                       </label>
                     ))}
                   </fieldset>
-                  <button
-                    className="text-button"
-                    onClick={() => setFilters(emptyFilters)}
-                  >
-                    Reset all filters
-                  </button>
                 </div>
+              </div>
+              <div className="filter-foot">
+                <button
+                  className="button"
+                  disabled={chips.length === 0}
+                  onClick={() => setFilters(emptyFilters)}
+                >
+                  <RotateCcw size={16} aria-hidden="true" /> Reset all filters
+                </button>
+                <button
+                  className="button primary"
+                  onClick={() => setFilterOpen(false)}
+                >
+                  Show {filtered.length}{" "}
+                  {filtered.length === 1 ? "event" : "events"}
+                </button>
               </div>
             </section>
           )}
@@ -826,6 +927,10 @@ export default function App() {
                         ? "Your local circuit"
                         : "Your season, taking shape"}
                 </h3>
+                <span className="list-count">
+                  {visibleList.length}{" "}
+                  {visibleList.length === 1 ? "event" : "events"}
+                </span>
                 <label>
                   Sort by{" "}
                   <select
@@ -842,61 +947,57 @@ export default function App() {
                 </label>
               </div>
               <div className="cards">
-                {sorted
-                  .filter(
-                    (e) =>
-                      view === "List" ||
-                      (view === "Watchlist" && e.section === "watchlist") ||
-                      (view === "Recurring SG" && e.section === "recurring_sg"),
-                  )
-                  .map((e) => (
-                    <div key={e.id}>
-                      {card(e)}
-                      {view === "Recurring SG" && (
-                        <div className="occurrences">
-                          {ranges(e).map((r) => (
-                            <span key={r.start_date}>
-                              {prettyDate(r.start_date)}
-                              {r.start_date !== r.end_date
-                                ? " – " + prettyDate(r.end_date)
-                                : ""}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                {visibleList.map((e) => (
+                  <div key={e.id}>
+                    {card(e)}
+                    {view === "Recurring SG" && (
+                      <div
+                        className="occurrences"
+                        role="group"
+                        aria-label={`Published dates for ${e.name}`}
+                      >
+                        <span className="occ-title">
+                          <CalendarDays size={14} aria-hidden="true" />{" "}
+                          Published dates
+                        </span>
+                        {ranges(e).map((r) => (
+                          <span key={r.start_date}>
+                            {prettyDate(r.start_date)}
+                            {r.start_date !== r.end_date
+                              ? " – " + prettyDate(r.end_date)
+                              : ""}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
-              {!sorted.some(
-                (e) =>
-                  view === "List" ||
-                  (view === "Watchlist" && e.section === "watchlist") ||
-                  (view === "Recurring SG" && e.section === "recurring_sg"),
-              ) && (
-                <div className="empty">
-                  <Bookmark size={30} />
-                  <h3>No matching events</h3>
-                  <p>Try broadening your filters.</p>
-                </div>
-              )}
+              {visibleList.length === 0 && noResults}
             </>
           )}
-          {view === "Timeline" && groups.size === 0 && (
-            <div className="empty">No events match your filters.</div>
-          )}
+          {view === "Timeline" && groups.size === 0 && noResults}
           <div className="calendar-foot">
-            <span>
-              <i className="legend-dot" /> Confirmed{" "}
-              <i className="legend-dot recurring-dot" /> Recurring SG{" "}
-              <span className="estimate-legend">◷ Estimated</span> ◇ TBA
+            <span className="legend" role="list" aria-label="Date status key">
+              <span role="listitem" className="badge confirmed">
+                ● Confirmed
+              </span>
+              <span role="listitem" className="badge estimated">
+                ◷ Estimated
+              </span>
+              <span role="listitem" className="badge tba">
+                ◇ TBA
+              </span>
+              <span role="listitem" className="badge recurring-key">
+                Recurring SG
+              </span>
             </span>
             <span>All dates are local to the event.</span>
           </div>
         </section>
         <footer>
           <span className="footer-brand">
-            <Layers size={16} /> FIELDNOTES{" "}
-            <span>Built for your next move.</span>
+            <BrandMark /> Holo Vault <span>TCG Vendor Calendar</span>
           </span>
           <span>Data last updated {prettyDate(meta.updatedAt)}</span>
           <small>

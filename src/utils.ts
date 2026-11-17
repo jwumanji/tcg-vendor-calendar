@@ -233,7 +233,7 @@ export function ics(events: Event[]) {
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//Vendor Calendar//EN",
+    "PRODID:-//Holo Vault//TCG Vendor Calendar//EN",
     "CALSCALE:GREGORIAN",
   ];
   for (const e of events.filter((e) => e.date_status === "confirmed"))

@@ -1,5 +1,10 @@
 import { useMemo } from "react";
-import { ArrowUpRight, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  ArrowUpRight,
+  CalendarX2,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import type { Event } from "../model";
 import { emptyEntry, type Entries } from "../storage";
 import {
@@ -11,6 +16,8 @@ import {
   primaryGameKey,
 } from "../utils";
 import { EventCard } from "./EventCard";
+import { EmptyState } from "./EmptyState";
+import { NoteTag } from "./EventIdentity";
 import { StageBadge } from "./Pipeline";
 export function CalendarView({
   filtered,
@@ -141,9 +148,7 @@ export function CalendarView({
                     <span aria-hidden="true">●</span>
                     <span className="calendar-event-name">{e.name}</span>{" "}
                     <StageBadge stage={(entries[e.id] || emptyEntry).stage} />
-                    {entries[e.id]?.note.trim() && (
-                      <span title="Has notes">📝</span>
-                    )}
+                    {entries[e.id]?.note.trim() && <NoteTag compact />}
                   </button>
                 ))}
               </div>
@@ -173,10 +178,17 @@ export function CalendarView({
             ),
           )
         ) : (
-          <div className="empty">
-            No confirmed shows this month. Try another month or adjust your
-            filters.
-          </div>
+          <EmptyState
+            icon={CalendarX2}
+            title="No confirmed shows this month"
+            action={
+              <button className="button" onClick={() => setMonth(initialMonth)}>
+                Jump to next shows
+              </button>
+            }
+          >
+            Try another month or adjust your filters.
+          </EmptyState>
         )}
       </div>
       {estimated.length > 0 && (
@@ -197,7 +209,7 @@ export function CalendarView({
               <button key={e.id} onClick={() => setSelected(e)}>
                 {e.name}
                 <StageBadge stage={(entries[e.id] || emptyEntry).stage} />
-                {entries[e.id]?.note.trim() && <span>📝 Notes</span>}
+                {entries[e.id]?.note.trim() && <NoteTag />}
                 <ArrowUpRight size={14} />
               </button>
             ))}

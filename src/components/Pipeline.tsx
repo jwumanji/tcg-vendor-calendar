@@ -1,16 +1,21 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import {
   Ban,
   BadgeCheck,
+  CalendarDays,
   CircleDollarSign,
   CreditCard,
   Send,
+  MapPin,
   Sparkles,
   Star,
   type LucideIcon,
 } from "lucide-react";
 import type { Event } from "../model";
 import { stages, emptyEntry, type Stage, type Entries } from "../storage";
+import { dateLabel, games, gameKey, primaryGameKey, rarity } from "../utils";
+import { holo } from "../holo";
+import { Logo, Status, CountryFlag, ScoreGem, NoteTag } from "./EventIdentity";
 
 /** Every stage has an icon as well as a label, so stages never rely on colour alone. */
 const stageIcons: Record<Stage, LucideIcon> = {
@@ -93,23 +98,18 @@ export function Pipeline({
             <h3>
               <StageBadge stage={stage} /> <span>{items.length}</span>
             </h3>
+            {items.length === 0 && (
+              <p className="pipeline-empty">No events in this stage.</p>
+            )}
             {items.map((e) => (
-              <article className="pipeline-card" key={e.id}>
-                <button onClick={() => open(e)}>
-                  {e.name}
-                  {entries[e.id]?.note.trim() && <small> 📝 Notes</small>}
-                </button>
-                <StagePicker
-                  name={e.name}
-                  stage={stage}
-                  onChange={(s) => change(e, s)}
-                />
-                {stage === "Too expensive" && (
-                  <button className="text-button" onClick={() => open(e)}>
-                    Add booth price →
-                  </button>
-                )}
-              </article>
+              <PipelineCard
+                key={e.id}
+                e={e}
+                stage={stage}
+                hasNote={!!entries[e.id]?.note.trim()}
+                open={open}
+                change={change}
+              />
             ))}
           </section>
         );
@@ -117,3 +117,83 @@ export function Pipeline({
     </div>
   );
 }
+
+/**
+ * Compact Holo Vault card. The title button is stretched over the card to open
+ * the detail panel; the stage select and price prompt sit above it (z-index) so
+ * no interactive element is nested inside another.
+ */
+const PipelineCard = memo(function PipelineCard({
+  e,
+  stage,
+  hasNote,
+  open,
+  change,
+}: {
+  e: Event;
+  stage: Stage;
+  hasNote: boolean;
+  open: (event: Event) => void;
+  change: (event: Event, stage: Stage) => void;
+}) {
+  const tier = e.vendor_score !== null ? rarity(e.vendor_score).tier : "none";
+  const primary = games(e)[0];
+  const place = [e.city, e.country].filter(Boolean).join(", ");
+  return (
+    <article
+      className={`pipeline-card holo status-${e.date_status}`}
+      data-game={primaryGameKey(e)}
+      data-tier={tier}
+      {...holo}
+    >
+      <span className="pcard-edge" aria-hidden="true" />
+      <div className="pcard-top">
+        <Logo e={e} />
+        <h4 className="pcard-title">
+          <button className="stretched-button" onClick={() => open(e)}>
+            {e.name}
+            <span className="sr-only">
+              {" "}
+              · {dateLabel(e)}
+              {hasNote ? " · has notes" : ""}
+            </span>
+          </button>
+        </h4>
+      </div>
+      <div className="pcard-meta">
+        <span className="pcard-line">
+          <CalendarDays size={14} aria-hidden="true" />
+          {dateLabel(e)}
+        </span>
+        <span className="pcard-line">
+          <MapPin size={14} aria-hidden="true" />
+          <span>
+            <CountryFlag code={e.country_code} /> {place || "Location TBA"}
+          </span>
+        </span>
+      </div>
+      <div className="pcard-foot">
+        <Status e={e} />
+        {e.vendor_score !== null && <ScoreGem score={e.vendor_score} />}
+      </div>
+      <div className="pcard-tags">
+        <span className="game-tag" data-game={gameKey(primary)}>
+          {primary}
+        </span>
+        {hasNote && <NoteTag />}
+      </div>
+      <div className="pcard-actions">
+        <StagePicker
+          name={e.name}
+          stage={stage}
+          onChange={(s) => change(e, s)}
+        />
+        {stage === "Too expensive" && (
+          <button className="text-button" onClick={() => open(e)}>
+            Add booth price →
+          </button>
+        )}
+      </div>
+    </article>
+  );
+});

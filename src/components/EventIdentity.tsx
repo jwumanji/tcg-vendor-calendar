@@ -1,3 +1,4 @@
+import { StickyNote } from "lucide-react";
 import { flag, rarity, type Rarity } from "../utils";
 import type { Event } from "../model";
 export function Logo({ e }: { e: Event }) {
@@ -66,6 +67,16 @@ export function ScoreGem({
       <span className="gem-tier">
         <span aria-hidden="true">{tierMark[r.tier]}</span> {r.label}
       </span>
+    </span>
+  );
+}
+
+/** "Has notes" indicator: icon + text (never an emoji or colour alone). */
+export function NoteTag({ compact = false }: { compact?: boolean }) {
+  return (
+    <span className={`note-tag${compact ? " note-tag-compact" : ""}`}>
+      <StickyNote size={compact ? 13 : 14} aria-hidden="true" />
+      <span className={compact ? "sr-only" : undefined}>Has notes</span>
     </span>
   );
 }

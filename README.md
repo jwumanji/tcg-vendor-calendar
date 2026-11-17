@@ -1,6 +1,6 @@
-# Fieldnotes — TCG Vendor Calendar
+# Holo Vault — TCG Vendor Calendar
 
-A mobile-first, static season planner for Justin’s 2027 TCG vendor circuit across Southeast Asia, Hong Kong and the GCC. Built with React, strict TypeScript and Vite; no backend or account required.
+A mobile-first, static season planner for the 2027 TCG vendor circuit across Southeast Asia, Hong Kong and the GCC. Built with React, strict TypeScript and Vite; no backend or account required.
 
 ## Local development
 
@@ -18,7 +18,8 @@ The development and preview URLs include `/tcg-vendor-calendar/`.
 
 ## Features
 
-- Month calendar (agenda on mobile), chronological timeline, sortable cards, watchlist, recurring Singapore shows and a seven-stage Pipeline board.
+- Hero summary with live counts (events, countries, confirmed dates, open deadlines) computed from `data/events.json`; its buttons jump to the calendar and the top picks.
+- Month calendar (agenda on mobile), chronological timeline, sortable cards, watchlist, recurring Singapore shows and a seven-stage Pipeline board whose cards show logo, game-coloured edge, dates, location, date status, score rarity, note indicator and a stage picker.
 - Country/game multi-select, market, size, date, status, score and multi-select pipeline filters; free-text search and removable filter chips.
 - Confirmed, estimated and TBA dates have distinct labels and styling. Estimates never become booking dates or calendar exports.
 - Top vendor picks and application radar with original deadline notes. Notices can describe player registration, booking openings or historical dates; verify vendor terms with the organizer.

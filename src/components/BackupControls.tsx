@@ -1,5 +1,12 @@
 import { useState } from "react";
 import {
+  CheckCircle2,
+  Download,
+  HardDrive,
+  TriangleAlert,
+  Upload,
+} from "lucide-react";
+import {
   backup,
   stashBeforeReplace,
   validateBackup,
@@ -24,46 +31,69 @@ export function BackupControls({
   const absent = preview ? unknownIds(preview, ids) : [];
   return (
     <div className="backup-controls">
-      <button
-        className="button"
-        onClick={() =>
-          download(
-            JSON.stringify(backup(entries), null, 2),
-            "tcg-pipeline-backup.json",
-            "application/json",
-          )
-        }
-      >
-        Export notes + stages
-      </button>
-      <label className="button">
-        Import JSON
-        <input
-          type="file"
-          accept="application/json,.json"
-          onChange={async (e) => {
-            const file = e.target.files?.[0];
-            e.target.value = "";
-            if (!file) return;
-            setPreview(null);
-            try {
-              if (file.size > 5 * 1024 * 1024)
-                throw new Error("Backup is too large (maximum 5 MB).");
-              setPreview(validateBackup(JSON.parse(await file.text())).entries);
-              setError("");
-            } catch (err) {
-              setError(
-                err instanceof Error ? err.message : "Could not read backup",
-              );
-            }
-          }}
-        />
-      </label>
-      <p role="status">{status}</p>
-      {error && <p role="alert">{error}</p>}
+      <div className="backup-intro">
+        <span className="backup-title">
+          <HardDrive size={16} aria-hidden="true" /> Backup &amp; restore
+        </span>
+        <span>
+          Stages and notes are kept in this browser only. Export a backup before
+          switching devices.
+        </span>
+      </div>
+      <div className="backup-actions">
+        <button
+          className="button"
+          onClick={() =>
+            download(
+              JSON.stringify(backup(entries), null, 2),
+              "tcg-pipeline-backup.json",
+              "application/json",
+            )
+          }
+        >
+          <Download size={16} aria-hidden="true" /> Export notes + stages
+        </button>
+        <label className="button">
+          <Upload size={16} aria-hidden="true" /> Import JSON
+          <input
+            type="file"
+            accept="application/json,.json"
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              if (!file) return;
+              setPreview(null);
+              try {
+                if (file.size > 5 * 1024 * 1024)
+                  throw new Error("Backup is too large (maximum 5 MB).");
+                setPreview(
+                  validateBackup(JSON.parse(await file.text())).entries,
+                );
+                setError("");
+              } catch (err) {
+                setError(
+                  err instanceof Error ? err.message : "Could not read backup",
+                );
+              }
+            }}
+          />
+        </label>
+      </div>
+      <p role="status" className="backup-status">
+        {status && <CheckCircle2 size={16} aria-hidden="true" />}
+        {status}
+      </p>
+      {error && (
+        <p role="alert" className="backup-error">
+          <TriangleAlert size={16} aria-hidden="true" />
+          {error}
+        </p>
+      )}
       {preview && (
         <section className="import-preview" aria-label="Import preview">
-          <strong>Preview: {Object.keys(preview).length} entries</strong>
+          <strong className="preview-title">
+            Preview: {Object.keys(preview).length} entries
+          </strong>
           <p>
             {absent.length} IDs absent from current data (kept):{" "}
             {absent.slice(0, 20).join(", ") || "none"}
@@ -88,29 +118,31 @@ export function BackupControls({
               ? "Only imported entries will remain. Your current entries will be backed up on this device first."
               : "Other saved entries will remain, including absent IDs."}
           </p>
-          <button
-            className="button"
-            onClick={() => {
-              try {
-                if (mode === "replace") stashBeforeReplace(entries);
-                apply(importEntries(entries, preview, mode));
-                setStatus(
-                  `Imported ${Object.keys(preview).length} entries (${mode}).`,
-                );
-                setError("");
-                setPreview(null);
-              } catch {
-                setError(
-                  "Could not preserve the current entries. Export a backup and free device storage before replacing.",
-                );
-              }
-            }}
-          >
-            Confirm import
-          </button>
-          <button className="button" onClick={() => setPreview(null)}>
-            Cancel
-          </button>
+          <div className="import-actions">
+            <button
+              className="button primary"
+              onClick={() => {
+                try {
+                  if (mode === "replace") stashBeforeReplace(entries);
+                  apply(importEntries(entries, preview, mode));
+                  setStatus(
+                    `Imported ${Object.keys(preview).length} entries (${mode}).`,
+                  );
+                  setError("");
+                  setPreview(null);
+                } catch {
+                  setError(
+                    "Could not preserve the current entries. Export a backup and free device storage before replacing.",
+                  );
+                }
+              }}
+            >
+              Confirm import
+            </button>
+            <button className="button" onClick={() => setPreview(null)}>
+              Cancel
+            </button>
+          </div>
         </section>
       )}
     </div>

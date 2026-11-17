@@ -1,5 +1,7 @@
 import { Component, type ReactNode } from "react";
+import { Download, RotateCcw, TriangleAlert } from "lucide-react";
 import { download } from "../utils";
+import { BrandMark } from "./Brand";
 export class ErrorBoundary extends Component<
   { children: ReactNode },
   { failed: boolean; error: string }
@@ -46,16 +48,36 @@ export class ErrorBoundary extends Component<
   };
   render() {
     return this.state.failed ? (
-      <main>
-        <h1>Could not open the planner</h1>
-        <p>Export your local data before resetting it.</p>
-        <button className="button" onClick={this.exportData}>
-          Export backup
-        </button>
-        <button className="button" onClick={this.reset}>
-          Reset local data
-        </button>
-        <p role="alert">{this.state.error}</p>
+      <main className="error-screen">
+        <section className="error-card" aria-labelledby="error-title">
+          <div className="error-brand">
+            <BrandMark />
+            <span>
+              <strong>Holo Vault</strong>
+              <span>TCG Vendor Calendar</span>
+            </span>
+          </div>
+          <span className="error-icon" aria-hidden="true">
+            <TriangleAlert size={26} />
+          </span>
+          <h1 id="error-title">Could not open the planner</h1>
+          <p>
+            Something went wrong while loading the data saved in this browser.
+            Your notes and stages have not been deleted. Export your local data
+            before resetting it.
+          </p>
+          <div className="error-actions">
+            <button className="button primary" onClick={this.exportData}>
+              <Download size={16} aria-hidden="true" /> Export backup
+            </button>
+            <button className="button" onClick={this.reset}>
+              <RotateCcw size={16} aria-hidden="true" /> Reset local data
+            </button>
+          </div>
+          <p role="alert" className="error-message">
+            {this.state.error}
+          </p>
+        </section>
       </main>
     ) : (
       this.props.children

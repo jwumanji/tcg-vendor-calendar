@@ -1,5 +1,15 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
-import { ArrowUpRight, CalendarDays, MapPin, X, Download } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowUpRight,
+  CalendarDays,
+  CheckCircle2,
+  Instagram,
+  LoaderCircle,
+  MapPin,
+  X,
+  Download,
+} from "lucide-react";
 import type { Event } from "../model";
 import {
   dateLabel,
@@ -153,7 +163,7 @@ export function Detail({
       >
         <div className="drawer-top">
           <span className="drawer-grip" aria-hidden="true" />
-          <span>EVENT FIELDNOTES</span>
+          <span>EVENT DETAILS</span>
           <button
             className="icon-button"
             onClick={close}
@@ -211,7 +221,7 @@ export function Detail({
               stage={entry.stage}
               onChange={onStage}
             />
-            <label htmlFor="event-note">Justin’s notes</label>
+            <label htmlFor="event-note">Your notes</label>
             <textarea
               id="event-note"
               ref={noteRef}
@@ -227,14 +237,28 @@ export function Detail({
               }}
               onBlur={flush}
             />
-            <small>
-              {draft !== entry.note
-                ? "Saving…"
-                : saved
-                  ? "Saved on this device"
-                  : "Not saved to this device — export a backup"}
-              {entry.noteUpdatedAt &&
-                ` · Last edited ${new Date(entry.noteUpdatedAt).toLocaleString()}`}
+            <small
+              className="save-status"
+              data-state={
+                draft !== entry.note ? "saving" : saved ? "saved" : "unsaved"
+              }
+            >
+              {draft !== entry.note ? (
+                <LoaderCircle size={14} aria-hidden="true" />
+              ) : saved ? (
+                <CheckCircle2 size={14} aria-hidden="true" />
+              ) : (
+                <AlertTriangle size={14} aria-hidden="true" />
+              )}
+              <span>
+                {draft !== entry.note
+                  ? "Saving…"
+                  : saved
+                    ? "Saved on this device"
+                    : "Not saved to this device — export a backup"}
+                {entry.noteUpdatedAt &&
+                  ` · Last edited ${new Date(entry.noteUpdatedAt).toLocaleString()}`}
+              </span>
             </small>
             <span className="sr-only" role="status">
               {saved && draft === entry.note
@@ -327,7 +351,10 @@ export function Detail({
             ))}
           </div>
           {e.instagram_followers !== null && (
-            <p>Instagram followers: {e.instagram_followers.toLocaleString()}</p>
+            <p className="detail-stat">
+              <Instagram size={16} aria-hidden="true" />
+              Instagram followers: {e.instagram_followers.toLocaleString()}
+            </p>
           )}
           {e.date_status === "confirmed" && ranges(e).length > 0 && (
             <button

@@ -1,6 +1,6 @@
 {
-  "name": "Fieldnotes · TCG Vendor Calendar",
-  "short_name": "Fieldnotes",
+  "name": "Holo Vault · TCG Vendor Calendar",
+  "short_name": "Holo Vault",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

@@ -4,7 +4,7 @@ import type { Event } from "../model";
 import type { Entry } from "../storage";
 import { games, dateLabel, gameKey, primaryGameKey, rarity } from "../utils";
 import { holo } from "../holo";
-import { Logo, Status, CountryFlag, ScoreGem } from "./EventIdentity";
+import { Logo, Status, CountryFlag, ScoreGem, NoteTag } from "./EventIdentity";
 import { StageBadge } from "./Pipeline";
 export const EventCard = memo(function EventCard({
   e,
@@ -64,11 +64,7 @@ export const EventCard = memo(function EventCard({
               </span>
             ))}
           <StageBadge stage={entry.stage} />
-          {entry.note.trim() && (
-            <span className="note-tag" title="Has notes">
-              📝 Notes
-            </span>
-          )}
+          {entry.note.trim() && <NoteTag />}
         </div>
       </div>
     </article>

@@ -1,3 +1,16 @@
+export interface EventSource {
+  /** Scraper module id, e.g. "sg-expo". */
+  id: string;
+  name: string;
+  /** Public page the event was found on. */
+  url: string;
+  /** ISO timestamp of the first scan that found it. */
+  discovered_at: string;
+  /** 0-1: how sure the scraper is that the parsed fields are right. */
+  confidence: number | null;
+  /** 0-1: how relevant the event is to a TCG vendor. */
+  relevance: number | null;
+}
 export interface Event {
   id: string;
   name: string;
@@ -45,6 +58,11 @@ export interface Event {
   fit: string | null;
   logo: string | null;
   logo_kind: string | null;
+  /** Present only on events found by a scraper (never on Scanner events). */
+  source?: EventSource | null;
+  /** True for scraper finds that no Scanner entry matched. */
+  is_new_find?: boolean;
+  verification?: "scanner" | "unverified";
 }
 export interface Filters {
   search: string;
@@ -56,6 +74,8 @@ export interface Filters {
   to: string;
   tba: boolean;
   score: number;
+  newOnly: boolean;
+  minTier: "any" | "strong" | "must";
   status: string;
   stages: import("./storage").Stage[];
 }
@@ -69,6 +89,8 @@ export const emptyFilters: Filters = {
   to: "",
   tba: true,
   score: 0,
+  newOnly: false,
+  minTier: "any",
   status: "",
   stages: [],
 };

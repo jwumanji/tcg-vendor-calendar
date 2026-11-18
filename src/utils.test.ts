@@ -13,6 +13,7 @@ import {
   timelineGroups,
   ics,
   placeLabel,
+  countryOptions,
   flagFile,
   goingEvents,
   csv,
@@ -461,4 +462,14 @@ it("exports a Going month estimate as a transparent tentative placeholder and om
   expect(result).toContain("STATUS:TENTATIVE");
   expect(result).toContain("SUMMARY:Est. February 2027");
   expect(() => ics([estimated])).toThrow();
+});
+
+describe("countryOptions", () => {
+  it("lists countries alphabetically with counts and Unknown last", () => {
+    const base = (raw as unknown as Event[])[0];
+    const mk = (country: string | null, code: string | null) => ({ ...base, country, country_code: code }) as Event;
+    const opts = countryOptions([mk("Singapore", "SG"), mk(null, null), mk("Hong Kong", "HK"), mk("Singapore", "SG")]);
+    expect(opts.map((o) => [o.name, o.count])).toEqual([["Hong Kong", 1], ["Singapore", 2], ["Unknown", 1]]);
+    expect(opts[1].code).toBe("SG");
+  });
 });

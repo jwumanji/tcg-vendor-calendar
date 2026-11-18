@@ -1,7 +1,7 @@
 import { usePriority } from "./hooks/usePriority";
 import { Modal } from "./components/Modal";
 import { EventRows, RowColumns, RowSortControl } from "./components/EventRows";
-import { normalizeColumns, normalizeListView, normalizeRowSort } from "./rows";
+import { normalizeColumns, normalizeListView, normalizeRowSort, sortRows } from "./rows";
 import { compareByScore } from "./scoring";
 import { CalendarView } from "./components/CalendarView";
 import { EventCard } from "./components/EventCard";
@@ -45,6 +45,8 @@ import {
 import raw from "../data/events.json";
 import { useEntries } from "./hooks/useEntries";
 import { useFilters, stored } from "./hooks/useFilters";
+import { CountryFilter } from "./components/CountryFilter";
+import { CountryFlag } from "./components/EventIdentity";
 import { useToday } from "./hooks/useToday";
 import { normalizeEvents } from "./data";
 import meta from "../data/meta.json";
@@ -55,6 +57,7 @@ import {
   dateSortKey,
   nextMonth,
   seasonEvents,
+  countryOptions,
   SEASON_START,
   timelineGroups,
   gameRules,
@@ -71,6 +74,8 @@ const Detail = lazy(async () => ({
 const ScoreSettings = lazy(async () => ({
   default: (await import("./components/ScoreSettings")).ScoreSettings,
 }));
+
+const GRID_SORTS = ["date", "name", "priority", "score", "country", "size", "stage"];
 
 export default function App() {
   const allEvents = useMemo(() => normalizeEvents(raw), []);
@@ -143,7 +148,14 @@ export default function App() {
   const [month, setMonth] = useState(initialMonth);
   const [filterOpen, setFilterOpen] = useState(false);
   const [selected, setSelected] = useState<Event | null>(null);
-  const [sort, setSort] = useState("date");
+  const [sort, setSort] = useState(() => {
+    const saved = stored("tcg-sort-v1");
+    return typeof saved === "string" && GRID_SORTS.includes(saved) ? saved : "date";
+  });
+  useEffect(() => {
+    const error = saveValue("tcg-sort-v1", sort);
+    if (error) setStorageError(error);
+  }, [sort, setStorageError]);
   const [groupByStage, setGroupByStage] = useState(false);
   const [theme, setTheme] = useState(
     () =>
@@ -340,7 +352,9 @@ export default function App() {
     () =>
       showRows
         ? filtered
-        : [...filtered].sort((a, b) => {
+        : sort === "country"
+          ? sortRows(filtered, { key: "country", direction: "asc" }, entries, scores, today)
+          : [...filtered].sort((a, b) => {
             if (sort === "priority")
               return compareByScore(scores[a.id], scores[b.id]);
             return sort === "stage"
@@ -351,14 +365,6 @@ export default function App() {
                 ? compareText(a.name, b.name)
                 : sort === "score"
                   ? (b.vendor_score ?? -1) - (a.vendor_score ?? -1)
-                  : sort === "country"
-                    ? a.country && b.country
-                      ? compareText(a.country, b.country)
-                      : a.country
-                        ? -1
-                        : b.country
-                          ? 1
-                          : compareText(a.name, b.name)
                     : sort === "size"
                       ? ["S", "M", "L", "XL"].indexOf(b.size_tier || "") -
                         ["S", "M", "L", "XL"].indexOf(a.size_tier || "")
@@ -420,7 +426,7 @@ export default function App() {
         <option value="name">Name</option>
         <option value="priority">Priority score (high to low)</option>
         <option value="score">Scanner score</option>
-        <option value="country">Country</option>
+        <option value="country">Country (A–Z, then date)</option>
         <option value="size">Size tier</option>
         <option value="stage">Pipeline stage</option>
       </select>
@@ -582,6 +588,12 @@ export default function App() {
                   />
                 </div>
               )}
+              <div className="quick-row">
+              <CountryFilter
+                options={countryOptions(events)}
+                selected={filters.countries}
+                change={(countries) => set("countries", countries)}
+              />
               <div
                 className="quick-filters"
                 role="group"
@@ -597,6 +609,7 @@ export default function App() {
                     Clear
                   </button>
                 )}
+              </div>
               </div>
             </>
           )}
@@ -636,27 +649,23 @@ export default function App() {
                 <fieldset>
                   <legend>Countries</legend>
                   <div className="check-scroll">
-                    {Array.from(
-                      new Set(events.map((e) => e.country || "Unknown")),
-                    )
-                      .sort()
-                      .map((c) => (
-                        <label key={c}>
-                          <input
-                            type="checkbox"
-                            checked={filters.countries.includes(c)}
-                            onChange={() =>
-                              set(
-                                "countries",
-                                filters.countries.includes(c)
-                                  ? filters.countries.filter((x) => x !== c)
-                                  : [...filters.countries, c],
-                              )
-                            }
-                          />
-                          {c}
-                        </label>
-                      ))}
+                    {countryOptions(events).map((o) => (
+                      <label key={o.name}>
+                        <input
+                          type="checkbox"
+                          checked={filters.countries.includes(o.name)}
+                          onChange={() =>
+                            set(
+                              "countries",
+                              filters.countries.includes(o.name)
+                                ? filters.countries.filter((x) => x !== o.name)
+                                : [...filters.countries, o.name],
+                            )
+                          }
+                        />
+                        <CountryFlag code={o.code} /> {o.name} ({o.count})
+                      </label>
+                    ))}
                   </div>
                 </fieldset>
                 <fieldset>

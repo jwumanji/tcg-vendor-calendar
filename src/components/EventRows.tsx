@@ -7,6 +7,7 @@ import { games, gameKey, upcoming } from "../utils";
 import {
   ROW_SORT_LABELS,
   groupRowsByMonth,
+  groupRowsByCountry,
   optionalColumns,
   type OptionalColumn,
   nextRowSort,
@@ -54,7 +55,9 @@ export function EventRows({
     () =>
       sort.key === "dates"
         ? groupRowsByMonth(sorted, today)
-        : new Map([["", sorted]]),
+        : sort.key === "country"
+          ? groupRowsByCountry(sorted)
+          : new Map([["", sorted]]),
     [sorted, sort.key, today],
   );
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
@@ -205,7 +208,7 @@ export function EventRows({
               )}
               {header("name")}
               {header("dates")}
-              {header("city")}
+              {header("country")}
               <th scope="col" role="columnheader" className="col-games">
                 Games
               </th>
@@ -225,12 +228,23 @@ export function EventRows({
                     scope="colgroup"
                     colSpan={7 + columns.length}
                   >
-                    {month === "tba"
-                      ? "Dates to be announced"
-                      : new Date(month + "-01T12:00:00").toLocaleDateString(
-                          "en-GB",
-                          { month: "short", year: "numeric" },
-                        )}
+                    {sort.key === "country" ? (
+                      <Place
+                        e={{
+                          city: null,
+                          country: month === "Unknown" ? null : month,
+                          country_code: items[0].country_code,
+                        }}
+                        countryOnly
+                      />
+                    ) : month === "tba" ? (
+                      "Dates to be announced"
+                    ) : (
+                      new Date(month + "-01T12:00:00").toLocaleDateString(
+                        "en-GB",
+                        { month: "short", year: "numeric" },
+                      )
+                    )}
                     <span>
                       {" "}
                       · {items.length} {items.length === 1 ? "event" : "events"}

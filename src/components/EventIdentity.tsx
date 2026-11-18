@@ -42,7 +42,7 @@ export function Status({ e }: { e: Event }) {
  * Flag as a self-hosted Twemoji SVG. Windows has no flag emoji font (Chrome
  * there shows the letters "SG"), so the image is used on every platform.
  */
-function CountryFlag({ code }: { code: string | null }) {
+export function CountryFlag({ code }: { code: string | null }) {
   const file = flagFile(code);
   return file ? (
     <img

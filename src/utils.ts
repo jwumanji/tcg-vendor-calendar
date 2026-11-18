@@ -510,3 +510,21 @@ export function seasonEvents(events: Event[], includeEarlier = false): Event[] {
   }
   return out;
 }
+
+export type CountryOption = { name: string; code: string | null; count: number };
+/** Countries present in `events` (alphabetical, "Unknown" last) with flag code and event count. */
+export function countryOptions(events: Event[]): CountryOption[] {
+  const map = new Map<string, CountryOption>();
+  for (const e of events) {
+    const name = e.country || "Unknown";
+    const o = map.get(name) || { name, code: null, count: 0 };
+    o.count++;
+    o.code = o.code || e.country_code;
+    map.set(name, o);
+  }
+  return [...map.values()].sort(
+    (a, b) =>
+      Number(a.name === "Unknown") - Number(b.name === "Unknown") ||
+      compareText(a.name, b.name),
+  );
+}

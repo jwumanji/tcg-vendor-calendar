@@ -13,7 +13,8 @@ export const ROW_SORT_LABELS = {
   going: "Going",
   name: "Event",
   dates: "Dates",
-  city: "Place",
+  country: "Country",
+  city: "City",
   status: "Date status",
   priority: "Priority",
   scanner: "Scanner score",
@@ -88,6 +89,8 @@ export function sortRows(
         return Number(entry.going);
       case "name":
         return e.name;
+      case "country":
+        return e.country;
       case "city":
         return e.city || e.country;
       case "dates": {
@@ -121,12 +124,23 @@ export function sortRows(
         : compareText(String(a), String(b));
     return sort.direction === "asc" ? diff : -diff;
   }
+  // Inside one country: soonest date first (undated last), then higher priority, then name.
+  function withinCountry(a: Event, b: Event) {
+    const da = a.date_status === "confirmed" ? dateSortKey(a, today) : a.estimated_month ? a.estimated_month + "-32" : "9999";
+    const db = b.date_status === "confirmed" ? dateSortKey(b, today) : b.estimated_month ? b.estimated_month + "-32" : "9999";
+    return (
+      compareText(da, db) ||
+      (scores[b.id]?.score ?? -1) - (scores[a.id]?.score ?? -1) ||
+      compareText(a.name, b.name)
+    );
+  }
   return events
     .map((e) => ({ e, key: value(e) }))
     .sort(
       (a, b) =>
         compare(a.key, b.key) ||
-        (sort.key === "city" ? compare(a.e.country, b.e.country) : 0),
+        (sort.key === "city" ? compare(a.e.country, b.e.country) : 0) ||
+        (sort.key === "country" ? withinCountry(a.e, b.e) : 0),
     )
     .map((row) => row.e);
 }
@@ -154,6 +168,17 @@ export function groupRowsByMonth(sorted: Event[], today: string) {
   }
   if (undated.length) months.set("tba", undated);
   return months;
+}
+
+/** Preserve the current country sort (including direction); unknown countries last. */
+export function groupRowsByCountry(sorted: Event[]) {
+  const groups = new Map<string, Event[]>();
+  for (const event of sorted) {
+    const name = event.country || "Unknown";
+    if (!groups.has(name)) groups.set(name, []);
+    groups.get(name)!.push(event);
+  }
+  return groups;
 }
 
 export function selectAllVisible(visible: readonly string[], checked: boolean) {

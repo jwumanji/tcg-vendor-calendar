@@ -4,6 +4,7 @@ import { normalizeEvents } from "./data";
 import {
   defaultRowSort,
   groupRowsByMonth,
+  groupRowsByCountry,
   normalizeColumns,
   nextRowSort,
   normalizeListView,
@@ -160,4 +161,40 @@ it("restores only recognized optional columns, once and in display order", () =>
   expect(normalizeColumns(["notes", "unexpected", "scanner", "notes"])).toEqual(
     ["scanner", "notes"],
   );
+});
+
+describe("country sort", () => {
+  const mk = (id: string, country: string | null, date: string, name = id) => ({
+    ...a,
+    id,
+    name,
+    country,
+    country_code: country ? country.slice(0, 2).toUpperCase() : null,
+    date_status: "confirmed" as const,
+    start_date: date,
+    end_date: date,
+  });
+  const list = [
+    mk("sg2", "Singapore", "2027-05-01"),
+    mk("hk", "Hong Kong", "2027-09-01"),
+    mk("sg1", "Singapore", "2027-02-01"),
+    mk("sg1b", "Singapore", "2027-02-01"),
+    mk("my", "Malaysia", "2027-01-10"),
+    mk("none", null, "2027-01-01"),
+  ];
+  const sc = { sg1: { score: 40 }, sg1b: { score: 90 } } as never;
+  it("orders alphabetically by country, then date, then priority", () => {
+    const ids = sortRows(list, { key: "country", direction: "asc" }, {}, sc, today).map((e) => e.id);
+    expect(ids.slice(0, 5)).toEqual(["hk", "my", "sg1b", "sg1", "sg2"]);
+  });
+  it("reverses the country order but keeps date order inside a country", () => {
+    const ids = sortRows(list, { key: "country", direction: "desc" }, {}, sc, today).map((e) => e.id);
+    expect(ids.indexOf("sg2")).toBeLessThan(ids.indexOf("my"));
+    expect(ids.indexOf("sg1b")).toBeLessThan(ids.indexOf("sg2"));
+  });
+  it("groups by country and accepts the key as a saved sort", () => {
+    const sorted = sortRows(list, { key: "country", direction: "asc" }, {}, sc, today);
+    expect([...groupRowsByCountry(sorted).keys()]).toEqual(["Hong Kong", "Malaysia", "Singapore", "Unknown"]);
+    expect(normalizeRowSort({ key: "country", direction: "asc" })).toEqual({ key: "country", direction: "asc" });
+  });
 });

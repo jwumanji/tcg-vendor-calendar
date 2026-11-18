@@ -3421,3 +3421,72 @@ input[type="checkbox"]:indeterminate::after { content: ""; width: 10px; height: 
   .event-rows .month-divider { display: block; position: sticky; top: calc(var(--header-h) + var(--tabs-h)); z-index: 2; }
   .event-rows .month-divider th { display: block; position: static; }
 }
+
+/* ---------- Score colours: ONE hue family (violet), light/muted -> deep/rich as the score rises ----------
+   Applies to Priority chips, the Scanner-score gem, tier legend, meters and the factor bars.
+   Text colours are chosen per level for >= 4.5:1 (large numbers >= 3:1). */
+:root {
+  --score-0-bg: #2b2947; --score-0-fg: #b7b5d8; --score-0-bd: #403d66;
+  --score-1-bg: #3e3972; --score-1-fg: #e0dcfa; --score-1-bd: #5a5499;
+  --score-2-bg: linear-gradient(135deg, #7a63dc, #5a43c8); --score-2-fg: #ffffff; --score-2-bd: #8f7be6;
+  --score-3-bg: linear-gradient(135deg, #7e5df2, #4a2db8); --score-3-fg: #ffffff; --score-3-bd: #a28cf7;
+  --score-bar: linear-gradient(90deg, #8f7be6, #6a4fd6);
+}
+:root[data-theme="light"] {
+  --score-0-bg: #efecf8; --score-0-fg: #4a4668; --score-0-bd: #cdc8e3;
+  --score-1-bg: #d9d2f7; --score-1-fg: #2d2262; --score-1-bd: #b3a7ea;
+  --score-2-bg: linear-gradient(135deg, #7660d9, #5a43c8); --score-2-fg: #ffffff; --score-2-bd: #5a43c8;
+  --score-3-bg: linear-gradient(135deg, #5b3cd0, #371c9c); --score-3-fg: #ffffff; --score-3-bd: #371c9c;
+  --score-bar: linear-gradient(90deg, #a99aee, #5a3fcb);
+}
+.priority-skip { background: var(--score-0-bg); color: var(--score-0-fg); border-color: var(--score-0-bd); }
+.priority-maybe { background: var(--score-1-bg); color: var(--score-1-fg); border-color: var(--score-1-bd); }
+.priority-strong { background: var(--score-2-bg); color: var(--score-2-fg); border-color: var(--score-2-bd); }
+.priority-must { background: var(--score-3-bg); color: var(--score-3-fg); border-color: var(--score-3-bd); box-shadow: 0 3px 12px -4px #7e5df2aa; }
+.priority-chip[data-confidence="low"] { border-style: dashed; }
+.factor-track i, .score-bar i { background: var(--score-bar); }
+
+/* Scanner-score gem: same violet scale (common = lightest, secret = deepest) */
+.gem-common { --t1: #ecebf8; --t2: #cfcbec; }
+.gem-uncommon { --t1: #d6cff6; --t2: #b4a8ec; }
+.gem-rare { --t1: #8872e0; --t2: #6a52d4; }
+.gem-ultra { --t1: #7660d9; --t2: #5239c2; }
+.gem-secret { --t1: #6446d2; --t2: #3b2299; }
+.gem.gem-common, .gem.gem-uncommon { color: #1d1445; }
+.gem.gem-rare, .gem.gem-ultra, .gem.gem-secret { color: #fff; }
+.gem.gem-secret {
+  background: linear-gradient(150deg, var(--t1), var(--t2));
+  animation: none;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.3), inset 0 -2px 0 rgb(0 0 0 / 0.18), 0 4px 14px -4px var(--t2);
+}
+.rarity-legend .gem-secret i, .vendor-meter.gem-secret meter::-webkit-meter-optimum-value { background: linear-gradient(150deg, var(--t1), var(--t2)); }
+.vendor-meter.gem-secret meter::-moz-meter-bar { background: linear-gradient(90deg, var(--t1), var(--t2)); }
+/* Card tier edge + hover sheen: violet only (no rainbow) */
+.holo::before { background: linear-gradient(115deg, #a99aee 0%, #6a4fd6 50%, #a99aee 100%); background-size: 300% 100%; }
+.holo::after {
+  background:
+    radial-gradient(circle at var(--mx, 30%) var(--my, 0%), var(--sheen), transparent 42%),
+    linear-gradient(115deg, transparent 25%, rgb(130 100 240 / 0.12) 50%, transparent 75%);
+}
+
+/* Country filter dropdown (sits outside the scrolling chip row so the panel is never clipped) */
+.quick-row { display: flex; align-items: flex-start; gap: 8px; }
+.quick-row .quick-filters { flex: 1; min-width: 0; }
+.country-filter { position: relative; flex-shrink: 0; margin-block: 6px 12px; }
+.country-filter > button {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 4px 12px;
+  border: 1px solid var(--line-2); border-radius: 999px; background: var(--surface); color: var(--ink); font-weight: 700; font-size: 13px;
+}
+.country-filter > button[aria-pressed="true"] { border-color: var(--accent); }
+.country-panel {
+  position: absolute; z-index: 30; top: calc(100% + 6px); left: 0; width: min(300px, calc(100vw - 24px));
+  max-height: min(60dvh, 420px); overflow: auto; padding: 8px;
+  background: var(--surface-2); border: 1px solid var(--line-2); border-radius: 14px; box-shadow: var(--shadow-card);
+}
+.country-panel label { display: flex; align-items: center; gap: 9px; padding: 9px 8px; min-height: 40px; border-radius: 9px; cursor: pointer; }
+.country-panel label:hover { background: var(--surface-3); }
+.country-panel .country-name { flex: 1; }
+.country-panel .country-count { font: 700 12px var(--font-mono); color: var(--muted); }
+.country-panel .country-clear { margin: 6px 8px 2px; color: var(--accent); font-weight: 700; text-decoration: underline; }
+.country-filter .count { background: var(--accent); color: var(--on-accent); border-radius: 99px; padding: 0 6px; font-size: 11px; }
+.place .flag-img { flex-shrink: 0; }

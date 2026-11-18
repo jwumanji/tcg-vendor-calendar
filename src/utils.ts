@@ -35,15 +35,6 @@ export function gameKeyOf(raw: string) {
 export function primaryGameKey(e: Event) {
   return gameKey(games(e)[0]);
 }
-export type Rarity = "common" | "uncommon" | "rare" | "ultra" | "secret";
-/** Card-rarity style tier for a 0-100 vendor score. */
-export function rarity(score: number): { tier: Rarity; label: string } {
-  if (score >= 80) return { tier: "secret", label: "Secret rare" };
-  if (score >= 65) return { tier: "ultra", label: "Ultra rare" };
-  if (score >= 50) return { tier: "rare", label: "Rare" };
-  if (score >= 30) return { tier: "uncommon", label: "Uncommon" };
-  return { tier: "common", label: "Common" };
-}
 export function games(e: Event) {
   const found = gameRules
     .filter(([, r]) => e.games.some((g) => r.test(g)))
@@ -428,8 +419,8 @@ export function nextMonth(events: Event[], today: string) {
   );
 }
 export function dateSortKey(e: Event, today: string) {
-  if (e.date_status === "estimated" && e.estimated_month)
-    return e.estimated_month + "-32";
+  if (e.date_status !== "confirmed")
+    return e.estimated_month ? e.estimated_month + "-32" : "9999";
   const dates = ranges(e)
     .slice()
     .sort((a, b) => compareText(a.start_date, b.start_date));

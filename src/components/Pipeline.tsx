@@ -16,14 +16,13 @@ import {
 } from "lucide-react";
 import type { Event } from "../model";
 import { stages, emptyEntry, type Stage, type Entries } from "../storage";
-import { dateLabel, games, gameKey, primaryGameKey, rarity } from "../utils";
+import { dateLabel, games, gameKey, primaryGameKey } from "../utils";
 import { holo } from "../holo";
 import {
   ClashCue,
   Logo,
   Status,
   Place,
-  ScoreGem,
   NoteTag,
 } from "./EventIdentity";
 
@@ -169,14 +168,12 @@ const PipelineCard = memo(function PipelineCard({
   setGoing: SetGoing;
   change: (event: Event, stage: Stage) => void;
 }) {
-  const tier = e.vendor_score !== null ? rarity(e.vendor_score).tier : "none";
   const primary = games(e)[0];
   return (
     <article
       className={`pipeline-card holo status-${e.date_status}`}
       data-game={primaryGameKey(e)}
       data-going={going}
-      data-tier={tier}
       {...holo}
     >
       <span className="pcard-edge" aria-hidden="true" />
@@ -205,7 +202,6 @@ const PipelineCard = memo(function PipelineCard({
       </div>
       <div className="pcard-foot">
         <PriorityChip result={score} />
-        {e.vendor_score !== null && <ScoreGem score={e.vendor_score} />}
       </div>
       <div className="pcard-tags">
         <Status e={e} />

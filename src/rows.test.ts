@@ -148,17 +148,26 @@ it("groups recurring and estimated dates by displayed month and always puts unda
     ...a,
     occurrences: [
       { start_date: "2025-12-30", end_date: "2025-12-31" },
-      { start_date: "2027-03-16", end_date: "2027-03-17" },
+      { start_date: "2027-03-31", end_date: "2027-04-02" },
     ],
   };
   const tba = { ...c, estimated_month: "2027-01" };
   const noMonth = { ...b, estimated_month: null };
-  const groups = groupRowsByMonth([tba, recurring, b, a, noMonth], today);
-  expect([...groups]).toEqual([
-    ["2027-03", [recurring, b]],
-    ["2027-01", [a]],
-    ["tba", [tba, noMonth]],
-  ]);
+  const list = [noMonth, tba, recurring, b, a, c];
+  for (const direction of ["asc", "desc"] as const) {
+    const sorted = sortRows(list, { key: "dates", direction }, entries, scores, today);
+    const groups = groupRowsByMonth(sorted, today);
+    expect([...groups]).toEqual(direction === "asc" ? [
+      ["2027-01", [a, tba]],
+      ["2027-03", [recurring, b]],
+      ["tba", [noMonth, c]],
+    ] : [
+      ["2027-03", [b, recurring]],
+      ["2027-01", [tba, a]],
+      ["tba", [noMonth, c]],
+    ]);
+    expect([...groups.values()].flat()).toEqual(sorted);
+  }
   expect(groupRowsByMonth([], today).size).toBe(0);
 });
 

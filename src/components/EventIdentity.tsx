@@ -1,7 +1,7 @@
 import type { ScoreResult } from "../scoring";
 import type { Entries } from "../storage";
 import { TriangleAlert, StickyNote } from "lucide-react";
-import { flagFile, placeLabel, rarity, type Rarity } from "../utils";
+import { flagFile, placeLabel } from "../utils";
 import type { Event } from "../model";
 import { useState } from "react";
 import { GeneratedCover } from "./GeneratedCover";
@@ -99,38 +99,6 @@ export function ClashCue({
   return (
     <span className="clash-cue" role="img" aria-label={label} title={label}>
       <TriangleAlert size={14} aria-hidden="true" />
-    </span>
-  );
-}
-
-const tierMark: Record<Rarity, string> = {
-  common: "●",
-  uncommon: "◆",
-  rare: "★",
-  ultra: "✦",
-  secret: "❖",
-};
-/** Vendor score shown as a rarity "gem": numeric score + tier label + shape (never colour alone). */
-export function ScoreGem({
-  score,
-  large = false,
-}: {
-  score: number;
-  large?: boolean;
-}) {
-  const r = rarity(score);
-  return (
-    <span
-      title={`Scanner score ${score} of 100, ${r.label}`}
-      className={`gem gem-${r.tier}${large ? " gem-lg" : ""}`}
-    >
-      <span className="gem-num">
-        {score}
-        <small>/100</small>
-      </span>
-      <span className="gem-tier">
-        <span aria-hidden="true">{tierMark[r.tier]}</span> {r.label}
-      </span>
     </span>
   );
 }

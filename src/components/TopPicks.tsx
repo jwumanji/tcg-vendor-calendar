@@ -78,7 +78,6 @@ export function TopPicks({
               key={e.id}
               data-going={!!entries[e.id]?.going}
               data-game={primaryGameKey(e)}
-              data-tier={scores[e.id].tier === "must" ? "secret" : "rare"}
               {...holo}
             >
               <span className="pick-rank" aria-hidden="true">
@@ -113,23 +112,23 @@ export function TopPicks({
             </article>
           ))}
         </div>
-        <ul className="rarity-legend" aria-label="Priority score tiers">
+        <ul className="priority-legend" aria-label="Priority score tiers">
           {[
-            ["Must-do", TIER_THRESHOLDS.must + "+", "secret"],
+            ["Must-do", TIER_THRESHOLDS.must + "+", "must"],
             [
               "Strong",
               `${TIER_THRESHOLDS.strong}–${TIER_THRESHOLDS.must - 1}`,
-              "ultra",
+              "strong",
             ],
             [
               "Maybe",
               `${TIER_THRESHOLDS.maybe}–${TIER_THRESHOLDS.strong - 1}`,
-              "rare",
+              "maybe",
             ],
-            ["Skip", `under ${TIER_THRESHOLDS.maybe}`, "common"],
-          ].map(([label, range, tone]) => (
-            <li key={label} className={`gem-${tone}`}>
-              <i aria-hidden="true" />
+            ["Skip", `under ${TIER_THRESHOLDS.maybe}`, "skip"],
+          ].map(([label, range, tier]) => (
+            <li key={label}>
+              <i className={`priority-${tier}`} aria-hidden="true" />
               {label}
               <span>{range}</span>
             </li>

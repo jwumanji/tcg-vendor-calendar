@@ -2,8 +2,9 @@ import { useEventRoute } from "./hooks/useEventRoute";
 import { usePriority } from "./hooks/usePriority";
 import { Modal } from "./components/Modal";
 import { EventRows, RowColumns, RowSortControl } from "./components/EventRows";
-import { normalizeColumns, normalizeListView, loadSort, SORT_STORAGE_KEY, sortRows } from "./rows";
+import { normalizeColumns, normalizeListView, loadSort, SORT_STORAGE_KEY, groupSortedRows, sortRows } from "./rows";
 import { CalendarView } from "./components/CalendarView";
+import { CardSections } from "./components/ListSections";
 import { EventCard } from "./components/EventCard";
 import { BrandLockup, BrandMark } from "./components/Brand";
 import { EmptyState } from "./components/EmptyState";
@@ -417,6 +418,10 @@ export default function App() {
           (view === "Recurring SG" && e.section === "recurring_sg"),
       ),
     [sorted, view],
+  );
+  const listGroups = useMemo(
+    () => groupSortedRows(visibleList, sort.key, today),
+    [visibleList, sort.key, today],
   );
   const sortControl = <RowSortControl sort={sort} setSort={setSort} />;
   const noResults = (
@@ -941,7 +946,7 @@ export default function App() {
                 visibleList.length > 0 && (
                   <EventRows
                     columns={columns}
-                    events={visibleList}
+                    groups={listGroups}
                     key={String(selectMode)}
                     selectMode={selectMode}
                     setGoing={setGoing}
@@ -954,8 +959,8 @@ export default function App() {
                   />
                 )
               ) : (
-                <div className="cards">
-                  {visibleList.map((e) => (
+                <CardSections groups={listGroups} sortKey={sort.key}>
+                  {(e) => (
                     <div key={e.id}>
                       {card(e)}
                       {view === "Recurring SG" && (
@@ -979,8 +984,8 @@ export default function App() {
                         </div>
                       )}
                     </div>
-                  ))}
-                </div>
+                  )}
+                </CardSections>
               )}
               {visibleList.length === 0 && noResults}
             </>

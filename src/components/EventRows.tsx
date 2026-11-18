@@ -6,7 +6,6 @@ import { emptyEntry, type Entries } from "../storage";
 import { games, gameKey, upcoming } from "../utils";
 import {
   ROW_SORT_LABELS,
-  groupSortedRows,
   optionalColumns,
   type OptionalColumn,
   nextRowSort,
@@ -16,14 +15,15 @@ import {
   type RowKey,
   type RowSort,
 } from "../rows";
-import { Logo, Place, NoteTag, ScoreGem, ClashCue } from "./EventIdentity";
+import { Logo, Place, NoteTag, ClashCue } from "./EventIdentity";
 import { GoingButton, type SetGoing } from "./GoingButton";
 import { StageBadge } from "./Pipeline";
 import { PriorityChip } from "./PriorityChip";
+import { SectionHeading } from "./ListSections";
 import { SourceChip } from "./FindSource";
 
 export function EventRows({
-  events: sorted,
+  groups,
   columns,
   sort,
   setSort,
@@ -34,7 +34,7 @@ export function EventRows({
   setGoing,
   open,
 }: {
-  events: Event[];
+  groups: ReadonlyMap<string, Event[]>;
   columns: OptionalColumn[];
   sort: RowSort;
   setSort: (sort: RowSort) => void;
@@ -45,13 +45,12 @@ export function EventRows({
   setGoing: SetGoing;
   open: (e: Event) => void;
 }) {
-  const groups = useMemo(
-    () => groupSortedRows(sorted, sort.key, today),
-    [sorted, sort.key, today],
-  );
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const anchor = useRef<string | null>(null);
-  const ids = useMemo(() => sorted.map((e) => e.id), [sorted]);
+  const ids = useMemo(
+    () => Array.from(groups.values()).flatMap((items) => items.map((e) => e.id)),
+    [groups],
+  );
   const visibleSelection = ids.filter((id) => selected.has(id));
   const count = visibleSelection.length;
   const all = count > 0 && count === ids.length;
@@ -208,36 +207,12 @@ export function EventRows({
               ))}
             </tr>
           </thead>
-          {Array.from(groups, ([month, items]) => (
-            <tbody key={month} role="rowgroup">
-              {month && (
+          {Array.from(groups, ([key, items]) => (
+            <tbody key={key} role="rowgroup">
+              {key && (
                 <tr role="row" className="month-divider">
-                  <th
-                    role="columnheader"
-                    scope="colgroup"
-                    colSpan={7 + columns.length}
-                  >
-                    {sort.key === "country" ? (
-                      <Place
-                        e={{
-                          city: null,
-                          country: month === "Unknown" ? null : month,
-                          country_code: items[0].country_code,
-                        }}
-                        countryOnly
-                      />
-                    ) : month === "tba" ? (
-                      "Dates to be announced"
-                    ) : (
-                      new Date(month + "-01T12:00:00").toLocaleDateString(
-                        "en-GB",
-                        { month: "short", year: "numeric" },
-                      )
-                    )}
-                    <span>
-                      {" "}
-                      · {items.length} {items.length === 1 ? "event" : "events"}
-                    </span>
+                  <th scope="rowgroup" colSpan={7 + columns.length}>
+                    <SectionHeading groupKey={key} sortKey={sort.key} items={items} />
                   </th>
                 </tr>
               )}
@@ -369,11 +344,8 @@ export function EventRows({
                     </td>
                     {columns.includes("scanner") && (
                       <td role="cell" className="row-scanner">
-                        {e.vendor_score === null ? (
-                          "—"
-                        ) : (
-                          <ScoreGem score={e.vendor_score} />
-                        )}
+                        <span className="row-mobile-header" aria-hidden="true">Scanner score · </span>
+                        {e.vendor_score ?? "—"}
                       </td>
                     )}
                     {columns.includes("source") && (

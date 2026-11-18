@@ -23,9 +23,8 @@ import {
   download,
   gameKeyOf,
   primaryGameKey,
-  rarity,
 } from "../utils";
-import { Logo, Status, Place, ScoreGem } from "./EventIdentity";
+import { Logo, Status, Place } from "./EventIdentity";
 import { StageBadge, StagePicker } from "./Pipeline";
 import type { Entry, Stage } from "../storage";
 export function Detail({
@@ -209,15 +208,6 @@ export function Detail({
               : ""}
           </span>
         </div>
-        {e.vendor_score !== null && (
-          <div className={`vendor-meter gem-${rarity(e.vendor_score).tier}`}>
-            <span>
-              Scanner score
-              <ScoreGem score={e.vendor_score} large />
-            </span>
-            <meter aria-label="Scanner score" min="0" max="100" value={e.vendor_score} />
-          </div>
-        )}
         {e.description && <p className="description">{e.description}</p>}
         <h2>The essentials</h2>
         <dl>

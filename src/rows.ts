@@ -4,7 +4,6 @@ import { emptyEntry, stages, type Entries } from "./storage";
 import {
   compareText,
   dateSortKey,
-  isUndated,
   prettyDate,
   ranges,
 } from "./utils";
@@ -107,10 +106,6 @@ export function sortRows(
       case "city":
         return e.city || e.country;
       case "dates": {
-        if (e.date_status !== "confirmed")
-          return e.date_status === "estimated" && e.estimated_month
-            ? e.estimated_month + "-32"
-            : null;
         const date = dateSortKey(e, today);
         return date === "9999" ? null : date;
       }
@@ -143,10 +138,8 @@ export function sortRows(
   }
   // Inside one country: soonest date first (undated last), then higher priority, then name.
   function withinCountry(a: Event, b: Event) {
-    const da = a.date_status === "confirmed" ? dateSortKey(a, today) : a.estimated_month ? a.estimated_month + "-32" : "9999";
-    const db = b.date_status === "confirmed" ? dateSortKey(b, today) : b.estimated_month ? b.estimated_month + "-32" : "9999";
     return (
-      compareText(da, db) ||
+      compareText(dateSortKey(a, today), dateSortKey(b, today)) ||
       (scores[b.id]?.score ?? -1) - (scores[a.id]?.score ?? -1) ||
       compareText(a.name, b.name)
     );
@@ -175,11 +168,11 @@ export function groupRowsByMonth(sorted: Event[], today: string) {
   const months = new Map<string, Event[]>();
   const undated: Event[] = [];
   for (const event of sorted) {
-    if (isUndated(event)) {
+    const month = dateSortKey(event, today).slice(0, 7);
+    if (month === "9999") {
       undated.push(event);
       continue;
     }
-    const month = dateSortKey(event, today).slice(0, 7);
     if (!months.has(month)) months.set(month, []);
     months.get(month)!.push(event);
   }

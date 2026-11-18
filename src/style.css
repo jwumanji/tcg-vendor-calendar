@@ -118,28 +118,6 @@
   --st-6: 12 128 70;
 }
 
-/* Rarity tiers (vendor score) */
-.gem-common {
-  --t1: #dfe2f2;
-  --t2: #9ba2c6;
-}
-.gem-uncommon {
-  --t1: #9bf5c8;
-  --t2: #2fcb8c;
-}
-.gem-rare {
-  --t1: #a8d8ff;
-  --t2: #4f98ff;
-}
-.gem-ultra {
-  --t1: #e6c4ff;
-  --t2: #a66dff;
-}
-.gem-secret {
-  --t1: #ffd24a;
-  --t2: #ff6bd6;
-}
-
 /* Game accents (triplets) — from the existing game normalisation */
 [data-game="pokemon"] {
   --g-rgb: 255 203 5;
@@ -552,7 +530,7 @@ section[id],
     box-shadow 0.28s;
   animation: rise 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
 }
-/* foil ring overlay: always on for secret rares, on hover/focus for the rest */
+/* Foil ring on hover and keyboard focus. */
 .holo::before {
   content: "";
   position: absolute;
@@ -597,14 +575,6 @@ section[id],
       rgb(107 200 255 / 0.13) 60%,
       transparent 80%
     );
-}
-[data-tier="secret"].holo::before,
-[data-tier="ultra"].holo::before {
-  opacity: 0.55;
-  animation: foil-drift 8s linear infinite alternate;
-}
-[data-tier="secret"].holo::before {
-  opacity: 1;
 }
 @media (hover: hover) {
   .holo:hover,
@@ -656,9 +626,6 @@ section[id],
   align-items: center;
   gap: 10px;
 }
-.pick-meta .gem {
-  margin-left: auto;
-}
 .pick h3 {
   font: 800 18px/1.25 var(--font-text);
   letter-spacing: -0.01em;
@@ -680,60 +647,7 @@ section[id],
   color: var(--muted);
 }
 
-/* Vendor score "rarity gem" */
-.gem {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: flex-end;
-  flex-shrink: 0;
-  gap: 1px;
-  padding: 5px 10px 6px;
-  border-radius: 12px 12px 12px 4px;
-  color: #120c2b;
-  background: linear-gradient(150deg, var(--t1), var(--t2));
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.55),
-    inset 0 -2px 0 rgb(0 0 0 / 0.16),
-    0 4px 12px -4px var(--t2);
-  line-height: 1.1;
-  white-space: nowrap;
-}
-.gem-num {
-  font: 800 20px/1 var(--font-display);
-  letter-spacing: -0.04em;
-}
-.gem-num small {
-  font: 700 11px var(--font-mono);
-  letter-spacing: 0;
-  opacity: 0.88;
-  margin-left: 1px;
-}
-.gem-tier {
-  font: 700 10.5px var(--font-mono);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-.gem-lg .gem-num {
-  font-size: 34px;
-}
-.gem-lg {
-  padding: 8px 14px 9px;
-  border-radius: 16px 16px 16px 5px;
-}
-.gem-lg .gem-tier {
-  font-size: 12px;
-}
-.gem.gem-secret {
-  background: var(--foil);
-  background-size: 300% 100%;
-  animation: foil-drift 5s linear infinite alternate;
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.6),
-    inset 0 -2px 0 rgb(0 0 0 / 0.15),
-    0 4px 16px -3px #ff6bd6aa;
-}
-
-.rarity-legend {
+.priority-legend {
   display: flex;
   flex-wrap: wrap;
   gap: 6px 14px;
@@ -742,22 +656,18 @@ section[id],
   letter-spacing: 0.04em;
   color: var(--muted);
 }
-.rarity-legend li {
+.priority-legend li {
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
-.rarity-legend i {
+.priority-legend i {
   width: 12px;
   height: 12px;
   border-radius: 3px 3px 3px 1px;
-  background: linear-gradient(150deg, var(--t1), var(--t2));
   transform: rotate(45deg) scale(0.85);
 }
-.rarity-legend .gem-secret i {
-  background: var(--foil);
-}
-.rarity-legend li span {
+.priority-legend li span {
   font-weight: 400;
 }
 
@@ -2031,9 +1941,6 @@ h4 > span {
 .pcard-foot .badge {
   align-self: flex-start;
 }
-.pcard-foot .gem-num {
-  font-size: 18px;
-}
 .pcard-tags {
   display: flex;
   flex-wrap: wrap;
@@ -2226,57 +2133,6 @@ footer > small {
 .planning small {
   font-size: 13px;
   color: var(--muted);
-}
-.vendor-meter {
-  margin: 20px 0;
-  padding: 14px 16px;
-  border-radius: 18px;
-  border: 1.5px solid var(--line-2);
-  background: var(--surface-2);
-}
-.vendor-meter > span {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  font: 700 12px var(--font-mono);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.vendor-meter meter {
-  appearance: none;
-  -webkit-appearance: none;
-  display: block;
-  width: 100%;
-  height: 14px;
-  margin-top: 12px;
-  border: 0;
-  border-radius: 99px;
-  background: var(--surface-3);
-  overflow: hidden;
-}
-.vendor-meter meter::-webkit-meter-bar {
-  height: 14px;
-  border: 0;
-  border-radius: 99px;
-  background: var(--surface-3);
-}
-.vendor-meter meter::-webkit-meter-optimum-value,
-.vendor-meter meter::-webkit-meter-suboptimum-value,
-.vendor-meter meter::-webkit-meter-even-less-good-value {
-  border-radius: 99px;
-  background: linear-gradient(90deg, var(--t1), var(--t2));
-}
-.vendor-meter.gem-secret meter::-webkit-meter-optimum-value {
-  background: var(--foil);
-}
-.vendor-meter meter::-moz-meter-bar {
-  border-radius: 99px;
-  background: linear-gradient(90deg, var(--t1), var(--t2));
-}
-.vendor-meter.gem-secret meter::-moz-meter-bar {
-  background: var(--foil);
 }
 .game-pills {
   display: flex;
@@ -2793,6 +2649,9 @@ input[type="range"]::-moz-range-thumb {
     padding: 22px;
   }
 
+  .list-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .cards {
     gap: 18px;
   }
@@ -2862,6 +2721,14 @@ input[type="range"]::-moz-range-thumb {
   }
 }
 @media (min-width: 700px) and (max-width: 1099px) {
+  .list-cards .event-card { grid-template-columns: 112px minmax(0, 1fr); }
+  .list-cards .card-details { padding: 10px; }
+  .list-cards .card-heading .going-button {
+    flex-direction: column;
+    gap: 2px;
+    padding: 3px;
+    font-size: 12px;
+  }
   .overview {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -2911,11 +2778,6 @@ input[type="range"]::-moz-range-thumb {
 @keyframes spin {
   to {
     transform: rotate(360deg);
-  }
-}
-@keyframes foil-drift {
-  to {
-    background-position: 100% 0;
   }
 }
 @keyframes spin-in {
@@ -2972,7 +2834,7 @@ input[type="range"]::-moz-range-thumb {
 @media (forced-colors: active) {
   .holo,
   .badge,
-  .gem {
+  .priority-chip {
     border: 2px solid CanvasText;
   }
 }
@@ -3031,7 +2893,7 @@ a.source-chip { text-underline-offset: 2px; }
 .rows-wrap { position: relative; border: 1px solid var(--line-2); border-radius: 13px; background: var(--surface); }
 .event-rows { border-spacing: 0; width: 100%; table-layout: fixed; font-size: 13px; line-height: 1.3; }
 .event-rows thead th {
-  position: sticky; top: calc(var(--header-h) + var(--tabs-h)); z-index: 2; height: 40px;
+  position: sticky; top: calc(var(--header-h) + var(--tabs-h)); z-index: 7; height: 40px;
   background: var(--surface-3); color: var(--muted); border-bottom: 1px solid var(--line-2);
   text-align: left; padding: 0 5px; font: 700 11px/1.2 var(--font-mono);
 }
@@ -3073,10 +2935,6 @@ a.source-chip { text-underline-offset: 2px; }
 .event-rows .game-tag { min-width: 0; }
 .event-rows .game-tag span { overflow: hidden; text-overflow: ellipsis; }
 .event-rows .game-tag::before { flex: none; width: 5px; height: 5px; }
-.event-rows .gem { align-items: flex-start; padding: 4px 7px; border-radius: 7px 7px 7px 2px; box-shadow: none; }
-.event-rows .gem-num { font-size: 15px; }
-.event-rows .gem-num small { font-size: 9px; }
-.event-rows .gem-tier { font-size: 9px; letter-spacing: 0; }
 .row-notes { text-align: center; }
 .row-mobile-header { display: none; }
 @media (min-width: 721px) and (max-width: 1160px) {
@@ -3198,7 +3056,7 @@ input[type="checkbox"]:indeterminate::after { content: ""; width: 10px; height: 
 }
 .bulk-bar .button { min-height: 36px; padding: 4px 10px; }
 @media (min-width: 1161px) {
-  .event-rows[data-selecting="true"] th { top: calc(var(--header-h) + var(--tabs-h) + 52px); }
+  .event-rows[data-selecting="true"] thead th { top: calc(var(--header-h) + var(--tabs-h) + 52px); }
 }
 .event-rows .row-going { padding: 0; text-align: center; }
 .going-button {
@@ -3312,14 +3170,37 @@ input[type="checkbox"]:indeterminate::after { content: ""; width: 10px; height: 
 .event-rows tr[data-selected="true"] td { background: transparent; }
 .event-rows tr[data-selected="true"] .row-select { box-shadow: inset 4px 0 var(--link); }
 .event-rows tr[data-past="true"] { opacity: .55; }
-.event-rows .month-divider th {
-  position: sticky; top: calc(var(--header-h) + var(--tabs-h) + 40px);
-  z-index: 1; background: var(--surface-2); color: var(--ink);
-  text-align: left; padding: 6px 14px; border-block: 1px solid var(--line-2);
-  border-radius: 0; font-size: 14px; cursor: default;
+/* Section headings share the same surface and remain below planner navigation. */
+.list-section-heading {
+  margin: 0;
+  padding: 6px 14px;
+  background: var(--surface-2);
+  color: var(--ink);
+  border-block: 1px solid var(--line-2);
+  font: 700 14px/1.4 var(--font-text);
+  text-align: left;
+  scroll-margin-top: calc(var(--header-h) + var(--tabs-h) + 8px);
 }
-.month-divider span { color: var(--muted); font-weight: 500; }
-.event-rows[data-selecting="true"] .month-divider th { top: calc(var(--header-h) + var(--tabs-h) + 92px); }
+.section-count { color: var(--muted); font-weight: 500; }
+.card-section + .card-section { margin-top: 20px; }
+.card-section > .list-section-heading {
+  position: sticky;
+  top: calc(var(--header-h) + var(--tabs-h));
+  z-index: 6;
+  margin-bottom: 10px;
+}
+.event-rows { --divider-top: calc(var(--header-h) + var(--tabs-h) + 40px); }
+.event-rows .month-divider th {
+  position: sticky;
+  top: var(--divider-top);
+  z-index: 6;
+  padding: 0;
+  cursor: default;
+}
+.event-rows .list-section-heading { scroll-margin-top: calc(var(--divider-top) + 8px); }
+@media (min-width: 1161px) {
+  .event-rows[data-selecting="true"] { --divider-top: calc(var(--header-h) + var(--tabs-h) + 92px); }
+}
 .mobile-select-all { display: none; }
 .going-toast:not(:empty) {
   position: fixed; z-index: 30; bottom: calc(16px + env(safe-area-inset-bottom));
@@ -3330,7 +3211,7 @@ input[type="checkbox"]:indeterminate::after { content: ""; width: 10px; height: 
 }
 .going-toast button { color: var(--accent); min-height: 44px; text-decoration: underline; font-weight: 750; }
 @media (min-width: 721px) and (max-width: 1160px) {
-  .event-rows .month-divider th, .event-rows[data-selecting="true"] .month-divider th { top: 40px; }
+  .event-rows { --divider-top: 40px; }
 }
 @media (max-width: 720px) {
   :root { --pad: 12px; --header-h: calc(48px + env(safe-area-inset-top)); --tabs-h: 48px; }
@@ -3387,12 +3268,13 @@ input[type="checkbox"]:indeterminate::after { content: ""; width: 10px; height: 
   .row-stage, .row-notes, .row-scanner, .row-source { grid-column: 1 / -1; font-size: 12px; }
   .row-stage { grid-column: 2 / -1; }
   .row-stage:empty { display: none; }
-  .event-rows .month-divider { display: block; position: sticky; top: calc(var(--header-h) + var(--tabs-h)); z-index: 2; }
+  .event-rows { --divider-top: calc(var(--header-h) + var(--tabs-h)); }
+  .event-rows .month-divider { display: block; position: sticky; top: var(--divider-top); z-index: 6; }
   .event-rows .month-divider th { display: block; position: static; }
 }
 
 /* ---------- Score colours: ONE hue family (violet), light/muted -> deep/rich as the score rises ----------
-   Applies to Priority chips, the Scanner-score gem, tier legend, meters and the factor bars.
+   Applies to Priority chips, the tier legend and the factor bars.
    Text colours are chosen per level for >= 4.5:1 (large numbers >= 3:1). */
 :root {
   --score-0-bg: #2b2947; --score-0-fg: #b7b5d8; --score-0-bd: #403d66;
@@ -3415,22 +3297,7 @@ input[type="checkbox"]:indeterminate::after { content: ""; width: 10px; height: 
 .priority-chip[data-confidence="low"] { border-style: dashed; }
 .factor-track i, .score-bar i { background: var(--score-bar); }
 
-/* Scanner-score gem: same violet scale (common = lightest, secret = deepest) */
-.gem-common { --t1: #ecebf8; --t2: #cfcbec; }
-.gem-uncommon { --t1: #d6cff6; --t2: #b4a8ec; }
-.gem-rare { --t1: #8872e0; --t2: #6a52d4; }
-.gem-ultra { --t1: #7660d9; --t2: #5239c2; }
-.gem-secret { --t1: #6446d2; --t2: #3b2299; }
-.gem.gem-common, .gem.gem-uncommon { color: #1d1445; }
-.gem.gem-rare, .gem.gem-ultra, .gem.gem-secret { color: #fff; }
-.gem.gem-secret {
-  background: linear-gradient(150deg, var(--t1), var(--t2));
-  animation: none;
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.3), inset 0 -2px 0 rgb(0 0 0 / 0.18), 0 4px 14px -4px var(--t2);
-}
-.rarity-legend .gem-secret i, .vendor-meter.gem-secret meter::-webkit-meter-optimum-value { background: linear-gradient(150deg, var(--t1), var(--t2)); }
-.vendor-meter.gem-secret meter::-moz-meter-bar { background: linear-gradient(90deg, var(--t1), var(--t2)); }
-/* Card tier edge + hover sheen: violet only (no rainbow) */
+/* Card edge + hover sheen: violet only (no rainbow) */
 .holo::before { background: linear-gradient(115deg, #a99aee 0%, #6a4fd6 50%, #a99aee 100%); background-size: 300% 100%; }
 .holo::after {
   background:

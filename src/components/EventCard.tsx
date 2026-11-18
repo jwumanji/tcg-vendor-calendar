@@ -6,14 +6,13 @@ import { memo } from "react";
 import { CalendarDays } from "lucide-react";
 import type { Event } from "../model";
 import type { Entries, Entry } from "../storage";
-import { games, dateLabel, gameKey, primaryGameKey, rarity } from "../utils";
+import { games, dateLabel, gameKey, primaryGameKey } from "../utils";
 import { holo } from "../holo";
 import {
   ClashCue,
   Logo,
   Status,
   Place,
-  ScoreGem,
   NoteTag,
 } from "./EventIdentity";
 import { StageBadge } from "./Pipeline";
@@ -34,13 +33,11 @@ export const EventCard = memo(function EventCard({
   occurrence?: string;
   open: (e: Event, occurrence?: string) => void;
 }) {
-  const tier = e.vendor_score !== null ? rarity(e.vendor_score).tier : "none";
   return (
     <article
       className={`event-card holo status-${e.date_status}`}
       data-game={primaryGameKey(e)}
       data-going={entry.going}
-      data-tier={tier}
       {...holo}
     >
       <Logo e={e} size="xl" />
@@ -67,7 +64,6 @@ export const EventCard = memo(function EventCard({
           </div>
           <div className="card-art-foot">
             <PriorityChip result={score} />
-            {e.vendor_score !== null && <ScoreGem score={e.vendor_score} />}
           </div>
         </div>
         <div className="card-tags">

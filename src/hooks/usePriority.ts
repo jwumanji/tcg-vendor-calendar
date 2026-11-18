@@ -28,6 +28,21 @@ export function usePriority(
     const error = saveValue(OVERRIDES_KEY, overrides);
     if (error) reportError(error);
   }, [overrides, reportError]);
+  // Keep several open tabs in sync: adopt another tab's change, but only when
+  // the content really differs, so two tabs never ping-pong writes.
+  useEffect(() => {
+    function onStorage(event: StorageEvent) {
+      if (event.key === WEIGHTS_KEY) {
+        const next = normalizeWeights(stored(WEIGHTS_KEY));
+        setWeights((cur) => (JSON.stringify(cur) === JSON.stringify(next) ? cur : next));
+      } else if (event.key === OVERRIDES_KEY) {
+        const next = normalizeOverrides(stored(OVERRIDES_KEY));
+        setOverrides((cur) => (JSON.stringify(cur) === JSON.stringify(next) ? cur : next));
+      }
+    }
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
   const scores = useMemo(
     () =>
       Object.fromEntries(

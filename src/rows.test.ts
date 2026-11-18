@@ -3,6 +3,8 @@ import fixtures from "../tests/fixtures/new-finds.json";
 import { normalizeEvents } from "./data";
 import {
   defaultRowSort,
+  groupRowsByMonth,
+  normalizeColumns,
   nextRowSort,
   normalizeListView,
   normalizeRowSort,
@@ -65,7 +67,11 @@ describe("row ordering", () => {
         { start_date: "2027-04-02", end_date: "2027-04-04" },
       ],
     };
-    const tentative = { ...c, estimated_month: "2027-02" };
+    const tentative = {
+      ...c,
+      date_status: "estimated" as const,
+      estimated_month: "2027-02",
+    };
     expect(
       sortRows(
         [recurring, b, tentative],
@@ -128,4 +134,30 @@ it("selects visible IDs and toggles ranges in the current sort order", () => {
   expect([...range]).toEqual(["c", "a", "b"]);
   expect([...selectRange(ids, range, "c", "b")]).toEqual([]);
   expect([...selectRange(ids, first, "b", "hidden")]).toEqual(["c", "b"]);
+});
+
+it("groups recurring and estimated dates by displayed month and always puts undated events last", () => {
+  const recurring = {
+    ...a,
+    occurrences: [
+      { start_date: "2025-12-30", end_date: "2025-12-31" },
+      { start_date: "2027-03-16", end_date: "2027-03-17" },
+    ],
+  };
+  const tba = { ...c, estimated_month: "2027-01" };
+  const noMonth = { ...b, estimated_month: null };
+  const groups = groupRowsByMonth([tba, recurring, b, a, noMonth], today);
+  expect([...groups]).toEqual([
+    ["2027-03", [recurring, b]],
+    ["2027-01", [a]],
+    ["tba", [tba, noMonth]],
+  ]);
+  expect(groupRowsByMonth([], today).size).toBe(0);
+});
+
+it("restores only recognized optional columns, once and in display order", () => {
+  expect(normalizeColumns(null)).toEqual([]);
+  expect(normalizeColumns(["notes", "unexpected", "scanner", "notes"])).toEqual(
+    ["scanner", "notes"],
+  );
 });

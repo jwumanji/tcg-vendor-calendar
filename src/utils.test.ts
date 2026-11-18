@@ -383,3 +383,82 @@ it("filters to Going and exports only its confirmed occurrences", () => {
   );
   expect(() => ics(goingEvents([event, tba], entries))).toThrow("No confirmed");
 });
+
+describe("quick filters", () => {
+  const confirmed = {
+    ...event,
+    country: "Singapore",
+    occurrences: undefined,
+    start_date: "2026-12-01",
+    end_date: "2026-12-02",
+    date_status: "confirmed" as const,
+  };
+  const estimated = {
+    ...confirmed,
+    date_status: "estimated" as const,
+    estimated_month: "2027-02",
+  };
+  it("shares confirmed and country filters and treats missing entries as not yet Going", () => {
+    const filters = {
+      ...emptyFilters,
+      status: "confirmed",
+      countries: ["Singapore", "Malaysia"],
+      notGoing: true,
+    };
+    expect(matches(confirmed, filters, {})).toBe(true);
+    expect(matches(estimated, filters, {})).toBe(false);
+    expect(matches({ ...confirmed, country: "Hong Kong" }, filters, {})).toBe(
+      false,
+    );
+    expect(
+      matches(confirmed, filters, {
+        [confirmed.id]: { ...emptyEntry, going: true },
+      }),
+    ).toBe(false);
+  });
+  it("checks all occurrences and estimated months within 90 calendar days including today", () => {
+    const filters = { ...emptyFilters, next90: true };
+    const match = (e: Event) => matches(e, filters, {}, 0, "2026-12-01");
+    expect(
+      match({ ...confirmed, start_date: "2026-10-01", end_date: "2026-12-01" }),
+    ).toBe(true);
+    expect(
+      match({ ...confirmed, start_date: "2026-10-01", end_date: "2026-11-30" }),
+    ).toBe(false);
+    expect(
+      match({
+        ...confirmed,
+        occurrences: [
+          { start_date: "2025-01-01", end_date: "2025-01-01" },
+          { start_date: "2027-02-28", end_date: "2027-02-28" },
+        ],
+      }),
+    ).toBe(true);
+    expect(match(estimated)).toBe(true);
+    expect(match({ ...estimated, estimated_month: "2027-03" })).toBe(false);
+    expect(match({ ...confirmed, date_status: "tba" })).toBe(false);
+    expect(
+      matches(
+        confirmed,
+        { ...filters, from: "2027-03-01" },
+        {},
+        0,
+        "2026-12-01",
+      ),
+    ).toBe(false);
+  });
+});
+it("exports a Going month estimate as a transparent tentative placeholder and omits TBA", () => {
+  const estimated = {
+    ...event,
+    date_status: "estimated" as const,
+    estimated_month: "2027-02",
+  };
+  const result = ics([estimated, { ...event, date_status: "tba" }], true);
+  expect(result.match(/BEGIN:VEVENT/g)).toHaveLength(1);
+  expect(result).toContain("DTSTART;VALUE=DATE:20270201");
+  expect(result).toContain("DTEND;VALUE=DATE:20270202");
+  expect(result).toContain("STATUS:TENTATIVE");
+  expect(result).toContain("SUMMARY:Est. February 2027");
+  expect(() => ics([estimated])).toThrow();
+});

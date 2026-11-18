@@ -1,13 +1,19 @@
 import type { Event } from "./model";
 import type { ScoreResult } from "./scoring";
 import { emptyEntry, stages, type Entries } from "./storage";
-import { compareText, dateSortKey, prettyDate, ranges } from "./utils";
+import {
+  compareText,
+  dateSortKey,
+  isUndated,
+  prettyDate,
+  ranges,
+} from "./utils";
 
 export const ROW_SORT_LABELS = {
   going: "Going",
   name: "Event",
   dates: "Dates",
-  city: "City / country",
+  city: "Place",
   status: "Date status",
   priority: "Priority",
   scanner: "Scanner score",
@@ -47,7 +53,7 @@ export function nextRowSort(sort: RowSort, key: RowKey): RowSort {
 }
 export function rowDateLabel(e: Event, today: string) {
   if (e.date_status !== "confirmed") {
-    return e.estimated_month
+    return e.date_status === "estimated" && e.estimated_month
       ? "Est. " +
           new Date(e.estimated_month + "-01T12:00:00").toLocaleDateString(
             "en-GB",
@@ -86,7 +92,9 @@ export function sortRows(
         return e.city || e.country;
       case "dates": {
         if (e.date_status !== "confirmed")
-          return e.estimated_month && e.estimated_month + "-32";
+          return e.date_status === "estimated" && e.estimated_month
+            ? e.estimated_month + "-32"
+            : null;
         const date = dateSortKey(e, today);
         return date === "9999" ? null : date;
       }
@@ -121,6 +129,31 @@ export function sortRows(
         (sort.key === "city" ? compare(a.e.country, b.e.country) : 0),
     )
     .map((row) => row.e);
+}
+
+export const optionalColumns = ["scanner", "source", "notes"] as const;
+export type OptionalColumn = (typeof optionalColumns)[number];
+export function normalizeColumns(input: unknown): OptionalColumn[] {
+  return optionalColumns.filter(
+    (key) => Array.isArray(input) && input.includes(key),
+  );
+}
+
+/** Preserve the current date sort (including direction) within and between months. */
+export function groupRowsByMonth(sorted: Event[], today: string) {
+  const months = new Map<string, Event[]>();
+  const undated: Event[] = [];
+  for (const event of sorted) {
+    if (isUndated(event)) {
+      undated.push(event);
+      continue;
+    }
+    const month = dateSortKey(event, today).slice(0, 7);
+    if (!months.has(month)) months.set(month, []);
+    months.get(month)!.push(event);
+  }
+  if (undated.length) months.set("tba", undated);
+  return months;
 }
 
 export function selectAllVisible(visible: readonly string[], checked: boolean) {

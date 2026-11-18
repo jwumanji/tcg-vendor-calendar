@@ -202,3 +202,17 @@ it("restores only a boolean Going filter", () => {
   for (const going of [undefined, false, "true", 1])
     expect(normalizeFilters({ going }).going).toBe(false);
 });
+
+it("normalizes saved quick filters and resolves contradictory Going filters", () => {
+  expect(normalizeFilters({ next90: true, notGoing: true })).toEqual({
+    ...emptyFilters,
+    next90: true,
+    notGoing: true,
+  });
+  expect(normalizeFilters({ next90: "true", notGoing: 1 })).toEqual(
+    emptyFilters,
+  );
+  expect(normalizeFilters({ going: true, notGoing: true }).notGoing).toBe(
+    false,
+  );
+});

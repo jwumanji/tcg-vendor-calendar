@@ -39,6 +39,7 @@ export function Detail({
   score,
   setOverride,
   openClash,
+  toast,
 }: {
   e: Event;
   close: () => void;
@@ -50,6 +51,7 @@ export function Detail({
   score: ScoreResult;
   setOverride: (value: number | null) => void;
   openClash: (id: string) => void;
+  toast: React.ReactNode;
 }) {
   const noteRef = useRef<HTMLTextAreaElement>(null);
   const ref = useRef<HTMLDivElement>(null);
@@ -385,6 +387,7 @@ export function Detail({
             </button>
           )}
         </div>
+        {toast}
       </div>
     </div>
   );

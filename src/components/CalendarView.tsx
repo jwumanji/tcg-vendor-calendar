@@ -20,7 +20,7 @@ import {
 import { EventCard } from "./EventCard";
 import { EmptyState } from "./EmptyState";
 import type { SetGoing } from "./GoingButton";
-import { NoteTag, Place, Logo } from "./EventIdentity";
+import { ClashCue, NoteTag, Place, Logo } from "./EventIdentity";
 import { StageBadge } from "./Pipeline";
 export function CalendarView({
   filtered,
@@ -49,6 +49,7 @@ export function CalendarView({
         key={e.id}
         e={e}
         score={scores[e.id]}
+        entries={entries}
         entry={entries[e.id] || emptyEntry}
         occurrence={occurrence}
         setGoing={setGoing}
@@ -155,6 +156,7 @@ export function CalendarView({
                     onClick={() => setSelected(e)}
                   >
                     <Logo e={e} />
+                    <ClashCue score={scores[e.id]} entries={entries} />
                     <span className="calendar-event-name">{e.name}</span>{" "}
                     <Place e={e} countryOnly />
                     <PriorityChip result={scores[e.id]} />

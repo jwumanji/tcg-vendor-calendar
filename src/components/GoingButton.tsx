@@ -1,4 +1,4 @@
-import { Check } from "lucide-react";
+import { Bookmark, BookmarkCheck } from "lucide-react";
 
 export type SetGoing = (ids: readonly string[], going: boolean) => void;
 
@@ -13,6 +13,7 @@ export function GoingButton({
   setGoing: SetGoing;
   compact?: boolean;
 }) {
+  const Icon = going ? BookmarkCheck : Bookmark;
   return (
     <button
       type="button"
@@ -26,7 +27,7 @@ export function GoingButton({
       }}
     >
       <span className="going-check" aria-hidden="true">
-        {going && <Check size={14} strokeWidth={3} />}
+        <Icon size={19} strokeWidth={going ? 2.6 : 1.7} />
       </span>
       {!compact && "Going"}
     </button>

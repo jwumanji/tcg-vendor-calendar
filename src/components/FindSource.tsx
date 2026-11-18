@@ -11,10 +11,10 @@ export function FindBadges({ e }: { e: Event }) {
     </>
   );
 }
-export function SourceChip({ e }: { e: Event }) {
+export function SourceChip({ e, link = true }: { e: Event; link?: boolean }) {
   if (!e.is_new_find) return <span className="source-chip">Scanner</span>;
   const label = "New find · " + (e.source?.name || "Unknown source");
-  return e.source && safeUrl(e.source.url) ? (
+  return link && e.source && safeUrl(e.source.url) ? (
     <a
       className="source-chip new-find"
       href={e.source.url}

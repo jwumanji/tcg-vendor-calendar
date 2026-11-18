@@ -47,6 +47,55 @@ export function applyGoing(
   }
   return next;
 }
+type GoingInverse = {
+  id: string;
+  going: boolean;
+  syncedStage?: Stage;
+};
+export function inverseGoingPatch(
+  before: Entries,
+  after: Entries,
+  ids: readonly string[],
+) {
+  const patch: GoingInverse[] = [];
+  for (const id of new Set(ids)) {
+    const previous = before[id] || emptyEntry;
+    const changed = after[id];
+    if (changed && changed.going !== previous.going)
+      patch.push({
+        id,
+        going: previous.going,
+        ...(previous.stage !== changed.stage && {
+          syncedStage: previous.stage,
+        }),
+      });
+  }
+  return patch;
+}
+export function undoGoingPatch(
+  current: Entries,
+  patch: GoingInverse[],
+  changedAt: string,
+  now: string,
+): Entries {
+  const next: Entries = { ...current };
+  for (const { id, going, syncedStage } of patch) {
+    const entry = current[id];
+    if (entry?.goingUpdatedAt !== changedAt) continue;
+    next[id] = {
+      ...entry,
+      going,
+      goingUpdatedAt: now,
+      ...(syncedStage &&
+        entry.stage === "Interested" &&
+        entry.stageUpdatedAt === changedAt && {
+          stage: syncedStage,
+          stageUpdatedAt: now,
+        }),
+    };
+  }
+  return next;
+}
 export const STORAGE_KEY = "tcg-pipeline-v1";
 export const WEIGHTS_KEY = "tcg-priority-weights";
 export const OVERRIDES_KEY = "tcg-priority-overrides";

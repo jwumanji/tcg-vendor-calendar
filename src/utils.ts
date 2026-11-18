@@ -59,8 +59,15 @@ export function ranges(e: Event) {
 }
 const normalizeSearch = (s: string) =>
   s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
-export function matches(e: Event, f: Filters, p: Entries, priorityScore = 0) {
+export function matches(
+  e: Event,
+  f: Filters,
+  p: Entries,
+  priorityScore = 0,
+  today = localDate(),
+) {
   if (f.going && !p[e.id]?.going) return false;
+  if (f.notGoing && p[e.id]?.going) return false;
   if (f.newOnly && !e.is_new_find) return false;
   if (f.minTier !== "any" && priorityScore < TIER_THRESHOLDS[f.minTier])
     return false;
@@ -105,8 +112,19 @@ export function matches(e: Event, f: Filters, p: Entries, priorityScore = 0) {
     return false;
   if (f.score > 0 && (e.vendor_score === null || e.vendor_score < f.score))
     return false;
-  if (e.date_status === "tba") return f.tba;
-  if (!f.from && !f.to) return true;
+  if (e.date_status === "tba") return f.tba && !f.next90;
+  if (!f.from && !f.to && !f.next90) return true;
+  let from = f.from,
+    to = f.to;
+  if (f.next90) {
+    if (isUndated(e)) return false;
+    const end = new Date(today + "T00:00:00Z");
+    end.setUTCDate(end.getUTCDate() + 89);
+    const last = end.toISOString().slice(0, 10);
+    if (from < today) from = today;
+    if (!to || to > last) to = last;
+    if (from > to) return false;
+  }
   const rr =
     e.date_status === "estimated" && e.estimated_month
       ? [
@@ -117,7 +135,7 @@ export function matches(e: Event, f: Filters, p: Entries, priorityScore = 0) {
         ]
       : ranges(e);
   return rr.some(
-    (r) => (!f.from || r.end_date >= f.from) && (!f.to || r.start_date <= f.to),
+    (r) => (!from || r.end_date >= from) && (!to || r.start_date <= to),
   );
 }
 export function monthEnd(m: string) {
@@ -252,8 +270,15 @@ export function goingEvents(events: Event[], entries: Entries) {
 export function hasConfirmedDates(e: Event) {
   return e.date_status === "confirmed" && ranges(e).length > 0;
 }
-export function ics(events: Event[]) {
-  if (!events.some(hasConfirmedDates))
+export function hasEstimatedMonth(e: Event) {
+  return e.date_status === "estimated" && Boolean(e.estimated_month);
+}
+export function ics(events: Event[], includeEstimated = false) {
+  if (
+    !events.some(
+      (e) => hasConfirmedDates(e) || (includeEstimated && hasEstimatedMonth(e)),
+    )
+  )
     throw new Error("No confirmed dates to export.");
   const lines = [
     "BEGIN:VCALENDAR",
@@ -261,8 +286,14 @@ export function ics(events: Event[]) {
     "PRODID:-//Holo Vault//TCG Vendor Calendar//EN",
     "CALSCALE:GREGORIAN",
   ];
-  for (const e of events.filter((e) => e.date_status === "confirmed"))
-    for (const r of ranges(e)) {
+  for (const e of events) {
+    const estimated = includeEstimated && hasEstimatedMonth(e);
+    if (!estimated && !hasConfirmedDates(e)) continue;
+    const first = e.estimated_month + "-01";
+    const dates = estimated
+      ? [{ start_date: first, end_date: first }]
+      : ranges(e);
+    for (const r of dates) {
       const next = new Date(r.end_date + "T00:00:00Z");
       next.setUTCDate(next.getUTCDate() + 1);
       lines.push(
@@ -274,7 +305,8 @@ export function ics(events: Event[]) {
           .replace(/\.\d{3}/, "")}`,
         `DTSTART;VALUE=DATE:${r.start_date.replaceAll("-", "")}`,
         `DTEND;VALUE=DATE:${next.toISOString().slice(0, 10).replaceAll("-", "")}`,
-        `SUMMARY:${escapeICS(e.name)}`,
+        `SUMMARY:${escapeICS(estimated ? "Est. " + monthLabel(e.estimated_month!) + " · " + e.name : e.name)}`,
+        ...(estimated ? ["STATUS:TENTATIVE", "TRANSP:TRANSPARENT"] : []),
         `LAST-MODIFIED:${meta.updatedAt.replaceAll("-", "")}T000000Z`,
         ...([e.venue, e.city, e.country].some(Boolean)
           ? [
@@ -290,6 +322,7 @@ export function ics(events: Event[]) {
         "END:VEVENT",
       );
     }
+  }
   lines.push("END:VCALENDAR");
   return lines.map(foldLine).join("\r\n") + "\r\n";
 }

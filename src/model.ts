@@ -75,6 +75,8 @@ export interface Filters {
   tba: boolean;
   score: number;
   going: boolean;
+  notGoing: boolean;
+  next90: boolean;
   newOnly: boolean;
   minTier: "any" | "strong" | "must";
   status: string;
@@ -91,6 +93,8 @@ export const emptyFilters: Filters = {
   tba: true,
   score: 0,
   going: false,
+  notGoing: false,
+  next90: false,
   newOnly: false,
   minTier: "any",
   status: "",

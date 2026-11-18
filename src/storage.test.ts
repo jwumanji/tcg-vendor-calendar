@@ -9,6 +9,8 @@ import {
 import { describe, it, expect, vi } from "vitest";
 import {
   applyGoing,
+  inverseGoingPatch,
+  undoGoingPatch,
   stages,
   stashBeforeReplace,
   backup,
@@ -355,5 +357,50 @@ describe("Going choices", () => {
       "2026-11-19T05:00:00.000Z",
     );
     expect(importEntries(later, restored, "merge")).toEqual(later);
+  });
+});
+
+it("undoes only changed Going values and stages synced by that action", () => {
+  const ids = ["new", "paid", "already", "new"];
+  const before = {
+    paid: { ...entry, stage: "Paid / attending" as const },
+    already: { ...entry, going: true },
+  };
+  const changedAt = "2026-11-17T00:00:00.000Z";
+  const now = "2026-11-18T00:00:00.000Z";
+  const marked = applyGoing(before, ids, true, changedAt);
+  const patch = inverseGoingPatch(before, marked, ids);
+  expect(patch.map((change) => change.id)).toEqual(["new", "paid"]);
+  const withNote = {
+    ...marked,
+    new: { ...marked.new, note: "Edited after marking" },
+  };
+  const undone = undoGoingPatch(withNote, patch, changedAt, now);
+  expect(undone.new).toMatchObject({
+    going: false,
+    stage: "New",
+    note: "Edited after marking",
+    stageUpdatedAt: now,
+  });
+  expect(undone.paid).toEqual({ ...before.paid, goingUpdatedAt: now });
+  expect(undone.already).toBe(before.already);
+  const edited = {
+    ...marked,
+    new: { ...marked.new, stage: "Contacted" as const, stageUpdatedAt: now },
+  };
+  expect(undoGoingPatch(edited, patch, changedAt, now).new.stage).toBe(
+    "Contacted",
+  );
+  const removed = applyGoing(marked, ids, false, now);
+  const restored = undoGoingPatch(
+    removed,
+    inverseGoingPatch(marked, removed, ids),
+    now,
+    now,
+  );
+  expect(restored.new).toMatchObject({
+    going: true,
+    stage: "Interested",
+    stageUpdatedAt: changedAt,
   });
 });

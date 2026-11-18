@@ -1,7 +1,7 @@
 import { usePriority } from "./hooks/usePriority";
 import { Modal } from "./components/Modal";
-import { EventRows, MobileRowSort } from "./components/EventRows";
-import { normalizeListView, normalizeRowSort } from "./rows";
+import { EventRows, RowColumns, RowSortControl } from "./components/EventRows";
+import { normalizeColumns, normalizeListView, normalizeRowSort } from "./rows";
 import { compareByScore } from "./scoring";
 import { CalendarView } from "./components/CalendarView";
 import { EventCard } from "./components/EventCard";
@@ -79,6 +79,8 @@ export default function App() {
     update,
     applyEntries,
     setGoing,
+    undo,
+    undoGoing,
     saved,
     storageError,
     setStorageError,
@@ -94,6 +96,13 @@ export default function App() {
   const [listView, setListView] = useState(() =>
     normalizeListView(stored("tcg-list-view")),
   );
+  const [columns, setColumns] = useState(() =>
+    normalizeColumns(stored("tcg-rows-columns")),
+  );
+  useEffect(() => {
+    const error = saveValue("tcg-rows-columns", columns);
+    if (error) setStorageError(error);
+  }, [columns, setStorageError]);
   const [rowSort, setRowSort] = useState(() =>
     normalizeRowSort(stored("tcg-rows-sort")),
   );
@@ -144,10 +153,10 @@ export default function App() {
     () =>
       events.filter(
         (e) =>
-          matches(e, filters, entries, scores[e.id].score) &&
+          matches(e, filters, entries, scores[e.id].score, today) &&
           (view === "Pipeline" || visible(e)),
       ),
-    [events, filters, entries, view, visible, scores],
+    [events, filters, entries, view, visible, scores, today],
   );
   const attending = useMemo(
     () => goingEvents(events, entries),
@@ -239,6 +248,75 @@ export default function App() {
       label: "TBA excluded",
       clear: () => set("tba", true),
     });
+  const quickCountries = ["Singapore", "Hong Kong", "Malaysia"];
+  const quick = [
+    {
+      id: "status",
+      label: "Confirmed",
+      active: filters.status === "confirmed",
+      toggle: () =>
+        set("status", filters.status === "confirmed" ? "" : "confirmed"),
+    },
+    ...quickCountries.map((country) => ({
+      id: "country:" + country,
+      label: country,
+      active: filters.countries.includes(country),
+      toggle: () =>
+        set(
+          "countries",
+          filters.countries.includes(country)
+            ? filters.countries.filter((c) => c !== country)
+            : [...filters.countries, country],
+        ),
+    })),
+    {
+      id: "next90",
+      label: "Next 90 days",
+      active: filters.next90,
+      toggle: () => set("next90", !filters.next90),
+    },
+    {
+      id: "notGoing",
+      label: "Not yet Going",
+      active: filters.notGoing,
+      toggle: () => set("notGoing", !filters.notGoing),
+    },
+  ];
+  const activeQuick = quick.filter((q) => q.active);
+  for (const q of activeQuick.filter(
+    (q) => q.id === "next90" || q.id === "notGoing",
+  ))
+    chips.push({ id: q.id, label: q.label, clear: q.toggle });
+  const otherChips = chips.filter(
+    (c) =>
+      c.id !== "going" &&
+      c.id !== "newOnly" &&
+      !activeQuick.some((q) => q.id === c.id),
+  );
+  function clearQuick() {
+    setFilters((f) => ({
+      ...f,
+      status: f.status === "confirmed" ? "" : f.status,
+      next90: false,
+      notGoing: false,
+      countries: f.countries.filter((c) => !quickCountries.includes(c)),
+    }));
+  }
+  const toast = (
+    <div role="status" aria-atomic="true" className="going-toast">
+      {undo && (
+        <>
+          <span key={undo.changedAt}>
+            {undo.going
+              ? `Marked ${undo.patch.length} Going`
+              : `Removed ${undo.patch.length} from Going`}
+          </span>
+          <span aria-hidden="true"> · </span>
+          <button onClick={undoGoing}>Undo</button>
+        </>
+      )}
+    </div>
+  );
   const showRows = view === "List" && listView === "rows";
   const sorted = useMemo(
     () =>
@@ -280,6 +358,7 @@ export default function App() {
         e={e}
         entry={entries[e.id] || emptyEntry}
         score={scores[e.id]}
+        entries={entries}
         setGoing={setGoing}
         occurrence={occurrence}
         open={setSelected}
@@ -459,14 +538,50 @@ export default function App() {
             <button
               className="button tools-trigger"
               aria-haspopup="dialog"
+              aria-label="Tools"
               onClick={() => setToolsOpen(true)}
             >
-              <Settings2 size={16} /> Tools
+              <Settings2 size={16} /> <span>Tools</span>
             </button>
-            <span className="result-count" role="status" aria-live="polite">
-              {filtered.length} events
-            </span>
           </div>
+          {view !== "Top picks" && (
+            <>
+              {filters.going && (
+                <div className="going-summary">
+                  <strong>Showing {filtered.length} Going</strong>
+                  <span aria-hidden="true"> · </span>
+                  <button
+                    className="clear-going"
+                    onClick={() => set("going", false)}
+                  >
+                    Clear
+                  </button>
+                  <EventExports
+                    events={attending}
+                    entries={entries}
+                    goingOnly
+                    compact
+                  />
+                </div>
+              )}
+              <div
+                className="quick-filters"
+                role="group"
+                aria-label="Quick filters"
+              >
+                {quick.map((q) => (
+                  <button key={q.id} aria-pressed={q.active} onClick={q.toggle}>
+                    {q.label}
+                  </button>
+                ))}
+                {activeQuick.length > 0 && (
+                  <button className="clear-quick" onClick={clearQuick}>
+                    Clear
+                  </button>
+                )}
+              </div>
+            </>
+          )}
           {view !== "Top picks" && filterOpen && (
             <section
               className="filters"
@@ -610,6 +725,14 @@ export default function App() {
                     />{" "}
                     Include TBA dates
                   </label>
+                  <label className="passed-toggle">
+                    <input
+                      type="checkbox"
+                      checked={showPassed}
+                      onChange={(e) => setShowPassed(e.target.checked)}
+                    />{" "}
+                    Show passed / too expensive
+                  </label>
                 </div>
                 <div className="filter-fields">
                   <label>
@@ -679,9 +802,9 @@ export default function App() {
               </div>
             </section>
           )}
-          {view !== "Top picks" && chips.length > 0 && (
+          {view !== "Top picks" && otherChips.length > 0 && (
             <div className="chips">
-              {chips.map((c) => (
+              {otherChips.map((c) => (
                 <button
                   key={c.id}
                   onClick={c.clear}
@@ -770,19 +893,20 @@ export default function App() {
           ) : (
             <>
               <div className="list-heading">
-                <span className="list-count">
+                <span className="list-count" role="status">
                   {visibleList.length}{" "}
                   {visibleList.length === 1 ? "event" : "events"}
                 </span>
                 {showRows && (
                   <>
-                    <MobileRowSort sort={rowSort} setSort={setRowSort} />
+                    <RowSortControl sort={rowSort} setSort={setRowSort} />
+                    <RowColumns columns={columns} change={setColumns} />
                     <button
                       className="button select-mode"
                       aria-pressed={selectMode}
                       onClick={() => setSelectMode(!selectMode)}
                     >
-                      <ListChecks size={16} /> Select
+                      <ListChecks size={16} /> Bulk select
                     </button>
                   </>
                 )}
@@ -816,6 +940,7 @@ export default function App() {
               {showRows ? (
                 filtered.length > 0 && (
                   <EventRows
+                    columns={columns}
                     events={filtered}
                     key={String(selectMode)}
                     selectMode={selectMode}
@@ -904,18 +1029,9 @@ export default function App() {
           close={() => setToolsOpen(false)}
           className="tools-dialog"
         >
-          <div className="tool-settings">
-            <button
-              className="button"
-              aria-haspopup="dialog"
-              onClick={() => setSettingsOpen(true)}
-            >
-              <SlidersHorizontal size={16} /> Score weights
-            </button>
-          </div>
           <section className="tool-exports" aria-label="Event exports">
-            <EventExports events={filtered} entries={entries} />
             <EventExports events={attending} entries={entries} goingOnly />
+            <EventExports events={filtered} entries={entries} />
           </section>
           <BackupControls
             entries={entries}
@@ -930,16 +1046,20 @@ export default function App() {
               priority.setOverrides(value.overrides);
             }}
           />
-          <label className="passed-toggle">
-            <input
-              type="checkbox"
-              checked={showPassed}
-              onChange={(e) => setShowPassed(e.target.checked)}
-            />{" "}
-            Show passed / too expensive
-          </label>
+
+          <div className="tool-settings">
+            <button
+              className="button"
+              aria-haspopup="dialog"
+              onClick={() => setSettingsOpen(true)}
+            >
+              <SlidersHorizontal size={16} /> Score weights
+            </button>
+          </div>
+          {toast}
         </Modal>
       )}
+      {!selected && !toolsOpen && toast}
       <Suspense fallback={null}>
         {settingsOpen && (
           <ScoreSettings
@@ -950,6 +1070,7 @@ export default function App() {
         )}
         {selected && (
           <Detail
+            toast={toast}
             e={selected}
             score={scores[selected.id]}
             setOverride={(value) => priority.setOverride(selected.id, value)}

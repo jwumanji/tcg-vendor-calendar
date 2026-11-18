@@ -13,7 +13,7 @@ import {
 } from "../utils";
 import { holo } from "../holo";
 import { EmptyState } from "./EmptyState";
-import { Logo, NoteTag, Place } from "./EventIdentity";
+import { ClashCue, Logo, NoteTag, Place } from "./EventIdentity";
 import { FindBadges } from "./FindSource";
 import { GoingButton, type SetGoing } from "./GoingButton";
 import { StageBadge } from "./Pipeline";
@@ -86,6 +86,7 @@ export function TopPicks({
               </span>
               <div className="pick-meta">
                 <Logo e={e} />
+                <ClashCue score={scores[e.id]} entries={entries} />
                 <PriorityChip result={scores[e.id]} />
                 <GoingButton
                   e={e}

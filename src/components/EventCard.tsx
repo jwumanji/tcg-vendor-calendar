@@ -5,14 +5,22 @@ import type { ScoreResult } from "../scoring";
 import { memo } from "react";
 import { CalendarDays } from "lucide-react";
 import type { Event } from "../model";
-import type { Entry } from "../storage";
+import type { Entries, Entry } from "../storage";
 import { games, dateLabel, gameKey, primaryGameKey, rarity } from "../utils";
 import { holo } from "../holo";
-import { Logo, Status, Place, ScoreGem, NoteTag } from "./EventIdentity";
+import {
+  ClashCue,
+  Logo,
+  Status,
+  Place,
+  ScoreGem,
+  NoteTag,
+} from "./EventIdentity";
 import { StageBadge } from "./Pipeline";
 export const EventCard = memo(function EventCard({
   e,
   entry,
+  entries,
   score,
   setGoing,
   occurrence,
@@ -20,6 +28,7 @@ export const EventCard = memo(function EventCard({
 }: {
   e: Event;
   entry: Entry;
+  entries: Entries;
   score: ScoreResult;
   setGoing: SetGoing;
   occurrence?: string;
@@ -70,6 +79,7 @@ export const EventCard = memo(function EventCard({
           </div>
         </div>
         <div className="card-tags">
+          <ClashCue score={score} entries={entries} />
           <Status e={e} />
           <FindBadges e={e} />
           {games(e)

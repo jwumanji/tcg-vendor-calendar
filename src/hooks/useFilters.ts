@@ -35,6 +35,8 @@ export function normalizeFilters(value: unknown): Filters {
   }
   if (v.minTier === "must" || v.minTier === "strong") f.minTier = v.minTier;
   f.going = v.going === true;
+  f.notGoing = !f.going && v.notGoing === true;
+  f.next90 = v.next90 === true;
   if (typeof v.newOnly === "boolean") f.newOnly = v.newOnly;
   if (typeof v.tba === "boolean") f.tba = v.tba;
   if (typeof v.score === "number" && Number.isFinite(v.score))
@@ -52,6 +54,11 @@ export function useFilters(reportError: (error: string) => void) {
     if (error) reportError(error);
   }, [filters, reportError]);
   const set = <K extends keyof Filters>(key: K, value: Filters[K]) =>
-    setFilters((f) => ({ ...f, [key]: value }));
+    setFilters((f) => ({
+      ...f,
+      ...(key === "going" && value && { notGoing: false }),
+      ...(key === "notGoing" && value && { going: false }),
+      [key]: value,
+    }));
   return { filters, setFilters, set };
 }

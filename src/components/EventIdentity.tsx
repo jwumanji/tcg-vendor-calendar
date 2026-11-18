@@ -1,4 +1,6 @@
-import { StickyNote } from "lucide-react";
+import type { ScoreResult } from "../scoring";
+import type { Entries } from "../storage";
+import { TriangleAlert, StickyNote } from "lucide-react";
 import { flagFile, placeLabel, rarity, type Rarity } from "../utils";
 import type { Event } from "../model";
 export type LogoSize = "md" | "row" | "xl" | "detail";
@@ -63,30 +65,35 @@ function CountryFlag({ code }: { code: string | null }) {
 export function Place({
   e,
   countryOnly = false,
-  stacked = false,
+  cityOnly = false,
 }: {
   e: Pick<Event, "city" | "country" | "country_code">;
   countryOnly?: boolean;
-  stacked?: boolean;
+  cityOnly?: boolean;
 }) {
-  const label = placeLabel(e, countryOnly);
-  const split = stacked && e.country && e.city && label !== e.country;
   return (
-    <span className="place">
+    <span className="place" title={cityOnly ? placeLabel(e) : undefined}>
       <CountryFlag code={e.country ? e.country_code : null} />
-      <span>
-        {split ? (
-          <>
-            {e.city}
-            <small>
-              <span className="place-comma">, </span>
-              {e.country}
-            </small>
-          </>
-        ) : (
-          label
-        )}
-      </span>
+      <span>{cityOnly && e.city ? e.city : placeLabel(e, countryOnly)}</span>
+    </span>
+  );
+}
+
+export function ClashCue({
+  score,
+  entries,
+}: {
+  score: ScoreResult;
+  entries: Entries;
+}) {
+  const names = score.clashes
+    .filter((c) => entries[c.id]?.going)
+    .map((c) => c.name);
+  if (!names.length) return null;
+  const label = "Clashes with " + names.join(", ");
+  return (
+    <span className="clash-cue" role="img" aria-label={label} title={label}>
+      <TriangleAlert size={14} aria-hidden="true" />
     </span>
   );
 }

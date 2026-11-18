@@ -18,7 +18,14 @@ import type { Event } from "../model";
 import { stages, emptyEntry, type Stage, type Entries } from "../storage";
 import { dateLabel, games, gameKey, primaryGameKey, rarity } from "../utils";
 import { holo } from "../holo";
-import { Logo, Status, Place, ScoreGem, NoteTag } from "./EventIdentity";
+import {
+  ClashCue,
+  Logo,
+  Status,
+  Place,
+  ScoreGem,
+  NoteTag,
+} from "./EventIdentity";
 
 /** Every stage has an icon as well as a label, so stages never rely on colour alone. */
 const stageIcons: Record<Stage, LucideIcon> = {
@@ -92,39 +99,47 @@ export function Pipeline({
   change: (event: Event, stage: Stage) => void;
 }) {
   return (
-    <div className="pipeline">
-      {stages.map((stage) => {
-        const items = events.filter(
-          (e) => (entries[e.id] || emptyEntry).stage === stage,
-        );
-        return (
-          <section
-            className={`pipeline-column stage-col-${stages.indexOf(stage)}`}
-            key={stage}
-          >
-            <h3>
-              <StageBadge stage={stage} /> <span>{items.length}</span>
-            </h3>
-            {items.length === 0 && (
-              <p className="pipeline-empty">No events in this stage.</p>
-            )}
-            {items.map((e) => (
-              <PipelineCard
-                key={e.id}
-                e={e}
-                score={scores[e.id]}
-                stage={stage}
-                going={!!entries[e.id]?.going}
-                setGoing={setGoing}
-                hasNote={!!entries[e.id]?.note.trim()}
-                open={open}
-                change={change}
-              />
-            ))}
-          </section>
-        );
-      })}
-    </div>
+    <>
+      <p className="pipeline-explainer">
+        Going = events you plan to attend. Pipeline stage = where each booth
+        application stands. Marking Going sets Interested if the stage is still
+        New.
+      </p>
+      <div className="pipeline">
+        {stages.map((stage) => {
+          const items = events.filter(
+            (e) => (entries[e.id] || emptyEntry).stage === stage,
+          );
+          return (
+            <section
+              className={`pipeline-column stage-col-${stages.indexOf(stage)}`}
+              key={stage}
+            >
+              <h3>
+                <StageBadge stage={stage} /> <span>{items.length}</span>
+              </h3>
+              {items.length === 0 && (
+                <p className="pipeline-empty">No events in this stage.</p>
+              )}
+              {items.map((e) => (
+                <PipelineCard
+                  key={e.id}
+                  e={e}
+                  entries={entries}
+                  score={scores[e.id]}
+                  stage={stage}
+                  going={!!entries[e.id]?.going}
+                  setGoing={setGoing}
+                  hasNote={!!entries[e.id]?.note.trim()}
+                  open={open}
+                  change={change}
+                />
+              ))}
+            </section>
+          );
+        })}
+      </div>
+    </>
   );
 }
 
@@ -138,6 +153,7 @@ const PipelineCard = memo(function PipelineCard({
   stage,
   going,
   hasNote,
+  entries,
   score,
   open,
   setGoing,
@@ -147,6 +163,7 @@ const PipelineCard = memo(function PipelineCard({
   stage: Stage;
   going: boolean;
   hasNote: boolean;
+  entries: Entries;
   score: ScoreResult;
   open: (event: Event) => void;
   setGoing: SetGoing;
@@ -177,6 +194,7 @@ const PipelineCard = memo(function PipelineCard({
         </h4>
       </div>
       <div className="pcard-meta">
+        <ClashCue score={score} entries={entries} />
         <span className="pcard-line">
           <CalendarDays size={14} aria-hidden="true" />
           {dateLabel(e)}

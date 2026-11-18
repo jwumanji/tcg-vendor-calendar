@@ -1,11 +1,14 @@
-import { useMemo, useState, useRef, type KeyboardEvent } from "react";
-import { ArrowDown, ArrowUp, ChevronsUpDown } from "lucide-react";
+import { Fragment, useMemo, useState, useRef, type KeyboardEvent } from "react";
+import { ArrowDown, ArrowUp, ChevronsUpDown, X, Columns3 } from "lucide-react";
 import type { Event } from "../model";
 import type { ScoreResult } from "../scoring";
 import { emptyEntry, type Entries } from "../storage";
-import { games, gameKey } from "../utils";
+import { games, gameKey, upcoming } from "../utils";
 import {
   ROW_SORT_LABELS,
+  groupRowsByMonth,
+  optionalColumns,
+  type OptionalColumn,
   nextRowSort,
   rowDateLabel,
   sortRows,
@@ -14,7 +17,7 @@ import {
   type RowKey,
   type RowSort,
 } from "../rows";
-import { Logo, Place, NoteTag, ScoreGem, Status } from "./EventIdentity";
+import { Logo, Place, NoteTag, ScoreGem, ClashCue } from "./EventIdentity";
 import { GoingButton, type SetGoing } from "./GoingButton";
 import { StageBadge } from "./Pipeline";
 import { PriorityChip } from "./PriorityChip";
@@ -22,6 +25,7 @@ import { SourceChip } from "./FindSource";
 
 export function EventRows({
   events,
+  columns,
   sort,
   setSort,
   entries,
@@ -32,6 +36,7 @@ export function EventRows({
   open,
 }: {
   events: Event[];
+  columns: OptionalColumn[];
   sort: RowSort;
   setSort: (sort: RowSort) => void;
   entries: Entries;
@@ -44,6 +49,13 @@ export function EventRows({
   const sorted = useMemo(
     () => sortRows(events, sort, entries, scores, today),
     [events, sort, entries, scores, today],
+  );
+  const groups = useMemo(
+    () =>
+      sort.key === "dates"
+        ? groupRowsByMonth(sorted, today)
+        : new Map([["", sorted]]),
+    [sorted, sort.key, today],
   );
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const anchor = useRef<string | null>(null);
@@ -108,23 +120,35 @@ export function EventRows({
       </th>
     );
   }
-  function navigate(ev: KeyboardEvent<HTMLTableRowElement>) {
-    if (!(ev.target instanceof HTMLButtonElement)) return;
-    const tr = ev.currentTarget;
-    const destination = {
-      ArrowUp: tr.previousElementSibling,
-      ArrowDown: tr.nextElementSibling,
-      Home: tr.parentElement?.firstElementChild,
-      End: tr.parentElement?.lastElementChild,
-    }[ev.key];
-    if (destination !== undefined) {
+  function navigate(ev: KeyboardEvent<HTMLTableRowElement>, e: Event) {
+    if (
+      !(ev.target instanceof HTMLButtonElement) ||
+      ev.altKey ||
+      ev.metaKey ||
+      ev.ctrlKey
+    )
+      return;
+    const name = ev.target.classList.contains("row-name");
+    if ((name && ev.key === " ") || ev.key.toLowerCase() === "g") {
       ev.preventDefault();
-      destination
-        ?.querySelector<HTMLButtonElement>(
-          ev.target.closest(".going-button") ? ".going-button" : ".row-name",
-        )
-        ?.focus();
+      if (!ev.repeat) setGoing([e.id], !entries[e.id]?.going);
+      return;
     }
+    const index = ids.indexOf(e.id);
+    const target = {
+      ArrowUp: index - 1,
+      ArrowDown: index + 1,
+      Home: 0,
+      End: ids.length - 1,
+    }[ev.key];
+    if (target === undefined) return;
+    ev.preventDefault();
+    const buttons = ev.currentTarget
+      .closest("table")
+      ?.querySelectorAll<HTMLButtonElement>(
+        name ? ".row-name" : ".going-button",
+      );
+    buttons?.[target]?.focus();
   }
   return (
     <>
@@ -133,34 +157,49 @@ export function EventRows({
       </span>
       {selectMode && (
         <div className="bulk-bar" role="group" aria-label="Bulk selection">
-          {selectAllCheckbox()}
           <strong>{count} selected</strong>
-          {count > 0 && (
-            <>
-              <button className="button primary" onClick={() => apply(true)}>
-                Mark Going
-              </button>
-              <button className="button" onClick={() => apply(false)}>
-                Unmark Going
-              </button>
-              <button className="button" onClick={() => selectAll(false)}>
-                Clear selection
-              </button>
-            </>
-          )}
+
+          <button
+            className="button primary"
+            disabled={!count}
+            onClick={() => apply(true)}
+          >
+            Mark Going
+          </button>
+          <button
+            className="button"
+            disabled={!count}
+            onClick={() => apply(false)}
+          >
+            Unmark
+          </button>
+          <button
+            className="button"
+            aria-label="Clear selection"
+            disabled={!count}
+            onClick={() => selectAll(false)}
+          >
+            <X size={16} />
+          </button>
         </div>
       )}
+      {selectMode && (
+        <div className="mobile-select-all">{selectAllCheckbox()}</div>
+      )}
       <div className="rows-wrap">
+        {/* Mobile rows use CSS grid and block cells. Explicit native roles retain
+            the table structure in WebKit. Each heading exposes one label per layout. */}
         <table className="event-rows" data-selecting={selectMode} role="table">
           <caption className="sr-only">
             Event opportunities. Sort by column. Use the arrow keys, Home or End
-            on event names to move between rows.
+            on event names to move between rows. Enter opens or selects. Space
+            or G toggles Going.
           </caption>
           <thead role="rowgroup">
             <tr role="row">
-              {header("going")}
+              {!selectMode && header("going")}
               {selectMode && (
-                <th className="col-select" scope="col">
+                <th role="columnheader" className="col-select" scope="col">
                   {selectAllCheckbox()}
                 </th>
               )}
@@ -170,144 +209,246 @@ export function EventRows({
               <th scope="col" role="columnheader" className="col-games">
                 Games
               </th>
-              {header("status")}
               {header("priority")}
-              {header("scanner")}
               {header("stage")}
-              {header("notes")}
-              {header("source")}
+              {columns.map((key) => (
+                <Fragment key={key}>{header(key)}</Fragment>
+              ))}
             </tr>
           </thead>
-          <tbody role="rowgroup">
-            {sorted.map((e) => {
-              const entry = entries[e.id] || emptyEntry;
-              const titles = games(e);
-              const dates = rowDateLabel(e, today);
-              return (
-                <tr
-                  key={e.id}
-                  role="row"
-                  data-going={entry.going}
-                  data-selected={selectMode && selected.has(e.id)}
-                  onKeyDown={navigate}
-                  onClick={(ev) => {
-                    if ((ev.target as Element).closest("a,button,input,label"))
-                      return;
-                    ev.currentTarget
-                      .querySelector<HTMLButtonElement>(".row-name")
-                      ?.focus({ preventScroll: true });
-                    if (selectMode) select(e.id, ev.shiftKey);
-                    else open(e);
-                  }}
-                >
-                  <td role="cell" className="row-going">
-                    <GoingButton
-                      e={e}
-                      going={entry.going}
-                      setGoing={setGoing}
-                      compact
-                    />
-                  </td>
-                  {selectMode && (
-                    <td role="cell" className="row-select">
-                      <label>
-                        <input
-                          type="checkbox"
-                          aria-label={`Select ${e.name}`}
-                          checked={selected.has(e.id)}
-                          onChange={(ev) =>
-                            select(
-                              e.id,
-                              (ev.nativeEvent as MouseEvent).shiftKey,
-                            )
-                          }
+          {Array.from(groups, ([month, items]) => (
+            <tbody key={month} role="rowgroup">
+              {month && (
+                <tr role="row" className="month-divider">
+                  <th
+                    role="columnheader"
+                    scope="colgroup"
+                    colSpan={7 + columns.length}
+                  >
+                    {month === "tba"
+                      ? "Dates to be announced"
+                      : new Date(month + "-01T12:00:00").toLocaleDateString(
+                          "en-GB",
+                          { month: "short", year: "numeric" },
+                        )}
+                    <span>
+                      {" "}
+                      · {items.length} {items.length === 1 ? "event" : "events"}
+                    </span>
+                  </th>
+                </tr>
+              )}
+              {items.map((e) => {
+                const entry = entries[e.id] || emptyEntry;
+                const titles = games(e);
+                const past = !upcoming(e, today);
+                const dates = rowDateLabel(e, today);
+                return (
+                  <tr
+                    key={e.id}
+                    role="row"
+                    data-going={entry.going}
+                    data-selected={selectMode && selected.has(e.id)}
+                    data-past={past}
+                    onKeyDown={(ev) => navigate(ev, e)}
+                    onClick={(ev) => {
+                      if (
+                        (ev.target as Element).closest("a,button,input,label")
+                      )
+                        return;
+                      ev.currentTarget
+                        .querySelector<HTMLButtonElement>(".row-name")
+                        ?.focus({ preventScroll: true });
+                      if (selectMode) select(e.id, ev.shiftKey);
+                      else open(e);
+                    }}
+                  >
+                    {!selectMode && (
+                      <td role="cell" className="row-going">
+                        <GoingButton
+                          e={e}
+                          going={entry.going}
+                          setGoing={setGoing}
+                          compact
                         />
-                      </label>
-                    </td>
-                  )}
-                  <td role="cell" className="row-identity">
-                    <div>
-                      <Logo e={e} size="row" />
+                      </td>
+                    )}
+                    {selectMode && (
+                      <td role="cell" className="row-select">
+                        <label>
+                          <input
+                            type="checkbox"
+                            aria-label={`Select ${e.name}`}
+                            checked={selected.has(e.id)}
+                            onChange={(ev) =>
+                              select(
+                                e.id,
+                                (ev.nativeEvent as MouseEvent).shiftKey,
+                              )
+                            }
+                          />
+                        </label>
+                      </td>
+                    )}
+                    <td role="cell" className="row-identity">
                       <div>
-                        <button
-                          className="row-name"
-                          aria-pressed={
-                            selectMode ? selected.has(e.id) : undefined
-                          }
-                          onClick={(ev) =>
-                            selectMode ? select(e.id, ev.shiftKey) : open(e)
-                          }
-                          title={e.name}
-                        >
-                          {e.name}
-                        </button>
-                        {e.organizer && (
-                          <small title={e.organizer}>{e.organizer}</small>
+                        <Logo e={e} size="row" />
+                        <div>
+                          <button
+                            className="row-name"
+                            aria-pressed={
+                              selectMode ? selected.has(e.id) : undefined
+                            }
+                            onClick={(ev) =>
+                              selectMode ? select(e.id, ev.shiftKey) : open(e)
+                            }
+                            title={e.name}
+                          >
+                            {e.name}
+                          </button>
+                          <div className="row-markers">
+                            {selectMode && entry.going && (
+                              <span className="going-marker">Going</span>
+                            )}
+                            {e.is_new_find && (
+                              <span className="source-chip new-find">
+                                New find
+                              </span>
+                            )}
+                            {entry.note.trim() && <NoteTag compact />}
+                            {past && <span>Past</span>}
+                            <ClashCue score={scores[e.id]} entries={entries} />
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td
+                      role="cell"
+                      className="row-dates"
+                      data-status={dates === "TBA" ? "tba" : e.date_status}
+                      title={e.date_status + " · " + dates}
+                    >
+                      <i aria-hidden="true" />
+                      {e.date_status === "confirmed" && (
+                        <span className="sr-only">Confirmed </span>
+                      )}
+                      {dates}
+                    </td>
+                    <td role="cell" className="row-place">
+                      <Place e={e} cityOnly />
+                    </td>
+                    <td role="cell" className="row-games">
+                      <div>
+                        {titles.slice(0, 2).map((g) => (
+                          <span
+                            key={g}
+                            className="game-tag"
+                            title={g}
+                            data-game={gameKey(g)}
+                          >
+                            <span>{g}</span>
+                          </span>
+                        ))}
+                        {titles.length > 2 && (
+                          <span title={titles.slice(2).join(", ")}>
+                            +{titles.length - 2}
+                          </span>
                         )}
                       </div>
-                    </div>
-                  </td>
-                  <td role="cell" className="row-dates" title={dates}>
-                    {dates}
-                  </td>
-                  <td role="cell" className="row-place">
-                    <Place e={e} stacked />
-                  </td>
-                  <td role="cell" className="row-games">
-                    <div>
-                      {titles.slice(0, 2).map((g) => (
-                        <span
-                          key={g}
-                          className="game-tag"
-                          data-game={gameKey(g)}
-                        >
-                          {g}
-                        </span>
-                      ))}
-                      {titles.length > 2 && (
-                        <span title={titles.slice(2).join(", ")}>
-                          +{titles.length - 2}
-                        </span>
+                    </td>
+                    <td role="cell" className="row-priority">
+                      <PriorityChip result={scores[e.id]} />
+                    </td>
+                    <td role="cell" className="row-stage">
+                      {entry.stage !== "New" && (
+                        <StageBadge stage={entry.stage} />
                       )}
-                    </div>
-                  </td>
-                  <td role="cell" className="row-status">
-                    <Status e={e} />
-                  </td>
-                  <td role="cell" className="row-priority">
-                    <PriorityChip result={scores[e.id]} />
-                  </td>
-                  <td role="cell" className="row-scanner">
-                    {e.vendor_score === null ? (
-                      "—"
-                    ) : (
-                      <ScoreGem score={e.vendor_score} />
+                    </td>
+                    {columns.includes("scanner") && (
+                      <td role="cell" className="row-scanner">
+                        {e.vendor_score === null ? (
+                          "—"
+                        ) : (
+                          <ScoreGem score={e.vendor_score} />
+                        )}
+                      </td>
                     )}
-                  </td>
-                  <td role="cell" className="row-stage" title={entry.stage}>
-                    <StageBadge stage={entry.stage} />
-                  </td>
-                  <td role="cell" className="row-notes">
-                    {entry.note.trim() ? (
-                      <NoteTag compact />
-                    ) : (
-                      <span className="sr-only">No notes</span>
+                    {columns.includes("source") && (
+                      <td role="cell" className="row-source">
+                        <SourceChip e={e} link={!selectMode} />
+                      </td>
                     )}
-                  </td>
-                  <td role="cell" className="row-source">
-                    <SourceChip e={e} />
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
+                    {columns.includes("notes") && (
+                      <td role="cell" className="row-notes" title={entry.note}>
+                        {entry.note || "—"}
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          ))}
         </table>
       </div>
     </>
   );
 }
 
-export function MobileRowSort({
+export function RowColumns({
+  columns,
+  change,
+}: {
+  columns: OptionalColumn[];
+  change: (columns: OptionalColumn[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
+  return (
+    <div
+      className="column-control"
+      onBlur={(ev) => {
+        if (!ev.currentTarget.contains(ev.relatedTarget)) setOpen(false);
+      }}
+      onKeyDown={(ev) => {
+        if (ev.key === "Escape") {
+          setOpen(false);
+          trigger.current?.focus();
+        }
+      }}
+    >
+      <button
+        className="button"
+        ref={trigger}
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+      >
+        <Columns3 size={15} /> Columns
+      </button>
+      {open && (
+        <fieldset className="columns-panel">
+          <legend className="sr-only">Optional columns</legend>
+          {optionalColumns.map((key) => (
+            <label key={key}>
+              <input
+                type="checkbox"
+                checked={columns.includes(key)}
+                onChange={() =>
+                  change(
+                    optionalColumns.filter((k) =>
+                      k === key ? !columns.includes(key) : columns.includes(k),
+                    ),
+                  )
+                }
+              />
+              {ROW_SORT_LABELS[key]}
+            </label>
+          ))}
+        </fieldset>
+      )}
+    </div>
+  );
+}
+export function RowSortControl({
   sort,
   setSort,
 }: {
@@ -316,7 +457,20 @@ export function MobileRowSort({
 }) {
   const Direction = sort.direction === "asc" ? ArrowUp : ArrowDown;
   return (
-    <div className="row-sort-mobile">
+    <div className="row-sort-control">
+      <div role="group" aria-label="Quick sort" className="quick-sort">
+        {(["priority", "dates"] as const).map((key) => (
+          <button
+            key={key}
+            aria-pressed={sort.key === key}
+            onClick={() =>
+              setSort({ key, direction: key === "priority" ? "desc" : "asc" })
+            }
+          >
+            {key === "priority" ? "Priority" : "Date"}
+          </button>
+        ))}
+      </div>
       <label>
         <span className="sr-only">Sort rows by</span>
         <select

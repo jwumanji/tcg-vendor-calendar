@@ -14,7 +14,7 @@ export function SectionHeading({
   return (
     <h3 className="list-section-heading">
       {sortKey === "country" ? (
-        <Place e={items[0]} countryOnly />
+        <Place e={items.find((e) => e.country_code) ?? items[0]} countryOnly />
       ) : groupKey === "tba" ? "Date TBA" : monthLabel(groupKey)}
       <span className="section-count"> · {items.length} {items.length === 1 ? "event" : "events"}</span>
     </h3>
@@ -26,16 +26,16 @@ export function CardSections({
 }: {
   groups: ReadonlyMap<string, Event[]>;
   sortKey: RowKey;
-  children: (event: Event) => ReactNode;
+  children: (event: Event, titleLevel: 3 | 4) => ReactNode;
 }) {
   return Array.from(groups, ([key, items]) =>
     key ? (
       <section className="card-section" key={key}>
         <SectionHeading groupKey={key} sortKey={sortKey} items={items} />
-        <div className="cards list-cards">{items.map(children)}</div>
+        <div className="cards list-cards">{items.map((e) => children(e, 4))}</div>
       </section>
     ) : (
-      <div className="cards list-cards" key={key}>{items.map(children)}</div>
+      <div className="cards list-cards" key={key}>{items.map((e) => children(e, 3))}</div>
     ),
   );
 }

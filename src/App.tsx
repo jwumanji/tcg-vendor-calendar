@@ -2,7 +2,7 @@ import { useEventRoute } from "./hooks/useEventRoute";
 import { usePriority } from "./hooks/usePriority";
 import { Modal } from "./components/Modal";
 import { EventRows, RowColumns, RowSortControl } from "./components/EventRows";
-import { normalizeColumns, normalizeListView, loadSort, SORT_STORAGE_KEY, groupSortedRows, sortRows } from "./rows";
+import { normalizeColumns, normalizeListView, loadSort, SORT_STORAGE_KEY, groupSortedRows, listCardDate, sortRows } from "./rows";
 import { CalendarView } from "./components/CalendarView";
 import { CardSections } from "./components/ListSections";
 import { EventCard } from "./components/EventCard";
@@ -376,7 +376,7 @@ export default function App() {
     () => sortRows(filtered, sort, entries, scores, today),
     [filtered, sort, entries, scores, today],
   );
-  function card(e: Event, occurrence?: string) {
+  function card(e: Event, occurrence?: string, titleLevel?: 3 | 4) {
     return (
       <EventCard
         key={e.id + (occurrence || "")}
@@ -386,6 +386,7 @@ export default function App() {
         entries={entries}
         setGoing={setGoing}
         occurrence={occurrence}
+        titleLevel={titleLevel}
         open={open}
       />
     );
@@ -960,9 +961,9 @@ export default function App() {
                 )
               ) : (
                 <CardSections groups={listGroups} sortKey={sort.key}>
-                  {(e) => (
+                  {(e, titleLevel) => (
                     <div key={e.id}>
-                      {card(e)}
+                      {card(e, listCardDate(e, today), titleLevel)}
                       {view === "Recurring SG" && (
                         <div
                           className="occurrences"

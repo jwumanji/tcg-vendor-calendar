@@ -23,6 +23,7 @@ export const EventCard = memo(function EventCard({
   score,
   setGoing,
   occurrence,
+  titleLevel = 3,
   open,
 }: {
   e: Event;
@@ -31,8 +32,10 @@ export const EventCard = memo(function EventCard({
   score: ScoreResult;
   setGoing: SetGoing;
   occurrence?: string;
+  titleLevel?: 3 | 4;
   open: (e: Event, occurrence?: string) => void;
 }) {
+  const Title = titleLevel === 4 ? "h4" : "h3";
   return (
     <article
       className={`event-card holo status-${e.date_status}`}
@@ -43,7 +46,7 @@ export const EventCard = memo(function EventCard({
       <Logo e={e} size="xl" />
       <div className="card-details">
         <div className="card-heading">
-          <h3 className="card-title">
+          <Title className="card-title">
             <button className="stretched-button" onClick={() => open(e, occurrence)}>
               {e.name}
               <span className="sr-only">
@@ -51,7 +54,7 @@ export const EventCard = memo(function EventCard({
                 · {occurrence || dateLabel(e)} · {entry.stage}
               </span>
             </button>
-          </h3>
+          </Title>
           <GoingButton e={e} going={entry.going} setGoing={setGoing} />
         </div>
         <div className="card-art">

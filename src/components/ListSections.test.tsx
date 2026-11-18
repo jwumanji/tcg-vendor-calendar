@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import fixtures from "../../tests/fixtures/new-finds.json";
 import { normalizeEvents } from "../data";
-import { defaultRowSort, groupSortedRows, sortRows, type RowSort } from "../rows";
+import { defaultRowSort, groupSortedRows, listCardDate, sortRows, type RowSort } from "../rows";
 import { scoreEvents } from "../scoring";
 import { emptyEntry } from "../storage";
 import { Detail } from "./Detail";
@@ -20,12 +20,15 @@ const events = [event, kowloon, pasar, { ...pasar, id: "estimate", estimated_mon
 const scores = Object.fromEntries(scoreEvents(events, { today }).map((score) => [score.id, score]));
 const shared = { entries: {}, open: vi.fn(), setGoing: vi.fn() };
 
-function layouts(sort: RowSort, scanner = false) {
-  const sorted = sortRows(events, sort, {}, scores, today);
+function layouts(sort: RowSort, scanner = false, list = events) {
+  const sorted = sortRows(list, sort, {}, scores, today);
   const groups = groupSortedRows(sorted, sort.key, today);
   const grid = (
     <CardSections groups={groups} sortKey={sort.key}>
-      {(e) => <EventCard key={e.id} e={e} entry={emptyEntry} score={scores[e.id]} {...shared} />}
+      {(e, titleLevel) => (
+        <EventCard key={e.id} e={e} entry={emptyEntry} score={scores[e.id]}
+          occurrence={listCardDate(e, today)} titleLevel={titleLevel} {...shared} />
+      )}
     </CardSections>
   );
   const rows = (
@@ -49,9 +52,31 @@ describe("Grid and Rows sections", () => {
     }
     expect(grid("section > h3 + .cards")).toHaveLength(expected.length);
     expect(grid(".cards")).toHaveLength(expected.length || 1);
+    expect(grid(expected.length ? "section h4.card-title" : "h3.card-title")).toHaveLength(events.length);
     expect(rows("th[scope=rowgroup] h3")).toHaveLength(expected.length);
     expect(grid(".cards .card-title button").map((_, el) => grid(el).contents().first().text()).get())
       .toEqual(rows(".row-name").map((_, el) => rows(el).contents().first().text()).get());
+  });
+
+  it("shows the dates used for grouping on recurring cards and TBA events with an estimate", () => {
+    const recurring = {
+      ...event,
+      start_date: "2026-10-31",
+      end_date: "2026-11-01",
+      occurrences: [
+        { start_date: "2026-10-31", end_date: "2026-11-01" },
+        { start_date: "2027-01-31", end_date: "2027-02-01" },
+      ],
+    };
+    const estimate = events[3];
+    expect(estimate.date_status).toBe("tba");
+    const { grid, rows } = layouts(defaultRowSort, false, [recurring, estimate]);
+    expect(grid(".list-section-heading").text()).toBe("January 2027 · 2 events");
+    expect(grid(".card-when").map((_, el) => grid(el).text()).get())
+      .toEqual(["31 Jan 2027 – 1 Feb 2027", "Est. January 2027"]);
+    expect(grid(".event-card").last().find(".badge.tba").text()).toContain("TBA");
+    expect(rows(".row-dates").first().text()).toBe("Confirmed 31 Jan–1 Feb 2027");
+    expect(rows(".row-dates[data-status=tba]").text()).toBe("Est. Jan 2027");
   });
 });
 

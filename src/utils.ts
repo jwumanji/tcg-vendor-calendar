@@ -418,17 +418,16 @@ export function nextMonth(events: Event[], today: string) {
       .sort()[0] || today.slice(0, 7)
   );
 }
-export function dateSortKey(e: Event, today: string) {
-  if (e.date_status !== "confirmed")
-    return e.estimated_month ? e.estimated_month + "-32" : "9999";
+export function dateSortRange(e: Event, today: string) {
   const dates = ranges(e)
     .slice()
     .sort((a, b) => compareText(a.start_date, b.start_date));
-  return (
-    dates.find((r) => r.end_date >= today)?.start_date ||
-    dates[0]?.start_date ||
-    "9999"
-  );
+  return dates.find((r) => r.end_date >= today) ?? dates[0];
+}
+export function dateSortKey(e: Event, today: string) {
+  if (e.date_status !== "confirmed")
+    return e.estimated_month ? e.estimated_month + "-32" : "9999";
+  return dateSortRange(e, today)?.start_date ?? "9999";
 }
 export function timelineGroups(
   events: Event[],

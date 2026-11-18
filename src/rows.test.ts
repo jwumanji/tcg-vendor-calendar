@@ -212,6 +212,22 @@ describe("country sort", () => {
     expect([...groupRowsByCountry(sorted).keys()]).toEqual(["Hong Kong", "Malaysia", "Singapore", "Unknown"]);
     expect(normalizeRowSort({ key: "country", direction: "asc" })).toEqual({ key: "country", direction: "asc" });
   });
+  it("keeps country groups contiguous and treats empty countries as missing", () => {
+    const mixed = [
+      mk("lower", "singapore", "2027-04-01"),
+      mk("early", "Singapore", "2027-01-01"),
+      mk("late", "Singapore", "2027-05-01"),
+      mk("empty", "", "2027-01-01"),
+      mk("missing", null, "2027-02-01"),
+    ];
+    for (const direction of ["asc", "desc"] as const) {
+      const sorted = sortRows(mixed, { key: "country", direction }, {}, {}, today);
+      const groups = groupRowsByCountry(sorted);
+      expect([...groups.values()].flat()).toEqual(sorted);
+      expect([...groups.keys()].at(-1)).toBe("Unknown");
+      expect(groups.get("Unknown")?.map((e) => e.id)).toEqual(["empty", "missing"]);
+    }
+  });
 });
 
 it.each(Object.keys(ROW_SORT_LABELS) as RowKey[])("preserves grid order in row groups for %s", (key) => {

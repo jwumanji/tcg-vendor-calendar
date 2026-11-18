@@ -3,9 +3,11 @@ import type { ScoreResult } from "./scoring";
 import { emptyEntry, stages, type Entries } from "./storage";
 import {
   compareText,
+  dateLabel,
   dateSortKey,
+  dateSortRange,
+  monthLabel,
   prettyDate,
-  ranges,
 } from "./utils";
 
 export const ROW_SORT_LABELS = {
@@ -66,7 +68,7 @@ export function nextRowSort(sort: RowSort, key: RowKey): RowSort {
 }
 export function rowDateLabel(e: Event, today: string) {
   if (e.date_status !== "confirmed") {
-    return e.date_status === "estimated" && e.estimated_month
+    return e.estimated_month
       ? "Est. " +
           new Date(e.estimated_month + "-01T12:00:00").toLocaleDateString(
             "en-GB",
@@ -74,9 +76,9 @@ export function rowDateLabel(e: Event, today: string) {
           )
       : "TBA";
   }
-  const start = dateSortKey(e, today);
-  const end = ranges(e).find((r) => r.start_date === start)?.end_date;
-  if (!end) return "TBA";
+  const range = dateSortRange(e, today);
+  if (!range) return "TBA";
+  const { start_date: start, end_date: end } = range;
   if (start === end) return prettyDate(start);
   const left =
     start.slice(0, 7) === end.slice(0, 7)
@@ -85,6 +87,15 @@ export function rowDateLabel(e: Event, today: string) {
         ? prettyDate(start).slice(0, -5)
         : prettyDate(start);
   return left + "–" + prettyDate(end);
+}
+
+export function listCardDate(e: Event, today: string) {
+  if (e.date_status === "tba" && e.estimated_month)
+    return "Est. " + monthLabel(e.estimated_month);
+  if (e.date_status === "confirmed" && e.occurrences?.length) {
+    const range = dateSortRange(e, today);
+    if (range) return dateLabel({ ...e, ...range });
+  }
 }
 
 export function sortRows(
@@ -102,7 +113,7 @@ export function sortRows(
       case "name":
         return e.name;
       case "country":
-        return e.country;
+        return e.country || null;
       case "city":
         return e.city || e.country;
       case "dates": {
@@ -136,8 +147,15 @@ export function sortRows(
         : compareText(String(a), String(b));
     return sort.direction === "asc" ? diff : -diff;
   }
-  // Inside one country: soonest date first (undated last), then higher priority, then name.
-  function withinCountry(a: Event, b: Event) {
+  function compareCountryTies(a: Event, b: Event) {
+    const countryA = a.country || "";
+    const countryB = b.country || "";
+    // Keep distinct country labels together when the locale comparator treats them as equal.
+    if (countryA !== countryB) {
+      const order = countryA < countryB ? -1 : 1;
+      return sort.direction === "asc" ? order : -order;
+    }
+    // Inside one country: soonest date first, then higher priority, then name.
     return (
       compareText(dateSortKey(a, today), dateSortKey(b, today)) ||
       (scores[b.id]?.score ?? -1) - (scores[a.id]?.score ?? -1) ||
@@ -150,7 +168,7 @@ export function sortRows(
       (a, b) =>
         compare(a.key, b.key) ||
         (sort.key === "city" ? compare(a.e.country, b.e.country) : 0) ||
-        (sort.key === "country" ? withinCountry(a.e, b.e) : 0),
+        (sort.key === "country" ? compareCountryTies(a.e, b.e) : 0),
     )
     .map((row) => row.e);
 }

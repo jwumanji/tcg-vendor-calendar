@@ -54,6 +54,8 @@ import {
   compareText,
   dateSortKey,
   nextMonth,
+  seasonEvents,
+  SEASON_START,
   timelineGroups,
   gameRules,
   ranges,
@@ -71,9 +73,21 @@ const ScoreSettings = lazy(async () => ({
 }));
 
 export default function App() {
-  const events = useMemo(() => normalizeEvents(raw), []);
+  const allEvents = useMemo(() => normalizeEvents(raw), []);
+  const [show2026, setShow2026] = useState(
+    () => stored("tcg-show-2026-v1") === true,
+  );
+  const events = useMemo(
+    () => seasonEvents(allEvents, show2026),
+    [allEvents, show2026],
+  );
   const today = useToday();
-  const initialMonth = nextMonth(events, today);
+  // The calendar opens on the first month of the season (January 2027).
+  const firstMonth = nextMonth(events, today);
+  const initialMonth =
+    show2026 || firstMonth >= SEASON_START.slice(0, 7)
+      ? firstMonth
+      : SEASON_START.slice(0, 7);
   const {
     entries,
     update,
@@ -137,6 +151,10 @@ export default function App() {
         ? String(stored("tcg-theme"))
         : "dark", // dark is the default look; an explicit saved choice always wins
   );
+  useEffect(() => {
+    const error = saveValue("tcg-show-2026-v1", show2026);
+    if (error) setStorageError(error);
+  }, [show2026, setStorageError]);
   useEffect(() => {
     const error = saveValue("tcg-show-passed-v1", showPassed);
     if (error) setStorageError(error);
@@ -1033,9 +1051,17 @@ export default function App() {
             <EventExports events={attending} entries={entries} goingOnly />
             <EventExports events={filtered} entries={entries} />
           </section>
+          <label className="passed-toggle tool-toggle">
+            <input
+              type="checkbox"
+              checked={show2026}
+              onChange={(e) => setShow2026(e.target.checked)}
+            />{" "}
+            Show 2026 events (hidden by default; notes and stages are kept)
+          </label>
           <BackupControls
             entries={entries}
-            ids={events.map((e) => e.id)}
+            ids={allEvents.map((e) => e.id)}
             apply={applyEntries}
             priority={{
               weights: priority.weights,

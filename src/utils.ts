@@ -478,3 +478,35 @@ export function timelineGroups(
   }
   return groups;
 }
+
+/** Planning season starts here: earlier events are hidden by default (kept in the data). */
+export const SEASON_START = "2027-01-01";
+/**
+ * Events for the 2027+ season. Anything wholly before SEASON_START is hidden;
+ * recurring events keep only their occurrences from SEASON_START on; undated
+ * (TBA) events stay. Pass includeEarlier to get everything unchanged. Ids are
+ * never touched, so notes, stages and Going marks survive.
+ */
+export function seasonEvents(events: Event[], includeEarlier = false): Event[] {
+  if (includeEarlier) return events;
+  const out: Event[] = [];
+  for (const e of events) {
+    if (e.occurrences?.length) {
+      const kept = e.occurrences.filter((o) => o.end_date >= SEASON_START);
+      if (!kept.length) continue;
+      out.push(
+        kept.length === e.occurrences.length
+          ? e
+          : { ...e, occurrences: kept, start_date: kept[0].start_date, end_date: kept[0].end_date },
+      );
+      continue;
+    }
+    const last = e.end_date || e.start_date;
+    if (last) {
+      if (last >= SEASON_START) out.push(e);
+    } else if (e.estimated_month) {
+      if (e.estimated_month >= SEASON_START.slice(0, 7)) out.push(e);
+    } else out.push(e);
+  }
+  return out;
+}

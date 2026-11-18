@@ -6,13 +6,11 @@ import { emptyEntry, type Entries } from "../storage";
 import { games, gameKey, upcoming } from "../utils";
 import {
   ROW_SORT_LABELS,
-  groupRowsByMonth,
-  groupRowsByCountry,
+  groupSortedRows,
   optionalColumns,
   type OptionalColumn,
   nextRowSort,
   rowDateLabel,
-  sortRows,
   selectAllVisible,
   selectRange,
   type RowKey,
@@ -25,7 +23,7 @@ import { PriorityChip } from "./PriorityChip";
 import { SourceChip } from "./FindSource";
 
 export function EventRows({
-  events,
+  events: sorted,
   columns,
   sort,
   setSort,
@@ -47,17 +45,8 @@ export function EventRows({
   setGoing: SetGoing;
   open: (e: Event) => void;
 }) {
-  const sorted = useMemo(
-    () => sortRows(events, sort, entries, scores, today),
-    [events, sort, entries, scores, today],
-  );
   const groups = useMemo(
-    () =>
-      sort.key === "dates"
-        ? groupRowsByMonth(sorted, today)
-        : sort.key === "country"
-          ? groupRowsByCountry(sorted)
-          : new Map([["", sorted]]),
+    () => groupSortedRows(sorted, sort.key, today),
     [sorted, sort.key, today],
   );
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
@@ -486,7 +475,7 @@ export function RowSortControl({
         ))}
       </div>
       <label>
-        <span className="sr-only">Sort rows by</span>
+        <span className="sr-only">Sort events by</span>
         <select
           value={sort.key}
           onChange={(ev) =>

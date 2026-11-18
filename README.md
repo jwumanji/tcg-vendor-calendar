@@ -35,7 +35,7 @@ Use **Export backup** for a JSON backup before switching devices. Import validat
 
 ## Views
 
-The List opens in **Rows**, highest Priority first. Choose **Priority** or **Date** for a quick sort. Date groups events under sticky month headings, shows an **Est.** marker on month estimates, and puts events awaiting dates at the end. The sort menu, direction button and desktop column headings offer other orderings. **Columns** adds Scanner score, Source or Notes. This browser remembers the layout, sort and optional columns in `tcg-list-view`, `tcg-rows-sort` and `tcg-rows-columns`.
+The List opens in **Rows**, soonest dates first. Grid and Rows use the same filtered, sorted events, with one item per recurring show ordered by its next occurrence for date sorts. Recurring SG lists the published dates beneath each card. Timeline shows the event in each matching occurrence month and retains the shared order within each group. Choose **Priority** or **Date** for a quick sort. Date groups events under sticky month headings, shows an **Est.** marker on month estimates, and puts events awaiting dates at the end. The sort menu, direction button and desktop column headings offer other orderings. **Columns** adds Scanner score, Source or Notes. This browser remembers the layout, sort and optional columns in `tcg-list-view`, `tcg-sort-v2` and `tcg-rows-columns`.
 
 Open an event by tapping the row or pressing Enter on its name. Use ↑/↓ or Home/End to move between names. **Grid** switches to cards. **Top picks** ranks upcoming dated events, **Calendar** shows a monthly agenda on phones, and **Timeline** can group by month or pipeline stage. Watchlist and Recurring SG have their own tabs.
 

@@ -18,13 +18,26 @@ export const ROW_SORT_LABELS = {
   status: "Date status",
   priority: "Priority",
   scanner: "Scanner score",
+  size: "Size tier",
   stage: "Stage",
   notes: "Notes",
   source: "Source",
 };
 export type RowKey = keyof typeof ROW_SORT_LABELS;
 export type RowSort = { key: RowKey; direction: "asc" | "desc" };
-export const defaultRowSort: RowSort = { key: "priority", direction: "desc" };
+export const SORT_STORAGE_KEY = "tcg-sort-v2";
+export const defaultRowSort: RowSort = { key: "dates", direction: "asc" };
+
+export function loadSort(storage?: Pick<Storage, "getItem" | "removeItem">): RowSort {
+  try {
+    const preferences = storage ?? window.localStorage;
+    preferences.removeItem("tcg-rows-sort");
+    preferences.removeItem("tcg-sort-v1");
+    return normalizeRowSort(JSON.parse(preferences.getItem(SORT_STORAGE_KEY) ?? "null"));
+  } catch {
+    return defaultRowSort;
+  }
+}
 export function normalizeRowSort(input: unknown): RowSort {
   if (
     input &&
@@ -47,7 +60,7 @@ export function nextRowSort(sort: RowSort, key: RowKey): RowSort {
   return {
     key,
     direction:
-      key === "priority" || key === "scanner" || key === "going"
+      key === "priority" || key === "scanner" || key === "going" || key === "size"
         ? "desc"
         : "asc",
   };
@@ -107,6 +120,10 @@ export function sortRows(
         return scores[e.id]?.score ?? null;
       case "scanner":
         return e.vendor_score;
+      case "size": {
+        const rank = ["S", "M", "L", "XL"].indexOf(e.size_tier ?? "");
+        return rank < 0 ? null : rank;
+      }
       case "stage":
         return stages.indexOf(entry.stage);
       case "notes":
@@ -179,6 +196,12 @@ export function groupRowsByCountry(sorted: Event[]) {
     groups.get(name)!.push(event);
   }
   return groups;
+}
+
+export function groupSortedRows(sorted: Event[], key: RowKey, today: string) {
+  if (key === "dates") return groupRowsByMonth(sorted, today);
+  if (key === "country") return groupRowsByCountry(sorted);
+  return new Map([["", sorted]]);
 }
 
 export function selectAllVisible(visible: readonly string[], checked: boolean) {

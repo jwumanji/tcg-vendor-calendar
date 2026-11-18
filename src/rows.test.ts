@@ -3,6 +3,10 @@ import fixtures from "../tests/fixtures/new-finds.json";
 import { normalizeEvents } from "./data";
 import {
   defaultRowSort,
+  groupSortedRows,
+  loadSort,
+  SORT_STORAGE_KEY,
+  ROW_SORT_LABELS,
   groupRowsByMonth,
   groupRowsByCountry,
   normalizeColumns,
@@ -24,6 +28,7 @@ const [a, b, c] = finds.map((e, i) => ({
   id: ["a", "b", "c"][i],
   name: ["Édition 12", "edition 2", "Edition 2"][i],
   vendor_score: [80, 0, null][i],
+  size_tier: ["XL", "M", null][i],
 }));
 const entries = {
   a: {
@@ -45,6 +50,7 @@ describe("row ordering", () => {
     ["status", "abc", "cba"],
     ["priority", "acb", "bca"],
     ["scanner", "bac", "abc"],
+    ["size", "bac", "abc"],
     ["stage", "cba", "abc"],
     ["notes", "bca", "abc"],
     ["source", "abc", "cba"],
@@ -102,7 +108,7 @@ describe("row ordering", () => {
   });
 });
 describe("saved row preferences", () => {
-  it("defaults to rows with independent highest-priority row ordering", () => {
+  it("defaults to rows and validates the shared sort preference", () => {
     for (const value of [null, {}, "other"])
       expect(normalizeListView(value)).toBe("rows");
     expect(normalizeListView("grid")).toBe("grid");
@@ -119,7 +125,7 @@ describe("saved row preferences", () => {
       key: "scanner",
       direction: "asc",
     });
-    expect(nextRowSort(defaultRowSort, "priority").direction).toBe("asc");
+    expect(nextRowSort(defaultRowSort, "priority").direction).toBe("desc");
     expect(nextRowSort(defaultRowSort, "scanner").direction).toBe("desc");
     expect(nextRowSort(defaultRowSort, "name").direction).toBe("asc");
   });
@@ -197,4 +203,30 @@ describe("country sort", () => {
     expect([...groupRowsByCountry(sorted).keys()]).toEqual(["Hong Kong", "Malaysia", "Singapore", "Unknown"]);
     expect(normalizeRowSort({ key: "country", direction: "asc" })).toEqual({ key: "country", direction: "asc" });
   });
+});
+
+it.each(Object.keys(ROW_SORT_LABELS) as RowKey[])("preserves grid order in row groups for %s", (key) => {
+  const filtered = events.filter((event) => event.vendor_score !== 0);
+  for (const direction of ["asc", "desc"] as const) {
+    const grid = sortRows(filtered, { key, direction }, entries, scores, today);
+    const rows = [...groupSortedRows(grid, key, today).values()].flat();
+    expect(rows.map((e) => e.id)).toEqual(grid.map((e) => e.id));
+  }
+});
+
+it("discards legacy sorts, preserves the layout and reads only valid v2 preferences", () => {
+  const data = new Map([
+    ["tcg-rows-sort", '{"key":"priority","direction":"desc"}'],
+    ["tcg-sort-v1", '"name"'],
+    ["tcg-list-view", '"grid"'],
+  ]);
+  const storage = { getItem: (k: string) => data.get(k) ?? null, removeItem: (k: string) => data.delete(k) };
+  expect(loadSort(storage)).toEqual({ key: "dates", direction: "asc" });
+  expect([...data.keys()]).toEqual(["tcg-list-view"]);
+  for (const invalid of ["broken JSON", '{"key":"size","direction":"up"}', '"score"']) {
+    data.set(SORT_STORAGE_KEY, invalid);
+    expect(loadSort(storage)).toEqual({ key: "dates", direction: "asc" });
+  }
+  data.set(SORT_STORAGE_KEY, '{"key":"size","direction":"desc"}');
+  expect(loadSort(storage)).toEqual({ key: "size", direction: "desc" });
 });

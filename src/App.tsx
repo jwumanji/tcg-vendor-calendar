@@ -1,8 +1,7 @@
 import { usePriority } from "./hooks/usePriority";
 import { Modal } from "./components/Modal";
 import { EventRows, RowColumns, RowSortControl } from "./components/EventRows";
-import { normalizeColumns, normalizeListView, normalizeRowSort, sortRows } from "./rows";
-import { compareByScore } from "./scoring";
+import { normalizeColumns, normalizeListView, loadSort, SORT_STORAGE_KEY, sortRows } from "./rows";
 import { CalendarView } from "./components/CalendarView";
 import { EventCard } from "./components/EventCard";
 import { BrandLockup, BrandMark } from "./components/Brand";
@@ -53,8 +52,6 @@ import meta from "../data/meta.json";
 import type { Event } from "./model";
 import { emptyFilters } from "./model";
 import {
-  compareText,
-  dateSortKey,
   nextMonth,
   seasonEvents,
   countryOptions,
@@ -74,8 +71,6 @@ const Detail = lazy(async () => ({
 const ScoreSettings = lazy(async () => ({
   default: (await import("./components/ScoreSettings")).ScoreSettings,
 }));
-
-const GRID_SORTS = ["date", "name", "priority", "score", "country", "size", "stage"];
 
 export default function App() {
   const allEvents = useMemo(() => normalizeEvents(raw), []);
@@ -122,17 +117,15 @@ export default function App() {
     const error = saveValue("tcg-rows-columns", columns);
     if (error) setStorageError(error);
   }, [columns, setStorageError]);
-  const [rowSort, setRowSort] = useState(() =>
-    normalizeRowSort(stored("tcg-rows-sort")),
-  );
+  const [sort, setSort] = useState(() => loadSort());
   useEffect(() => {
     const error = saveValue("tcg-list-view", listView);
     if (error) setStorageError(error);
   }, [listView, setStorageError]);
   useEffect(() => {
-    const error = saveValue("tcg-rows-sort", rowSort);
+    const error = saveValue(SORT_STORAGE_KEY, sort);
     if (error) setStorageError(error);
-  }, [rowSort, setStorageError]);
+  }, [sort, setStorageError]);
   const [showPassed, setShowPassed] = useState(
     () => stored("tcg-show-passed-v1") === true,
   );
@@ -148,14 +141,6 @@ export default function App() {
   const [month, setMonth] = useState(initialMonth);
   const [filterOpen, setFilterOpen] = useState(false);
   const [selected, setSelected] = useState<Event | null>(null);
-  const [sort, setSort] = useState(() => {
-    const saved = stored("tcg-sort-v1");
-    return typeof saved === "string" && GRID_SORTS.includes(saved) ? saved : "date";
-  });
-  useEffect(() => {
-    const error = saveValue("tcg-sort-v1", sort);
-    if (error) setStorageError(error);
-  }, [sort, setStorageError]);
   const [groupByStage, setGroupByStage] = useState(false);
   const [theme, setTheme] = useState(
     () =>
@@ -349,31 +334,8 @@ export default function App() {
   );
   const showRows = view === "List" && listView === "rows";
   const sorted = useMemo(
-    () =>
-      showRows
-        ? filtered
-        : sort === "country"
-          ? sortRows(filtered, { key: "country", direction: "asc" }, entries, scores, today)
-          : [...filtered].sort((a, b) => {
-            if (sort === "priority")
-              return compareByScore(scores[a.id], scores[b.id]);
-            return sort === "stage"
-              ? stages.indexOf((entries[a.id] || emptyEntry).stage) -
-                  stages.indexOf((entries[b.id] || emptyEntry).stage) ||
-                  compareText(a.name, b.name)
-              : sort === "name"
-                ? compareText(a.name, b.name)
-                : sort === "score"
-                  ? (b.vendor_score ?? -1) - (a.vendor_score ?? -1)
-                    : sort === "size"
-                      ? ["S", "M", "L", "XL"].indexOf(b.size_tier || "") -
-                        ["S", "M", "L", "XL"].indexOf(a.size_tier || "")
-                      : compareText(
-                          dateSortKey(a, today),
-                          dateSortKey(b, today),
-                        ) || compareText(a.name, b.name);
-          }),
-    [filtered, sort, entries, today, scores, showRows],
+    () => sortRows(filtered, sort, entries, scores, today),
+    [filtered, sort, entries, scores, today],
   );
   function card(e: Event, occurrence?: string) {
     return (
@@ -418,20 +380,7 @@ export default function App() {
       ),
     [sorted, view],
   );
-  const sortControl = (
-    <label>
-      Sort by{" "}
-      <select value={sort} onChange={(e) => setSort(e.target.value)}>
-        <option value="date">Date</option>
-        <option value="name">Name</option>
-        <option value="priority">Priority score (high to low)</option>
-        <option value="score">Scanner score</option>
-        <option value="country">Country (A–Z, then date)</option>
-        <option value="size">Size tier</option>
-        <option value="stage">Pipeline stage</option>
-      </select>
-    </label>
-  );
+  const sortControl = <RowSortControl sort={sort} setSort={setSort} />;
   const noResults = (
     <EmptyState
       icon={SearchX}
@@ -874,7 +823,7 @@ export default function App() {
             />
           ) : view === "Pipeline" ? (
             <Pipeline
-              events={filtered}
+              events={sorted}
               scores={scores}
               entries={entries}
               open={setSelected}
@@ -899,7 +848,9 @@ export default function App() {
                 .sort(([a], [b]) =>
                   groupByStage
                     ? stages.indexOf(a as Stage) - stages.indexOf(b as Stage)
-                    : a.localeCompare(b),
+                    : sort.key === "dates" && sort.direction === "desc" && a !== "9999" && b !== "9999"
+                      ? b.localeCompare(a)
+                      : a.localeCompare(b),
                 )
                 .map(([m, items]) => (
                   <section key={m}>
@@ -924,9 +875,9 @@ export default function App() {
                   {visibleList.length}{" "}
                   {visibleList.length === 1 ? "event" : "events"}
                 </span>
+                {sortControl}
                 {showRows && (
                   <>
-                    <RowSortControl sort={rowSort} setSort={setRowSort} />
                     <RowColumns columns={columns} change={setColumns} />
                     <button
                       className="button select-mode"
@@ -962,18 +913,17 @@ export default function App() {
                     </button>
                   </div>
                 )}
-                {!showRows && sortControl}
               </div>
               {showRows ? (
-                filtered.length > 0 && (
+                visibleList.length > 0 && (
                   <EventRows
                     columns={columns}
-                    events={filtered}
+                    events={visibleList}
                     key={String(selectMode)}
                     selectMode={selectMode}
                     setGoing={setGoing}
-                    sort={rowSort}
-                    setSort={setRowSort}
+                    sort={sort}
+                    setSort={setSort}
                     entries={entries}
                     scores={scores}
                     today={today}

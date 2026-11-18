@@ -3301,8 +3301,9 @@ input[type="checkbox"]:indeterminate::after { content: ""; width: 10px; height: 
   white-space: nowrap; color: var(--muted); font: 650 13px/1.2 var(--font-text);
 }
 .quick-filters button {
+  display: inline-flex; align-items: center; gap: 5px; flex: none;
   border: 1px solid var(--line-2); border-radius: 99px;
-  background: var(--surface); min-height: 32px; padding: 5px 12px;
+  background: var(--surface); min-height: 36px; padding: 5px 12px;
 }
 .quick-filters button[aria-pressed="true"], .quick-sort button[aria-pressed="true"] {
   color: var(--ink); background: var(--surface-3); border-color: var(--accent);
@@ -3488,6 +3489,7 @@ input[type="checkbox"]:indeterminate::after { content: ""; width: 10px; height: 
   display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 4px 12px;
   border: 1px solid var(--line-2); border-radius: 999px; background: var(--surface); color: var(--ink); font-weight: 700; font-size: 13px;
 }
+.quick-filters .flag-img, .country-filter > button .flag-img { width: 17px; height: 17px; }
 .country-filter > button[aria-pressed="true"] { border-color: var(--accent); }
 .country-panel {
   position: absolute; z-index: 30; top: calc(100% + 6px); left: 0; width: min(300px, calc(100vw - 24px));

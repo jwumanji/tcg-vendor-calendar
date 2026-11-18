@@ -14,6 +14,7 @@ import {
   ics,
   placeLabel,
   countryOptions,
+  selectedFlags,
   flagFile,
   goingEvents,
   csv,
@@ -472,4 +473,13 @@ describe("countryOptions", () => {
     expect(opts.map((o) => [o.name, o.count])).toEqual([["Hong Kong", 1], ["Singapore", 2], ["Unknown", 1]]);
     expect(opts[1].code).toBe("SG");
   });
+});
+
+it("previews selected flags in selection order and counts overflow or missing flags", () => {
+  const options = ["SG", "HK", "MY", "JP"].map((code) => ({ name: code, code, count: 1 }));
+  expect(selectedFlags([], options)).toEqual({ flags: [], more: 0 });
+  expect(selectedFlags(["HK", "Unknown", "MY", "SG", "JP"], options)).toEqual({
+    flags: ["HK", "MY", "SG"], more: 2,
+  });
+  expect(selectedFlags(["JP", "HK"], options, 1)).toEqual({ flags: ["JP"], more: 1 });
 });

@@ -72,6 +72,12 @@ const ScoreSettings = lazy(async () => ({
   default: (await import("./components/ScoreSettings")).ScoreSettings,
 }));
 
+const quickCountries = [
+  { country: "Singapore", code: "SG" },
+  { country: "Hong Kong", code: "HK" },
+  { country: "Malaysia", code: "MY" },
+];
+
 export default function App() {
   const allEvents = useMemo(() => normalizeEvents(raw), []);
   const [show2026, setShow2026] = useState(
@@ -263,7 +269,6 @@ export default function App() {
       label: "TBA excluded",
       clear: () => set("tba", true),
     });
-  const quickCountries = ["Singapore", "Hong Kong", "Malaysia"];
   const quick = [
     {
       id: "status",
@@ -272,7 +277,8 @@ export default function App() {
       toggle: () =>
         set("status", filters.status === "confirmed" ? "" : "confirmed"),
     },
-    ...quickCountries.map((country) => ({
+    ...quickCountries.map(({ country, code }) => ({
+      code,
       id: "country:" + country,
       label: country,
       active: filters.countries.includes(country),
@@ -314,7 +320,7 @@ export default function App() {
       status: f.status === "confirmed" ? "" : f.status,
       next90: false,
       notGoing: false,
-      countries: f.countries.filter((c) => !quickCountries.includes(c)),
+      countries: f.countries.filter((c) => !quickCountries.some(({ country }) => country === c)),
     }));
   }
   const toast = (
@@ -550,6 +556,7 @@ export default function App() {
               >
                 {quick.map((q) => (
                   <button key={q.id} aria-pressed={q.active} onClick={q.toggle}>
+                    {"code" in q && <CountryFlag code={q.code} />}
                     {q.label}
                   </button>
                 ))}

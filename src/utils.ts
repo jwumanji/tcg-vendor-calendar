@@ -528,3 +528,12 @@ export function countryOptions(events: Event[]): CountryOption[] {
       compareText(a.name, b.name),
   );
 }
+
+
+export function selectedFlags(selected: string[], options: CountryOption[], max = 3) {
+  const flags = selected
+    .map((name) => options.find((option) => option.name === name)?.code)
+    .filter((code): code is string => Boolean(code && flagFile(code)))
+    .slice(0, Math.max(0, max));
+  return { flags, more: selected.length - flags.length };
+}

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { CountryFlag } from "./EventIdentity";
-import type { CountryOption } from "../utils";
+import { selectedFlags, type CountryOption } from "../utils";
 
 /** Multi-select country dropdown with flags and event counts. */
 export function CountryFilter({
@@ -13,6 +13,7 @@ export function CountryFilter({
   selected: string[];
   change: (countries: string[]) => void;
 }) {
+  const { flags, more } = selectedFlags(selected, options);
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -36,13 +37,15 @@ export function CountryFilter({
       }}
     >
       <button
+        aria-label={selected.length ? `Countries, selected: ${selected.join(", ")}` : "Countries"}
         aria-expanded={open}
         aria-controls="country-filter-panel"
         aria-pressed={selected.length > 0}
         onClick={() => setOpen(!open)}
       >
         Countries
-        {selected.length > 0 && <span className="count">{selected.length}</span>}
+        {flags.map((code) => <CountryFlag key={code} code={code} />)}
+        {more > 0 && <span className="count">+{more}</span>}
         <ChevronDown size={14} aria-hidden="true" />
       </button>
       {open && (

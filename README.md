@@ -75,6 +75,7 @@ Read [the data guide](data/DATA_README.md) before editing. Replace `data/events.
 
 The grid, Rows, event hero and compact views share one image treatment. On first load the planner fits the entire image over a darkened, blurred copy. It checks the natural aspect ratio and samples 16 × 16 pixels once per image URL. Wide images (at least 1.45:1), images with at least 2% transparent pixels and Scanner `logo` hints keep that treatment. Other `poster_or_photo` images fill the box edge to edge. Without a hint, a mostly uniform perimeter (72% of edge samples) indicates a flat logo, and the remaining images fill the box. For logos the planner trims transparent margins and removes edge-connected, uniform neutral mattes from the foreground. The original file supplies the backdrop.
 
+Events without artwork get a generated cover immediately, including new scanner finds. A hash of the stable event ID selects a single violet hue, gradient and geometric motif. Grid cards and event pages show the event name in Unbounded with game glyphs and a country badge. Rows and compact views use the same design with a monogram.
 
 Update the visible “Data last updated” note in `src/App.tsx` when refreshing. Run `npm test` and `npm run build` after changes. The app reads the JSON at build time; redeploy to publish new data. No live scraping occurs.
 

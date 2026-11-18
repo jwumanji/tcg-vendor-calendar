@@ -4,6 +4,7 @@ import { TriangleAlert, StickyNote } from "lucide-react";
 import { flagFile, placeLabel, rarity, type Rarity } from "../utils";
 import type { Event } from "../model";
 import { useState } from "react";
+import { GeneratedCover } from "./GeneratedCover";
 import { EventImage } from "./EventImage";
 
 export type LogoSize = "md" | "row" | "xl" | "detail";
@@ -21,13 +22,11 @@ export function Logo({ e, size = "md" }: { e: Event; size?: LogoSize }) {
           onError={() => setFailed(e.logo)}
         />
       ) : (
-        <span className="initials">
-          {e.name
-            .split(/\s+/)
-            .slice(0, 2)
-            .map((word) => [...word][0])
-            .join("")}
-        </span>
+        <GeneratedCover
+          e={e}
+          compact={size === "row" || size === "md"}
+          flag={<CountryFlag code={e.country_code} />}
+        />
       )}
     </span>
   );

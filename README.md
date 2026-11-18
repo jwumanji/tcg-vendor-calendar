@@ -31,7 +31,35 @@ Filters, theme, notes, stages and the passed-event visibility toggle are stored 
 
 Notes and stages use the versioned `tcg-pipeline-v1` key. Refreshes never prune saved IDs absent from the dataset. The old `tcg-plans` key is retained and migrated on first load: Interested → Interested, Planning to vend → Interested, Applied → Contacted, Accepted → Need to pay, Skip → Pass. Old entries have no recorded timestamps.
 
-Use **Export notes + stages** for a JSON backup before switching devices. Import validates version 1 and previews absent IDs before confirmation. Merge overwrites matching IDs and keeps other entries; Replace explicitly discards entries outside the backup. Unknown JSON fields are ignored. Pass and Too expensive are hidden by default outside Pipeline; use the persisted visibility toggle to include them. Pipeline always renders every stage column and honors search and filters. Timeline can group by stage; card views can sort by stage. CSV includes stage and notes. Storage errors leave edits in memory and display a warning so they can be exported.
+Use **Export backup** for a JSON backup before switching devices. Import validates version 1 and previews absent IDs before confirmation. Merge takes the newest note and stage independently for each ID, retaining local edits on timestamp ties; Replace explicitly discards entries outside the backup. Unknown JSON fields are ignored. Pass and Too expensive are hidden by default outside Pipeline; use the persisted visibility toggle to include them. Pipeline always renders every stage column and honors search and filters. Timeline can group by stage; card views can sort by stage. CSV includes stage and notes. Storage errors leave edits in memory and display a warning so they can be exported.
+
+## Views
+
+The List opens in **Grid**. Switch to **Rows** to compare dates, locations, stages, notes, sources and both scores in one table. Rows starts with the highest Priority score first. Select a column heading to sort, then select it again to reverse direction. On a phone, the sort menu and direction button sit above the two-line rows. With an event name focused, use ↑/↓ to move, Home/End to jump and Enter or Space to open its details. The browser remembers the layout in `tcg-list-view` and the column and direction in `tcg-rows-sort`.
+
+**New finds** filters to scraper discoveries. Cards show the source, and event details include the discovery date, extraction confidence, relevance and a link to the listing when available. Check the organiser page before applying. Dated discoveries appear in their calendar month and on the timeline. Undated discoveries join the watchlist. Each discovery uses its stable ID for notes and pipeline stages. The new-finds toggle and minimum Priority tier are saved with the other filters in `tcg-filters`.
+
+## Priority score
+
+Priority rates each event from 0 to 100. It drives the upcoming top picks, the Priority sort and the minimum-tier filter. **Score weights** adjusts the relative importance of seven factors. The effective percentages always total 100. A factor earns its weight multiplied by its rating.
+
+| Factor | Default weight | What contributes |
+| --- | ---: | --- |
+| Scale | 20% | Reported attendance or capacity and vendor counts. A recognised large venue or size tier can supply an estimate. |
+| Track record | 10% | Documented prior editions or years running. An established publisher or recurring series can supply an estimate. |
+| TCG fit | 20% | Event format, featured games, card-show naming and evidence that vendors can take part. |
+| Market | 15% | Host country, with the highest ratings for Singapore and Hong Kong, followed by Malaysia. |
+| Commercial potential | 15% | Quoted booth cost per thousand attendees, attendees per vendor, booth availability and applications. Size and market supply proxies when comparable prices are unavailable. |
+| Logistics | 10% | Date certainty, travel from Singapore and time until the vendor deadline. The available inputs share this factor’s weight. |
+| Scanner score | 10% | The original vendor score, with shortlist priority as a fallback estimate. The separate Scanner score filter still uses the original vendor score. |
+
+The model labels each factor **real**, **estimated** or **missing**. Real factors have direct supporting evidence. Most proxy ratings are capped at 75% of the factor’s weight, with an 80% cap for the Scanner shortlist proxy. Missing factors receive 40% of their weight. Confidence measures the share of total weight backed by real factors. **High** starts at 65%, **medium** at 40%, and **low** falls below 40%. A dashed score chip and a tilde identify low confidence. Expand a factor in event details to see its signals and assumptions.
+
+The model rounds the weighted total, then deducts one point per higher-scored confirmed event with overlapping dates or adjacent Friday–Saturday or Saturday–Sunday dates, up to four points. Recurring shows use their published occurrences. Clash comparisons use the calculated scores before penalties and overrides. The final tiers are **Must-do 77–100**, **Strong 64–76**, **Maybe 52–63** and **Skip 0–51**.
+
+Use **Use my score** in event details to override an individual event. The pencil identifies your score wherever it appears. Details retain the calculated score, factor breakdown and confidence. **Reset to calculated** removes the override. **Copy explanation** copies the score, confidence and supporting signals.
+
+Effective weights are saved in `tcg-priority-weights` and event-ID overrides in `tcg-priority-overrides`. JSON backups include both alongside the existing notes and stages. Importing a backup with score settings applies its weights. Merge adds imported overrides and uses the imported value for matching IDs. Replace restores the imported override set, including IDs absent from the current snapshot. Older version-1 backups restore notes and stages and preserve the current score settings.
 
 ## Refresh data
 

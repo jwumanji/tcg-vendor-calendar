@@ -1,4 +1,5 @@
 import { emptyEntry, type Entries } from "./storage";
+import { TIER_THRESHOLDS } from "./scoring";
 import meta from "../data/meta.json";
 import type { Event, Filters } from "./model";
 export const gameRules: [string, RegExp][] = [
@@ -58,7 +59,10 @@ export function ranges(e: Event) {
 }
 const normalizeSearch = (s: string) =>
   s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
-export function matches(e: Event, f: Filters, p: Entries) {
+export function matches(e: Event, f: Filters, p: Entries, priorityScore = 0) {
+  if (f.newOnly && !e.is_new_find) return false;
+  if (f.minTier !== "any" && priorityScore < TIER_THRESHOLDS[f.minTier])
+    return false;
   if (
     f.search &&
     !normalizeSearch(

@@ -1,3 +1,6 @@
+import { PriorityChip } from "./PriorityChip";
+import { FindBadges } from "./FindSource";
+import type { ScoreResult } from "../scoring";
 import { memo } from "react";
 import { CalendarDays, MapPin } from "lucide-react";
 import type { Event } from "../model";
@@ -9,11 +12,13 @@ import { StageBadge } from "./Pipeline";
 export const EventCard = memo(function EventCard({
   e,
   entry,
+  score,
   occurrence,
   open,
 }: {
   e: Event;
   entry: Entry;
+  score: ScoreResult;
   occurrence?: string;
   open: (e: Event) => void;
 }) {
@@ -51,11 +56,13 @@ export const EventCard = memo(function EventCard({
             </span>
           </div>
           <div className="card-art-foot">
-            <Status e={e} />
+            <PriorityChip result={score} />
             {e.vendor_score !== null && <ScoreGem score={e.vendor_score} />}
           </div>
         </div>
         <div className="card-tags">
+          <Status e={e} />
+          <FindBadges e={e} />
           {games(e)
             .slice(0, 3)
             .map((g) => (

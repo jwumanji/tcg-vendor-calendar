@@ -59,7 +59,10 @@ export function ScoreGem({
 }) {
   const r = rarity(score);
   return (
-    <span className={`gem gem-${r.tier}${large ? " gem-lg" : ""}`}>
+    <span
+      title={`Scanner score ${score} of 100, ${r.label}`}
+      className={`gem gem-${r.tier}${large ? " gem-lg" : ""}`}
+    >
       <span className="gem-num">
         {score}
         <small>/100</small>
@@ -74,7 +77,10 @@ export function ScoreGem({
 /** "Has notes" indicator: icon + text (never an emoji or colour alone). */
 export function NoteTag({ compact = false }: { compact?: boolean }) {
   return (
-    <span className={`note-tag${compact ? " note-tag-compact" : ""}`}>
+    <span
+      title="Has notes"
+      className={`note-tag${compact ? " note-tag-compact" : ""}`}
+    >
       <StickyNote size={compact ? 13 : 14} aria-hidden="true" />
       <span className={compact ? "sr-only" : undefined}>Has notes</span>
     </span>

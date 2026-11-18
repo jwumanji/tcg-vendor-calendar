@@ -1,3 +1,11 @@
+import { DEFAULT_WEIGHTS, normalizeWeights } from "./scoring";
+import { stored } from "./hooks/useFilters";
+import {
+  importPriority,
+  normalizeOverrides,
+  WEIGHTS_KEY,
+  OVERRIDES_KEY,
+} from "./storage";
 import { describe, it, expect, vi } from "vitest";
 import {
   stashBeforeReplace,
@@ -219,5 +227,67 @@ describe("replace safety net", () => {
         entries: { test: { ...entry, note: 42 } },
       }),
     ).toThrow("note must be text");
+  });
+});
+
+describe("priority preferences and backups", () => {
+  const priority = {
+    weights: normalizeWeights({ scale: 52 }),
+    overrides: { known: 0, absent: 88 },
+  };
+  it("reads both storage keys, tolerates corrupt JSON, and keeps zero overrides", () => {
+    const memory = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      setItem: (k: string, v: string) => memory.set(k, v),
+      getItem: (k: string) => memory.get(k) ?? null,
+    });
+    try {
+      expect(saveValue(WEIGHTS_KEY, priority.weights)).toBe("");
+      expect(saveValue(OVERRIDES_KEY, priority.overrides)).toBe("");
+      expect(normalizeWeights(stored(WEIGHTS_KEY))).toEqual(priority.weights);
+      expect(normalizeOverrides(stored(OVERRIDES_KEY))).toEqual(
+        priority.overrides,
+      );
+      memory.set(WEIGHTS_KEY, "{broken");
+      expect(normalizeWeights(stored(WEIGHTS_KEY))).toEqual(DEFAULT_WEIGHTS);
+      expect(normalizeOverrides([])).toEqual({});
+      expect(
+        normalizeOverrides({
+          " ": 50,
+          a: -12,
+          b: 300,
+          c: 80.7,
+          d: "90",
+          e: NaN,
+          f: null,
+        }),
+      ).toEqual({ a: 0, b: 100, c: 81 });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+  it("round trips notes, weights and overrides, preserving old backups", () => {
+    const restored = validateBackup(
+      JSON.parse(JSON.stringify(backup({ known: entry }, priority))),
+    );
+    expect(restored).toMatchObject({ entries: { known: entry }, priority });
+    expect(
+      unknownIds(restored.entries, ["known"], restored.priority?.overrides),
+    ).toEqual(["absent"]);
+    const current = {
+      weights: { ...DEFAULT_WEIGHTS },
+      overrides: { other: 75, known: 44 },
+    };
+    expect(importPriority(current, restored.priority, "replace")).toEqual(
+      priority,
+    );
+    expect(importPriority(current, restored.priority, "merge")).toEqual({
+      ...priority,
+      overrides: { ...priority.overrides, other: 75 },
+    });
+    for (const mode of ["merge", "replace"] as const)
+      expect(
+        importPriority(current, validateBackup(backup({})).priority, mode),
+      ).toBe(current);
   });
 });

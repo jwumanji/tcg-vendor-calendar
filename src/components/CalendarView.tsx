@@ -1,3 +1,5 @@
+import { PriorityChip } from "./PriorityChip";
+import type { ScoreResult } from "../scoring";
 import { useMemo } from "react";
 import {
   ArrowUpRight,
@@ -22,6 +24,7 @@ import { StageBadge } from "./Pipeline";
 export function CalendarView({
   filtered,
   entries,
+  scores,
   month,
   setMonth,
   initialMonth,
@@ -30,6 +33,7 @@ export function CalendarView({
 }: {
   filtered: Event[];
   entries: Entries;
+  scores: Record<string, ScoreResult>;
   month: string;
   setMonth: (month: string) => void;
   initialMonth: string;
@@ -41,6 +45,7 @@ export function CalendarView({
       <EventCard
         key={e.id}
         e={e}
+        score={scores[e.id]}
         entry={entries[e.id] || emptyEntry}
         occurrence={occurrence}
         open={setSelected}
@@ -147,6 +152,7 @@ export function CalendarView({
                   >
                     <span aria-hidden="true">●</span>
                     <span className="calendar-event-name">{e.name}</span>{" "}
+                    <PriorityChip result={scores[e.id]} />
                     <StageBadge stage={(entries[e.id] || emptyEntry).stage} />
                     {entries[e.id]?.note.trim() && <NoteTag compact />}
                   </button>
@@ -208,6 +214,7 @@ export function CalendarView({
             {tba.map((e) => (
               <button key={e.id} onClick={() => setSelected(e)}>
                 {e.name}
+                <PriorityChip result={scores[e.id]} />
                 <StageBadge stage={(entries[e.id] || emptyEntry).stage} />
                 {entries[e.id]?.note.trim() && <NoteTag />}
                 <ArrowUpRight size={14} />

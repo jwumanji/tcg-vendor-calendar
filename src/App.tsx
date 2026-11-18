@@ -1,18 +1,20 @@
+import { usePriority } from "./hooks/usePriority";
+import { PriorityChip } from "./components/PriorityChip";
+import { EventRows } from "./components/EventRows";
+import { FindBadges } from "./components/FindSource";
+import { normalizeListView, normalizeRowSort } from "./rows";
+import { compareByScore, TIER_THRESHOLDS } from "./scoring";
 import { CalendarView } from "./components/CalendarView";
 import { EventCard } from "./components/EventCard";
-import {
-  Logo,
-  CountryFlag,
-  ScoreGem,
-  NoteTag,
-} from "./components/EventIdentity";
+import { Logo, CountryFlag, NoteTag } from "./components/EventIdentity";
 import { BrandLockup, BrandMark } from "./components/Brand";
 import { EmptyState } from "./components/EmptyState";
-import { Detail } from "./components/Detail";
 import { Pipeline, StageBadge } from "./components/Pipeline";
 import { BackupControls } from "./components/BackupControls";
 import { stages, emptyEntry, saveValue, type Stage } from "./storage";
 import {
+  lazy,
+  Suspense,
   useState,
   useEffect,
   useCallback,
@@ -38,6 +40,9 @@ import {
   Clock,
   Gem,
   RotateCcw,
+  LayoutGrid,
+  List,
+  Sparkles,
 } from "lucide-react";
 import raw from "../data/events.json";
 import { useEntries } from "./hooks/useEntries";
@@ -64,10 +69,17 @@ import {
   csv,
   download,
   primaryGameKey,
-  rarity,
+  isUndated,
 } from "./utils";
 import { holo } from "./holo";
 import "./style.css";
+const Detail = lazy(async () => ({
+  default: (await import("./components/Detail")).Detail,
+}));
+const ScoreSettings = lazy(async () => ({
+  default: (await import("./components/ScoreSettings")).ScoreSettings,
+}));
+
 export default function App() {
   const events = useMemo(() => normalizeEvents(raw), []);
   const today = useToday();
@@ -83,6 +95,23 @@ export default function App() {
     acknowledgeRecovery,
   } = useEntries();
   const { filters, setFilters, set } = useFilters(setStorageError);
+  const priority = usePriority(events, today, setStorageError);
+  const { scores } = priority;
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [listView, setListView] = useState(() =>
+    normalizeListView(stored("tcg-list-view")),
+  );
+  const [rowSort, setRowSort] = useState(() =>
+    normalizeRowSort(stored("tcg-rows-sort")),
+  );
+  useEffect(() => {
+    const error = saveValue("tcg-list-view", listView);
+    if (error) setStorageError(error);
+  }, [listView, setStorageError]);
+  useEffect(() => {
+    const error = saveValue("tcg-rows-sort", rowSort);
+    if (error) setStorageError(error);
+  }, [rowSort, setStorageError]);
   const [showPassed, setShowPassed] = useState(
     () => stored("tcg-show-passed-v1") === true,
   );
@@ -122,18 +151,17 @@ export default function App() {
     () =>
       events.filter(
         (e) =>
-          matches(e, filters, entries) && (view === "Pipeline" || visible(e)),
+          matches(e, filters, entries, scores[e.id].score) &&
+          (view === "Pipeline" || visible(e)),
       ),
-    [events, filters, entries, view, visible],
+    [events, filters, entries, view, visible, scores],
   );
   const top = useMemo(
     () =>
       events
-        .filter(
-          (e) => visible(e) && upcoming(e, today) && e.vendor_score !== null,
-        )
-        .sort((a, b) => (b.vendor_score || 0) - (a.vendor_score || 0)),
-    [events, visible, today],
+        .filter((e) => visible(e) && !isUndated(e) && upcoming(e, today))
+        .sort((a, b) => compareByScore(scores[a.id], scores[b.id])),
+    [events, visible, today, scores],
   );
   const deadlines = useMemo(
     () =>
@@ -215,10 +243,25 @@ export default function App() {
           filters.stages.filter((s) => s !== stage),
         ),
     });
+  if (filters.newOnly)
+    chips.push({
+      id: "newOnly",
+      label: "New finds",
+      clear: () => set("newOnly", false),
+    });
+  if (filters.minTier !== "any")
+    chips.push({
+      id: "minTier",
+      label:
+        filters.minTier === "must"
+          ? "Priority · Must-do only"
+          : "Priority · Strong+",
+      clear: () => set("minTier", "any"),
+    });
   if (filters.score)
     chips.push({
       id: "score",
-      label: `Score ≥ ${filters.score}`,
+      label: `Scanner score ≥ ${filters.score}`,
       clear: () => set("score", 0),
     });
   if (!filters.tba)
@@ -227,32 +270,39 @@ export default function App() {
       label: "TBA excluded",
       clear: () => set("tba", true),
     });
+  const showRows = view === "List" && listView === "rows";
   const sorted = useMemo(
     () =>
-      [...filtered].sort((a, b) =>
-        sort === "stage"
-          ? stages.indexOf((entries[a.id] || emptyEntry).stage) -
-              stages.indexOf((entries[b.id] || emptyEntry).stage) ||
-            compareText(a.name, b.name)
-          : sort === "name"
-            ? compareText(a.name, b.name)
-            : sort === "score"
-              ? (b.vendor_score ?? -1) - (a.vendor_score ?? -1)
-              : sort === "country"
-                ? a.country && b.country
-                  ? compareText(a.country, b.country)
-                  : a.country
-                    ? -1
-                    : b.country
-                      ? 1
-                      : compareText(a.name, b.name)
-                : sort === "size"
-                  ? ["S", "M", "L", "XL"].indexOf(b.size_tier || "") -
-                    ["S", "M", "L", "XL"].indexOf(a.size_tier || "")
-                  : compareText(dateSortKey(a, today), dateSortKey(b, today)) ||
-                    compareText(a.name, b.name),
-      ),
-    [filtered, sort, entries, today],
+      showRows
+        ? filtered
+        : [...filtered].sort((a, b) => {
+            if (sort === "priority")
+              return compareByScore(scores[a.id], scores[b.id]);
+            return sort === "stage"
+              ? stages.indexOf((entries[a.id] || emptyEntry).stage) -
+                  stages.indexOf((entries[b.id] || emptyEntry).stage) ||
+                  compareText(a.name, b.name)
+              : sort === "name"
+                ? compareText(a.name, b.name)
+                : sort === "score"
+                  ? (b.vendor_score ?? -1) - (a.vendor_score ?? -1)
+                  : sort === "country"
+                    ? a.country && b.country
+                      ? compareText(a.country, b.country)
+                      : a.country
+                        ? -1
+                        : b.country
+                          ? 1
+                          : compareText(a.name, b.name)
+                    : sort === "size"
+                      ? ["S", "M", "L", "XL"].indexOf(b.size_tier || "") -
+                        ["S", "M", "L", "XL"].indexOf(a.size_tier || "")
+                      : compareText(
+                          dateSortKey(a, today),
+                          dateSortKey(b, today),
+                        ) || compareText(a.name, b.name);
+          }),
+    [filtered, sort, entries, today, scores, showRows],
   );
   function card(e: Event, occurrence?: string) {
     return (
@@ -260,14 +310,21 @@ export default function App() {
         key={e.id + (occurrence || "")}
         e={e}
         entry={entries[e.id] || emptyEntry}
+        score={scores[e.id]}
         occurrence={occurrence}
         open={setSelected}
       />
     );
   }
   const groups = useMemo(
-    () => timelineGroups(sorted, filters, entries, groupByStage),
-    [sorted, filters, entries, groupByStage],
+    () =>
+      timelineGroups(
+        view === "Timeline" ? sorted : [],
+        filters,
+        entries,
+        groupByStage,
+      ),
+    [view, sorted, filters, entries, groupByStage],
   );
   const filterTrigger = useRef<HTMLButtonElement>(null);
   const filterPanel = useRef<HTMLElement>(null);
@@ -287,6 +344,20 @@ export default function App() {
           (view === "Recurring SG" && e.section === "recurring_sg"),
       ),
     [sorted, view],
+  );
+  const sortControl = (
+    <label>
+      Sort by{" "}
+      <select value={sort} onChange={(e) => setSort(e.target.value)}>
+        <option value="date">Date</option>
+        <option value="name">Name</option>
+        <option value="priority">Priority score (high to low)</option>
+        <option value="score">Scanner score</option>
+        <option value="country">Country</option>
+        <option value="size">Size tier</option>
+        <option value="stage">Pipeline stage</option>
+      </select>
+    </label>
   );
   const noResults = (
     <EmptyState
@@ -426,8 +497,8 @@ export default function App() {
             [confirmedCount, "Confirmed events"],
             [datedDeadlines.length, "Upcoming deadline notices"],
             [
-              top.filter((e) => (e.vendor_score || 0) >= 80).length,
-              "Top picks · score 80+",
+              top.filter((e) => scores[e.id].tier === "must").length,
+              "Must-do upcoming events",
             ],
           ].map(([n, label], i) => (
             <div key={label} className={i === 3 ? "stat-secret" : undefined}>
@@ -441,12 +512,12 @@ export default function App() {
           <div className="picks" id="top-picks" tabIndex={-1}>
             <div className="section-label">
               <span>✦ TOP VENDOR PICKS</span>
-              <span>CURATED BY VENDOR SCORE</span>
+              <span>RANKED BY PRIORITY</span>
             </div>
             {top.length === 0 && (
               <EmptyState icon={Gem} title="No scored events to show">
-                Upcoming events with a vendor score appear here. Check the “Show
-                passed / too expensive” toggle below.
+                Upcoming events with announced or estimated dates appear here.
+                Check the “Show passed / too expensive” toggle below.
               </EmptyState>
             )}
             <div className="pick-grid">
@@ -455,7 +526,7 @@ export default function App() {
                   className="pick holo"
                   key={e.id}
                   data-game={primaryGameKey(e)}
-                  data-tier={rarity(e.vendor_score || 0).tier}
+                  data-tier={scores[e.id].tier === "must" ? "secret" : "rare"}
                   {...holo}
                 >
                   <span className="pick-rank" aria-hidden="true">
@@ -463,7 +534,7 @@ export default function App() {
                   </span>
                   <div className="pick-meta">
                     <Logo e={e} />
-                    <ScoreGem score={e.vendor_score || 0} />
+                    <PriorityChip result={scores[e.id]} />
                     <ArrowUpRight size={18} className="pick-arrow" />
                   </div>
                   <h3>
@@ -480,6 +551,7 @@ export default function App() {
                   </h3>
                   <StageBadge stage={(entries[e.id] || emptyEntry).stage} />
                   {entries[e.id]?.note.trim() && <NoteTag />}
+                  <FindBadges e={e} />
                   <p>
                     <CountryFlag code={e.country_code} /> {e.city || e.country}{" "}
                     <span>· {dateLabel(e)}</span>
@@ -487,21 +559,25 @@ export default function App() {
                 </article>
               ))}
             </div>
-            <ul
-              className="rarity-legend"
-              aria-label="Vendor score rarity tiers"
-            >
+            <ul className="rarity-legend" aria-label="Priority score tiers">
               {[
-                [0, "under 30"],
-                [30, "30–49"],
-                [50, "50–64"],
-                [65, "65–79"],
-                [80, "80+"],
-              ].map(([n, range]) => (
-                <li key={n} className={`gem-${rarity(n as number).tier}`}>
+                ["Must-do", TIER_THRESHOLDS.must + "+", "secret"],
+                [
+                  "Strong",
+                  `${TIER_THRESHOLDS.strong}–${TIER_THRESHOLDS.must - 1}`,
+                  "ultra",
+                ],
+                [
+                  "Maybe",
+                  `${TIER_THRESHOLDS.maybe}–${TIER_THRESHOLDS.strong - 1}`,
+                  "rare",
+                ],
+                ["Skip", `under ${TIER_THRESHOLDS.maybe}`, "common"],
+              ].map(([label, range, tone]) => (
+                <li key={label} className={`gem-${tone}`}>
                   <i aria-hidden="true" />
-                  {rarity(n as number).label}
-                  <span> {range}</span>
+                  {label}
+                  <span>{range}</span>
                 </li>
               ))}
             </ul>
@@ -525,8 +601,11 @@ export default function App() {
                     : "CHECK DETAILS"}
                 </span>
                 <strong>{e.name}</strong>
-                <StageBadge stage={(entries[e.id] || emptyEntry).stage} />
-                {entries[e.id]?.note.trim() && <NoteTag />}
+                <span className="card-tags">
+                  <PriorityChip result={scores[e.id]} />
+                  <StageBadge stage={(entries[e.id] || emptyEntry).stage} />
+                  {entries[e.id]?.note.trim() && <NoteTag />}
+                </span>
                 <span className="deadline-copy">{e.vendor_deadline}</span>
                 <ArrowUpRight size={15} />
               </button>
@@ -539,12 +618,24 @@ export default function App() {
         <section className="workspace">
           <div className="workspace-heading">
             <div>
-              <div className="eyebrow">BUILD YOUR 2027 CIRCUIT</div>
+              <div className="eyebrow">
+                BUILD YOUR 2027 CIRCUIT{" "}
+                <span className="source-chip">
+                  {events.filter((e) => e.is_new_find).length} new finds
+                </span>
+              </div>
               <h2 id="workspace-title" tabIndex={-1}>
                 Explore the calendar<span>.</span>
               </h2>
             </div>
             <div className="export-actions">
+              <button
+                className="button"
+                aria-haspopup="dialog"
+                onClick={() => setSettingsOpen(true)}
+              >
+                <SlidersHorizontal size={16} /> Score weights
+              </button>
               <button
                 className="button"
                 onClick={() =>
@@ -580,6 +671,14 @@ export default function App() {
             entries={entries}
             ids={events.map((e) => e.id)}
             apply={applyEntries}
+            priority={{
+              weights: priority.weights,
+              overrides: priority.overrides,
+            }}
+            applyPriority={(value) => {
+              priority.setWeights(value.weights);
+              priority.setOverrides(value.overrides);
+            }}
           />
           <label className="passed-toggle">
             <input
@@ -643,6 +742,14 @@ export default function App() {
               {chips.length > 0 && (
                 <span className="count">{chips.length}</span>
               )}
+            </button>
+            <button
+              className="button finds-toggle"
+              aria-pressed={filters.newOnly}
+              onClick={() => set("newOnly", !filters.newOnly)}
+            >
+              <Sparkles size={15} />
+              New finds
             </button>
             <span className="result-count" role="status" aria-live="polite">
               {filtered.length} events
@@ -794,7 +901,23 @@ export default function App() {
                 </div>
                 <div className="filter-fields">
                   <label>
-                    Minimum vendor score: {filters.score}
+                    Priority
+                    <select
+                      value={filters.minTier}
+                      onChange={(ev) =>
+                        set(
+                          "minTier",
+                          ev.target.value as typeof filters.minTier,
+                        )
+                      }
+                    >
+                      <option value="any">Any</option>
+                      <option value="strong">Strong+</option>
+                      <option value="must">Must-do only</option>
+                    </select>
+                  </label>
+                  <label>
+                    Minimum scanner score · {filters.score}
                     <input
                       type="range"
                       min="0"
@@ -865,18 +988,22 @@ export default function App() {
             </div>
           )}
           {view === "Timeline" && (
-            <label className="passed-toggle">
-              <input
-                type="checkbox"
-                checked={groupByStage}
-                onChange={(e) => setGroupByStage(e.target.checked)}
-              />
-              Group by pipeline stage
-            </label>
+            <div className="timeline-controls">
+              {sortControl}
+              <label className="passed-toggle">
+                <input
+                  type="checkbox"
+                  checked={groupByStage}
+                  onChange={(e) => setGroupByStage(e.target.checked)}
+                />
+                Group by pipeline stage
+              </label>
+            </div>
           )}
           {view === "Pipeline" ? (
             <Pipeline
               events={filtered}
+              scores={scores}
               entries={entries}
               open={setSelected}
               change={(e, stage) => update(e.id, "stage", stage)}
@@ -884,6 +1011,7 @@ export default function App() {
           ) : view === "Calendar" ? (
             <CalendarView
               filtered={filtered}
+              scores={scores}
               entries={entries}
               month={month}
               setMonth={setMonth}
@@ -931,48 +1059,71 @@ export default function App() {
                   {visibleList.length}{" "}
                   {visibleList.length === 1 ? "event" : "events"}
                 </span>
-                <label>
-                  Sort by{" "}
-                  <select
-                    value={sort}
-                    onChange={(e) => setSort(e.target.value)}
+                {view === "List" && (
+                  <div
+                    className="list-switch"
+                    role="group"
+                    aria-label="List layout"
                   >
-                    <option value="date">Date</option>
-                    <option value="name">Name</option>
-                    <option value="score">Vendor score</option>
-                    <option value="country">Country</option>
-                    <option value="size">Size tier</option>
-                    <option value="stage">Pipeline stage</option>
-                  </select>
-                </label>
-              </div>
-              <div className="cards">
-                {visibleList.map((e) => (
-                  <div key={e.id}>
-                    {card(e)}
-                    {view === "Recurring SG" && (
-                      <div
-                        className="occurrences"
-                        role="group"
-                        aria-label={`Published dates for ${e.name}`}
-                      >
-                        <span className="occ-title">
-                          <CalendarDays size={14} aria-hidden="true" />{" "}
-                          Published dates
-                        </span>
-                        {ranges(e).map((r) => (
-                          <span key={r.start_date}>
-                            {prettyDate(r.start_date)}
-                            {r.start_date !== r.end_date
-                              ? " – " + prettyDate(r.end_date)
-                              : ""}
-                          </span>
-                        ))}
-                      </div>
-                    )}
+                    <button
+                      aria-pressed={listView === "grid"}
+                      onClick={() => setListView("grid")}
+                    >
+                      <LayoutGrid size={16} />
+                      Grid
+                    </button>
+                    <button
+                      aria-pressed={listView === "rows"}
+                      onClick={() => setListView("rows")}
+                    >
+                      <List size={16} />
+                      Rows
+                    </button>
                   </div>
-                ))}
+                )}
+                {!showRows && sortControl}
               </div>
+              {showRows ? (
+                filtered.length > 0 && (
+                  <EventRows
+                    events={filtered}
+                    sort={rowSort}
+                    setSort={setRowSort}
+                    entries={entries}
+                    scores={scores}
+                    today={today}
+                    open={setSelected}
+                  />
+                )
+              ) : (
+                <div className="cards">
+                  {visibleList.map((e) => (
+                    <div key={e.id}>
+                      {card(e)}
+                      {view === "Recurring SG" && (
+                        <div
+                          className="occurrences"
+                          role="group"
+                          aria-label={`Published dates for ${e.name}`}
+                        >
+                          <span className="occ-title">
+                            <CalendarDays size={14} aria-hidden="true" />{" "}
+                            Published dates
+                          </span>
+                          {ranges(e).map((r) => (
+                            <span key={r.start_date}>
+                              {prettyDate(r.start_date)}
+                              {r.start_date !== r.end_date
+                                ? " – " + prettyDate(r.end_date)
+                                : ""}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
               {visibleList.length === 0 && noResults}
             </>
           )}
@@ -1005,17 +1156,31 @@ export default function App() {
           </small>
         </footer>
       </main>
-      {selected && (
-        <Detail
-          e={selected}
-          close={closeDetail}
-          key={selected.id}
-          entry={entries[selected.id] || emptyEntry}
-          saved={saved}
-          onStage={(stage) => update(selected.id, "stage", stage)}
-          onNote={(note) => update(selected.id, "note", note)}
-        />
-      )}
+      <Suspense fallback={null}>
+        {settingsOpen && (
+          <ScoreSettings
+            weights={priority.weights}
+            change={priority.setWeights}
+            close={() => setSettingsOpen(false)}
+          />
+        )}
+        {selected && (
+          <Detail
+            e={selected}
+            score={scores[selected.id]}
+            setOverride={(value) => priority.setOverride(selected.id, value)}
+            openClash={(id) =>
+              setSelected(events.find((e) => e.id === id) || null)
+            }
+            close={closeDetail}
+            key={selected.id}
+            entry={entries[selected.id] || emptyEntry}
+            saved={saved}
+            onStage={(stage) => update(selected.id, "stage", stage)}
+            onNote={(note) => update(selected.id, "note", note)}
+          />
+        )}
+      </Suspense>
     </>
   );
 }

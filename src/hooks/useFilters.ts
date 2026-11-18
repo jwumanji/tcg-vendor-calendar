@@ -33,6 +33,8 @@ export function normalizeFilters(value: unknown): Filters {
     )
       f[key] = v[key];
   }
+  if (v.minTier === "must" || v.minTier === "strong") f.minTier = v.minTier;
+  if (typeof v.newOnly === "boolean") f.newOnly = v.newOnly;
   if (typeof v.tba === "boolean") f.tba = v.tba;
   if (typeof v.score === "number" && Number.isFinite(v.score))
     f.score = Math.max(0, Math.min(100, v.score));

@@ -1,3 +1,6 @@
+import { PriorityChip } from "./PriorityChip";
+import { FindBadges } from "./FindSource";
+import type { ScoreResult } from "../scoring";
 import { memo, useEffect, useRef, useState } from "react";
 import {
   Ban,
@@ -76,11 +79,13 @@ export function StagePicker({
 export function Pipeline({
   events,
   entries,
+  scores,
   open,
   change,
 }: {
   events: Event[];
   entries: Entries;
+  scores: Record<string, ScoreResult>;
   open: (event: Event) => void;
   change: (event: Event, stage: Stage) => void;
 }) {
@@ -105,6 +110,7 @@ export function Pipeline({
               <PipelineCard
                 key={e.id}
                 e={e}
+                score={scores[e.id]}
                 stage={stage}
                 hasNote={!!entries[e.id]?.note.trim()}
                 open={open}
@@ -127,12 +133,14 @@ const PipelineCard = memo(function PipelineCard({
   e,
   stage,
   hasNote,
+  score,
   open,
   change,
 }: {
   e: Event;
   stage: Stage;
   hasNote: boolean;
+  score: ScoreResult;
   open: (event: Event) => void;
   change: (event: Event, stage: Stage) => void;
 }) {
@@ -173,10 +181,12 @@ const PipelineCard = memo(function PipelineCard({
         </span>
       </div>
       <div className="pcard-foot">
-        <Status e={e} />
+        <PriorityChip result={score} />
         {e.vendor_score !== null && <ScoreGem score={e.vendor_score} />}
       </div>
       <div className="pcard-tags">
+        <Status e={e} />
+        <FindBadges e={e} />
         <span className="game-tag" data-game={gameKey(primary)}>
           {primary}
         </span>

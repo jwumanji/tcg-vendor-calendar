@@ -1,3 +1,5 @@
+import { normalizeWeights, type Weights } from "./scoring";
+
 export const stages = [
   "New",
   "Pass",
@@ -22,7 +24,24 @@ export const emptyEntry: Entry = {
   stageUpdatedAt: null,
 };
 export const STORAGE_KEY = "tcg-pipeline-v1";
+export const WEIGHTS_KEY = "tcg-priority-weights";
+export const OVERRIDES_KEY = "tcg-priority-overrides";
+export function normalizeOverrides(value: unknown): Record<string, number> {
+  if (!object(value)) return {};
+  return Object.fromEntries(
+    Object.entries(value).flatMap(([id, score]) =>
+      id.trim() && typeof score === "number" && Number.isFinite(score)
+        ? [[id, Math.max(0, Math.min(100, Math.round(score)))]]
+        : [],
+    ),
+  );
+}
+export interface PriorityPreferences {
+  weights: Weights;
+  overrides: Record<string, number>;
+}
 export interface Backup {
+  priority?: PriorityPreferences;
   version: 1;
   exportedAt: string;
   entries: Entries;
@@ -67,10 +86,45 @@ export function validateBackup(value: unknown): Backup {
       stageUpdatedAt: e.stageUpdatedAt,
     };
   }
-  return { version: 1, exportedAt: value.exportedAt, entries };
+  const result: Backup = { version: 1, exportedAt: value.exportedAt, entries };
+  if (value.priority !== undefined) {
+    if (
+      !object(value.priority) ||
+      !object(value.priority.weights) ||
+      !object(value.priority.overrides)
+    )
+      throw new Error("Invalid priority settings in backup.");
+    result.priority = {
+      weights: normalizeWeights(value.priority.weights),
+      overrides: normalizeOverrides(value.priority.overrides),
+    };
+  }
+  return result;
 }
-export function backup(entries: Entries): Backup {
-  return { version: 1, exportedAt: new Date().toISOString(), entries };
+export function backup(
+  entries: Entries,
+  priority?: PriorityPreferences,
+): Backup {
+  return {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    entries,
+    ...(priority && { priority }),
+  };
+}
+export function importPriority(
+  current: PriorityPreferences,
+  incoming: PriorityPreferences | undefined,
+  mode: "merge" | "replace",
+): PriorityPreferences {
+  if (!incoming) return current;
+  return {
+    weights: incoming.weights,
+    overrides:
+      mode === "merge"
+        ? { ...current.overrides, ...incoming.overrides }
+        : incoming.overrides,
+  };
 }
 export function importEntries(
   current: Entries,
@@ -99,9 +153,15 @@ export function importEntries(
   }
   return result;
 }
-export function unknownIds(entries: Entries, ids: string[]) {
+export function unknownIds(
+  entries: Entries,
+  ids: string[],
+  overrides: Record<string, number> = {},
+) {
   const known = new Set(ids);
-  return Object.keys(entries).filter((id) => !known.has(id));
+  return [
+    ...new Set([...Object.keys(entries), ...Object.keys(overrides)]),
+  ].filter((id) => !known.has(id));
 }
 export function migrateLegacy(value: unknown): Entries {
   const result: Entries = Object.create(null);
@@ -179,9 +239,12 @@ export function loadEntries(
   result.error = `Saved pipeline needs recovery. Recovered ${Object.keys(result.entries).length} entries; dropped ${result.dropped} invalid entries. Automatic saving is paused. ${result.recoveryKey ? "The original is preserved on this device." : "Export the original before continuing."}`;
   return result;
 }
-export function stashBeforeReplace(entries: Entries): string {
+export function stashBeforeReplace(
+  entries: Entries,
+  priority?: PriorityPreferences,
+): string {
   const key = `${STORAGE_KEY}-before-replace-${Date.now()}`;
-  localStorage.setItem(key, JSON.stringify(backup(entries)));
+  localStorage.setItem(key, JSON.stringify(backup(entries, priority)));
   return key;
 }
 export function saveValue(key: string, value: unknown): string {

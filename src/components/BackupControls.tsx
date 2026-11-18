@@ -8,6 +8,9 @@ import {
 } from "lucide-react";
 import {
   backup,
+  importPriority,
+  type PriorityPreferences,
+  type Backup,
   stashBeforeReplace,
   validateBackup,
   importEntries,
@@ -19,16 +22,22 @@ export function BackupControls({
   entries,
   ids,
   apply,
+  priority,
+  applyPriority,
 }: {
   entries: Entries;
   ids: string[];
+  priority: PriorityPreferences;
+  applyPriority: (value: PriorityPreferences) => void;
   apply: (entries: Entries) => void;
 }) {
-  const [preview, setPreview] = useState<Entries | null>(null);
+  const [preview, setPreview] = useState<Backup | null>(null);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
   const [mode, setMode] = useState<"merge" | "replace">("merge");
-  const absent = preview ? unknownIds(preview, ids) : [];
+  const absent = preview
+    ? unknownIds(preview.entries, ids, preview.priority?.overrides)
+    : [];
   return (
     <div className="backup-controls">
       <div className="backup-intro">
@@ -36,8 +45,8 @@ export function BackupControls({
           <HardDrive size={16} aria-hidden="true" /> Backup &amp; restore
         </span>
         <span>
-          Stages and notes are kept in this browser only. Export a backup before
-          switching devices.
+          Stages, notes and score settings are kept in this browser only. Export
+          a backup before switching devices.
         </span>
       </div>
       <div className="backup-actions">
@@ -45,13 +54,13 @@ export function BackupControls({
           className="button"
           onClick={() =>
             download(
-              JSON.stringify(backup(entries), null, 2),
+              JSON.stringify(backup(entries, priority), null, 2),
               "tcg-pipeline-backup.json",
               "application/json",
             )
           }
         >
-          <Download size={16} aria-hidden="true" /> Export notes + stages
+          <Download size={16} aria-hidden="true" /> Export backup
         </button>
         <label className="button">
           <Upload size={16} aria-hidden="true" /> Import JSON
@@ -66,9 +75,7 @@ export function BackupControls({
               try {
                 if (file.size > 5 * 1024 * 1024)
                   throw new Error("Backup is too large (maximum 5 MB).");
-                setPreview(
-                  validateBackup(JSON.parse(await file.text())).entries,
-                );
+                setPreview(validateBackup(JSON.parse(await file.text())));
                 setError("");
               } catch (err) {
                 setError(
@@ -92,7 +99,7 @@ export function BackupControls({
       {preview && (
         <section className="import-preview" aria-label="Import preview">
           <strong className="preview-title">
-            Preview: {Object.keys(preview).length} entries
+            Preview: {Object.keys(preview.entries).length} entries
           </strong>
           <p>
             {absent.length} IDs absent from current data (kept):{" "}
@@ -118,15 +125,26 @@ export function BackupControls({
               ? "Only imported entries will remain. Your current entries will be backed up on this device first."
               : "Other saved entries will remain, including absent IDs."}
           </p>
+          {preview.priority && (
+            <p>
+              Imported score weights will apply to all events.{" "}
+              {mode === "merge"
+                ? "Imported overrides take precedence for matching IDs."
+                : "Imported overrides replace all saved overrides."}
+            </p>
+          )}
           <div className="import-actions">
             <button
               className="button primary"
               onClick={() => {
                 try {
-                  if (mode === "replace") stashBeforeReplace(entries);
-                  apply(importEntries(entries, preview, mode));
+                  if (mode === "replace") stashBeforeReplace(entries, priority);
+                  apply(importEntries(entries, preview.entries, mode));
+                  applyPriority(
+                    importPriority(priority, preview.priority, mode),
+                  );
                   setStatus(
-                    `Imported ${Object.keys(preview).length} entries (${mode}).`,
+                    `Imported ${Object.keys(preview.entries).length} entries (${mode}).`,
                   );
                   setError("");
                   setPreview(null);

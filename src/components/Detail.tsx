@@ -1,3 +1,6 @@
+import { PriorityDetail } from "./PriorityDetail";
+import { FindDetails } from "./FindSource";
+import type { ScoreResult } from "../scoring";
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import {
   AlertTriangle,
@@ -32,6 +35,9 @@ export function Detail({
   onStage,
   onNote,
   saved,
+  score,
+  setOverride,
+  openClash,
 }: {
   e: Event;
   close: () => void;
@@ -39,6 +45,9 @@ export function Detail({
   onStage: (s: Stage) => void;
   onNote: (s: string) => void;
   saved: boolean;
+  score: ScoreResult;
+  setOverride: (value: number | null) => void;
+  openClash: (id: string) => void;
 }) {
   const noteRef = useRef<HTMLTextAreaElement>(null);
   const ref = useRef<HTMLDivElement>(null);
@@ -95,7 +104,7 @@ export function Detail({
       if (ev.key !== "Tab") return;
       const nodes = [
         ...(ref.current?.querySelectorAll<HTMLElement>(
-          'button:not(:disabled),a[href],select:not(:disabled),input:not(:disabled),textarea,[tabindex="0"]',
+          'button:not(:disabled),a[href],select:not(:disabled),input:not(:disabled),textarea,summary,[tabindex="0"]',
         ) || []),
       ];
       const first = nodes[0],
@@ -163,7 +172,7 @@ export function Detail({
       >
         <div className="drawer-top">
           <span className="drawer-grip" aria-hidden="true" />
-          <span>EVENT DETAILS</span>
+          <span className="drawer-event-name">{e.name}</span>
           <button
             className="icon-button"
             onClick={close}
@@ -199,6 +208,12 @@ export function Detail({
             <MapPin size={16} /> <CountryFlag code={e.country_code} />{" "}
             {[e.city, e.country].filter(Boolean).join(", ") || "Location TBA"}
           </p>
+          <FindDetails e={e} />
+          <PriorityDetail
+            result={score}
+            setOverride={setOverride}
+            openClash={openClash}
+          />
           <div className="planning">
             <label htmlFor="detail-stage">PIPELINE STAGE</label>
             <StageBadge stage={entry.stage} />
@@ -269,7 +284,7 @@ export function Detail({
           {e.vendor_score !== null && (
             <div className={`vendor-meter gem-${rarity(e.vendor_score).tier}`}>
               <span>
-                Vendor fit score
+                Scanner score
                 <ScoreGem score={e.vendor_score} large />
               </span>
               <meter min="0" max="100" value={e.vendor_score} />

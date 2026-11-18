@@ -1,3 +1,5 @@
+import finds from "../tests/fixtures/new-finds.json";
+import { ics, matches } from "./utils";
 import { describe, expect, it } from "vitest";
 import { existsSync } from "node:fs";
 import raw from "../data/events.json";
@@ -54,6 +56,12 @@ describe("source data integrity", () => {
         expect(["http:", "https:"]).toContain(new URL(url!).protocol);
     },
   );
+  it("exports the current live snapshot date in calendar downloads", () => {
+    const dated = normalizeEvents(raw).filter((e) => e.date_status === "confirmed");
+    expect(ics(dated)).toContain(
+      `LAST-MODIFIED:${meta.updatedAt.replaceAll("-", "")}T000000Z`,
+    );
+  });
   it("normalizes missing arrays and invalid date fields at runtime", () => {
     const e = normalizeEvents([
       {
@@ -105,5 +113,75 @@ describe("stored filters", () => {
       score: 100,
       priority: "top",
     });
+  });
+});
+
+describe("scanner discoveries and priority filters", () => {
+  it("defaults old and malformed preferences and restores valid preferences", () => {
+    expect(
+      normalizeFilters({ ...emptyFilters, minTier: "unknown", newOnly: 1 }),
+    ).toEqual(emptyFilters);
+    expect(normalizeFilters({ score: 82 })).toEqual({
+      ...emptyFilters,
+      score: 82,
+    });
+    expect(normalizeFilters({ newOnly: true, minTier: "must" })).toEqual({
+      ...emptyFilters,
+      newOnly: true,
+      minTier: "must",
+    });
+  });
+  it("preserves discovery metadata and places dated and undated finds", () => {
+    const events = normalizeEvents(finds);
+    expect(events.map((e) => e.section)).toEqual([
+      "timeline",
+      "timeline",
+      "watchlist",
+    ]);
+    expect(events[0]).toMatchObject({
+      source: finds[0].source,
+      verification: "unverified",
+      is_new_find: true,
+    });
+    expect(
+      events.every((e) => matches(e, { ...emptyFilters, newOnly: true }, {})),
+    ).toBe(true);
+    expect(
+      matches(
+        normalizeEvents(raw).find((e) => !e.source)!,
+        { ...emptyFilters, newOnly: true },
+        {},
+      ),
+    ).toBe(false);
+    const e = { ...events[0], vendor_score: 72 };
+    expect(
+      matches(
+        e,
+        { ...emptyFilters, newOnly: true, score: 72, minTier: "strong" },
+        {},
+        64,
+      ),
+    ).toBe(true);
+    expect(
+      matches(e, { ...emptyFilters, score: 73, minTier: "strong" }, {}, 100),
+    ).toBe(false);
+    expect(matches(e, { ...emptyFilters, minTier: "must" }, {}, 76)).toBe(
+      false,
+    );
+    expect(matches(e, { ...emptyFilters, minTier: "must" }, {}, 77)).toBe(true);
+  });
+  it("keeps incomplete discovery records usable", () => {
+    const [e] = normalizeEvents([
+      { ...finds[0], source: { confidence: "0", relevance: 2 } },
+    ]);
+    expect(e.source).toMatchObject({
+      name: "",
+      confidence: null,
+      relevance: null,
+      url: "",
+    });
+    expect(
+      normalizeEvents([{ ...finds[2], source: null }])[0].is_new_find,
+    ).toBe(true);
   });
 });

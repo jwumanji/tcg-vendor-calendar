@@ -99,6 +99,51 @@ export function normalizeEvents(value: unknown): Event[] {
             r.end_date >= r.start_date,
         )
       : undefined;
+    if (v.source && typeof v.source === "object" && !Array.isArray(v.source)) {
+      const src = v.source;
+      const ratio = (n: unknown) =>
+        typeof n === "number" && Number.isFinite(n) && n >= 0 && n <= 1
+          ? n
+          : null;
+      e.source = {
+        id: typeof src.id === "string" ? src.id : "",
+        name: typeof src.name === "string" ? src.name.trim() : "",
+        url:
+          typeof src.url === "string" &&
+          URL.canParse(src.url) &&
+          /^https?:\/\//i.test(src.url)
+            ? src.url
+            : "",
+        discovered_at:
+          typeof src.discovered_at === "string" &&
+          /^\d{4}-\d{2}-\d{2}T/.test(src.discovered_at) &&
+          Number.isFinite(Date.parse(src.discovered_at))
+            ? src.discovered_at
+            : "",
+        confidence: ratio(src.confidence),
+        relevance: ratio(src.relevance),
+      };
+    }
+    e.is_new_find = v.is_new_find === true;
+    if (e.is_new_find) {
+      e.verification = "unverified";
+      const dated =
+        e.date_status === "estimated"
+          ? e.estimated_month
+          : e.date_status === "confirmed" &&
+            (e.start_date ||
+              (Array.isArray(e.occurrences) && e.occurrences.length));
+      e.section = dated
+        ? e.section === "recurring_sg"
+          ? "recurring_sg"
+          : "timeline"
+        : "watchlist";
+    } else if (
+      v.verification === "scanner" ||
+      v.verification === "unverified"
+    ) {
+      e.verification = v.verification;
+    }
     return e as unknown as Event;
   });
 }

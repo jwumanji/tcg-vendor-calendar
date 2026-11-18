@@ -1,0 +1,234 @@
+{
+  "scanned_at": "2026-11-18T10:04:54.096Z",
+  "today": "2026-11-18",
+  "through": "2028-05-18",
+  "sources": [
+    {
+      "source": "sg-card-show",
+      "fetched": 1,
+      "relevant": 1,
+      "new": 1,
+      "already_known": 0,
+      "dropped_as_junk": 0,
+      "outside_window": 0,
+      "status": "OK",
+      "reason": ""
+    },
+    {
+      "source": "afa",
+      "fetched": 1,
+      "relevant": 1,
+      "new": 1,
+      "already_known": 0,
+      "dropped_as_junk": 0,
+      "outside_window": 0,
+      "status": "OK",
+      "reason": ""
+    },
+    {
+      "source": "sgcc",
+      "fetched": 1,
+      "relevant": 1,
+      "new": 1,
+      "already_known": 0,
+      "dropped_as_junk": 0,
+      "outside_window": 0,
+      "status": "OK",
+      "reason": ""
+    },
+    {
+      "source": "bandai",
+      "fetched": 10,
+      "relevant": 5,
+      "new": 5,
+      "already_known": 0,
+      "dropped_as_junk": 3,
+      "outside_window": 2,
+      "status": "OK",
+      "reason": ""
+    },
+    {
+      "source": "magic",
+      "fetched": 1,
+      "relevant": 0,
+      "new": 0,
+      "already_known": 0,
+      "dropped_as_junk": 1,
+      "outside_window": 0,
+      "status": "OK",
+      "reason": ""
+    },
+    {
+      "source": "supanova",
+      "fetched": 6,
+      "relevant": 6,
+      "new": 6,
+      "already_known": 0,
+      "dropped_as_junk": 0,
+      "outside_window": 0,
+      "status": "OK",
+      "reason": ""
+    },
+    {
+      "source": "oz-comic-con",
+      "fetched": 1,
+      "relevant": 1,
+      "new": 1,
+      "already_known": 0,
+      "dropped_as_junk": 0,
+      "outside_window": 0,
+      "status": "OK",
+      "reason": ""
+    },
+    {
+      "source": "jump-festa",
+      "fetched": 1,
+      "relevant": 0,
+      "new": 0,
+      "already_known": 0,
+      "dropped_as_junk": 1,
+      "outside_window": 0,
+      "status": "OK",
+      "reason": ""
+    },
+    {
+      "source": "sg-expo",
+      "fetched": 11,
+      "relevant": 1,
+      "new": 0,
+      "already_known": 1,
+      "dropped_as_junk": 10,
+      "outside_window": 0,
+      "status": "OK",
+      "reason": ""
+    },
+    {
+      "source": "suntec",
+      "fetched": 53,
+      "relevant": 3,
+      "new": 1,
+      "already_known": 2,
+      "dropped_as_junk": 50,
+      "outside_window": 0,
+      "status": "OK",
+      "reason": ""
+    },
+    {
+      "source": "hkcec",
+      "fetched": 45,
+      "relevant": 2,
+      "new": 1,
+      "already_known": 1,
+      "dropped_as_junk": 43,
+      "outside_window": 0,
+      "status": "OK",
+      "reason": ""
+    }
+  ],
+  "new_count": 17,
+  "removed": 0,
+  "new_events": [
+    {
+      "name": "BANDAI CARD GAMES Fest 26-27 in Bangkok",
+      "date": "2026-11-21",
+      "city": "Bangkok",
+      "source": "bandai"
+    },
+    {
+      "name": "Anime Festival Asia Singapore 2026",
+      "date": "2026-11-27",
+      "city": "Singapore",
+      "source": "afa"
+    },
+    {
+      "name": "BANDAI CARD GAMES Fest 26-27 in Hong Kong",
+      "date": "2026-11-28",
+      "city": "Hong Kong",
+      "source": "bandai"
+    },
+    {
+      "name": "Singapore Comic Con",
+      "date": "2026-12-04",
+      "city": "Singapore",
+      "source": "sgcc"
+    },
+    {
+      "name": "BANDAI CARD GAMES Fest 26-27 in Singapore",
+      "date": "2026-12-05",
+      "city": "Singapore",
+      "source": "bandai"
+    },
+    {
+      "name": "Amazing Toy Show 2026",
+      "date": "2026-12-11",
+      "city": "Wan Chai",
+      "source": "hkcec"
+    },
+    {
+      "name": "BANDAI CARD GAMES Fest 26-27 in Kuala Lumpur",
+      "date": "2026-12-12",
+      "city": "Kuala Lumpur",
+      "source": "bandai"
+    },
+    {
+      "name": "Singapore Card Show 2026",
+      "date": "2026-12-12",
+      "city": "Singapore",
+      "source": "sg-card-show"
+    },
+    {
+      "name": "BANDAI CARD GAMES Fest 26-27 in Taipei",
+      "date": "2026-12-19",
+      "city": "Taipei",
+      "source": "bandai"
+    },
+    {
+      "name": "Asia Comic Expo 005",
+      "date": "2027-01-23",
+      "city": "Singapore",
+      "source": "suntec"
+    },
+    {
+      "name": "Supanova Comic Con & Gaming – Gold Coast",
+      "date": "2027-04-10",
+      "city": "Gold Coast",
+      "source": "supanova"
+    },
+    {
+      "name": "Supanova Comic Con & Gaming – Melbourne",
+      "date": "2027-04-16",
+      "city": "Melbourne",
+      "source": "supanova"
+    },
+    {
+      "name": "Supanova Comic Con & Gaming – Sydney",
+      "date": "2027-06-18",
+      "city": "Sydney",
+      "source": "supanova"
+    },
+    {
+      "name": "Supanova Comic Con & Gaming – Perth",
+      "date": "2027-06-25",
+      "city": "Perth",
+      "source": "supanova"
+    },
+    {
+      "name": "Oz Comic-Con Sydney",
+      "date": "2027-09-18",
+      "city": "Sydney",
+      "source": "oz-comic-con"
+    },
+    {
+      "name": "Supanova Comic Con & Gaming – Adelaide",
+      "date": "2027-10-29",
+      "city": "Adelaide",
+      "source": "supanova"
+    },
+    {
+      "name": "Supanova Comic Con & Gaming – Brisbane",
+      "date": "2027-11-05",
+      "city": "Brisbane",
+      "source": "supanova"
+    }
+  ]
+}

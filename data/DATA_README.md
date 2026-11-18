@@ -76,3 +76,20 @@ last-updated date and calendar `LAST-MODIFIED` values. It is the source snapshot
 date, not the build date or an event's future date. The current value comes from
 the export date above. The app deploys on pushes to `main` or a manual workflow
 run. There is no scheduled data fetch or rebuild in this repository.
+
+## Scraper discoveries
+
+The 97-event breakdown above describes the 16 November 2026 Scanner export. The merged planner also includes discoveries from public calendars and organisers. On a content change the scanner sets `meta.json.updatedAt` to the refresh date in Asia/Saigon.
+
+| Optional field | Meaning |
+| --- | --- |
+| `source.id`, `source.name`, `source.url` | Stable adapter ID, source display name and public evidence page. |
+| `source.discovered_at` | ISO timestamp of the first sighting, preserved through updates. |
+| `source.confidence`, `source.relevance` | Parser confidence and keyword relevance, each on a 0–1 scale. |
+| `is_new_find` | True for scraper discoveries; the badge persists across runs. The run report counts first sightings separately. |
+| `verification` | Scraped records are `unverified`. Scanner records may omit this field or use `scanner`. |
+| `region_group` | Also accepts `Other` for lower-priority expansion markets, including the Philippines for this planner. |
+
+Dated discoveries enter the timeline. Estimated months are recorded separately from confirmed travel dates. Undated finds enter the watchlist. For a published forecast range, the numeric field holds its lower bound and `expected_size` retains the range and forecast wording. `previous_editions_count` can count documented past listings. A year on the earliest available listing alone does not establish `first_year`. Scraper `vendor_score` and `logo` are null. A vendor link can be an enquiry or expression of interest; a blank application field means the source did not supply one.
+
+Scanner records retain export key order and IDs during import. Existing scraper IDs and their first discovery timestamps survive parser corrections. Schedule and deploy commands are in the [scanner instructions](../README.md#scanners).

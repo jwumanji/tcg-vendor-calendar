@@ -96,3 +96,23 @@ The planner only exists in deployments made by this script. If the main Grailfox
 Vite defaults to `/vendor-planner/`; set `VITE_BASE` to override it for local builds. The deployment script sets `VITE_BASE` from `PLANNER_PATH`. Bases are normalized to start and end with `/`.
 
 Application code lives in `src/App.tsx`, `src/components/`, `src/storage.ts`, `src/style.css`, `src/model.ts` and `src/utils.ts`; `src/main.tsx` is the bootstrap; the original event dataset remains in `data/`.
+
+## Scanners
+
+Use Node 24 and install dependencies with `npm ci`. Run from the repository root.
+
+| Command | Effect |
+| --- | --- |
+| `npm run scan:dry` | Fetch live listings, validate and print the proposed changes. Writes no files. |
+| `npm run scan` | Merge live finds, update the snapshot date when records change, and save the run report. |
+| `node scanner/run.ts --import-scanner /workspace/tcg-calendar/events.json` | Replace the Scanner export, copy changed sibling logos, deduplicate retained finds and run all sources. Add `--dry-run` to preview. |
+| `scripts/weekly-refresh.sh --no-push --no-deploy` | Refresh locally and run tests and the production build. |
+| `scripts/weekly-refresh.sh` | Refresh, test, build, commit changed data, rebase, push to main and deploy. `--force-deploy` deploys even with no data changes. |
+
+The active sources are Singapore Card Show, Singapore EXPO, Suntec, HKCEC, Anime Festival Asia, Singapore Comic Con, Bandai Card Games Fest, Wizards’ Magic Play Events, Jump Festa, Supanova and Oz Comic-Con Sydney. The live window starts today in Asia/Saigon and extends 18 months. Smaller store events and unrelated venue bookings are filtered out. The source report records tested calendars, access failures, examples and the reasons for exclusions. [Source review](scanner/SOURCES.md)
+
+Each scraper-owned event carries a stable `scan-` ID, its source and discovery timestamp, relevance and confidence, `is_new_find` and `verification`. Vendor details require an explicit source statement. Some official events offer merchandise or tournament play without publishing third-party exhibitor terms. These fields stay null until the source supplies them. [Data dictionary](data/DATA_README.md)
+
+To add a source, save a small fragment of its actual public listing in `scanner/fixtures/`, add its pure parser and source module in `scanner/sources/`, and register it in `scanner/sources/index.ts`. Venue calendars can configure `venueParser` with selectors, location and date extraction. Add a dated parser case and document the live result in the source review. Use `ctx.get` for all network access. It checks robots.txt, serializes requests per host with at least a one-second gap, uses a 15-second request timeout, retries transient failures once and sends no-cache headers. The user agent is `Mozilla/5.0 (compatible; GrailfoxEventScanner/1.0; +https://www.grailfoxtcg.com)`. Only public HTML and documented public feeds are eligible.
+
+The report counts parsed listings, relevant in-window listings, junk, out-of-window records, new finds and matches against Scanner or scraper records. Source failures include their reason. Failed sources retain their upcoming finds. Finds age out 30 days after their end date; a later Scanner export takes precedence when its date, location and title match. [Latest scan](scanner/last-run.json)

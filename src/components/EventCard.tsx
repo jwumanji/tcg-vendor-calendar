@@ -43,28 +43,20 @@ export const EventCard = memo(function EventCard({
       data-tier={tier}
       {...holo}
     >
-      <div className="card-face">
-        <div className="logo-banner">
-          {e.logo && (
-            <img
-              className="banner-backdrop"
-              src={import.meta.env.BASE_URL + e.logo}
-              alt=""
-              loading="lazy"
-            />
-          )}
-          <Logo e={e} size="xl" />
+      <Logo e={e} size="xl" />
+      <div className="card-details">
+        <div className="card-heading">
+          <h3 className="card-title">
+            <button className="stretched-button" onClick={() => open(e)}>
+              {e.name}
+              <span className="sr-only">
+                {" "}
+                · {occurrence || dateLabel(e)} · {entry.stage}
+              </span>
+            </button>
+          </h3>
+          <GoingButton e={e} going={entry.going} setGoing={setGoing} />
         </div>
-        <GoingButton e={e} going={entry.going} setGoing={setGoing} />
-        <h3 className="card-title">
-          <button className="stretched-button" onClick={() => open(e)}>
-            {e.name}
-            <span className="sr-only">
-              {" "}
-              · {occurrence || dateLabel(e)} · {entry.stage}
-            </span>
-          </button>
-        </h3>
         <div className="card-art">
           <div className="card-when">
             <CalendarDays size={16} aria-hidden="true" />

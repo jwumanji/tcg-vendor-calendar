@@ -1,14 +1,20 @@
 export type ImageKind = "cover" | "logo";
 type EdgeSample = { transparent: number; flatEdge: number };
 
+// Reviewed assets carry an explicit fit. Sampling is only for new, unlabelled art.
+export function hintedImageKind(hint: string | null): ImageKind | undefined {
+  if (hint === "logo") return "logo";
+  if (hint === "poster_or_photo") return "cover";
+}
+
 export function decideImageKind(
   aspect: number,
   { transparent, flatEdge }: EdgeSample,
-  hint?: string | null,
 ): ImageKind {
-  if (aspect >= 1.45 || transparent >= 0.02 || hint === "logo") return "logo";
-  if (hint === "poster_or_photo") return "cover";
-  return flatEdge >= 0.72 ? "logo" : "cover";
+  if (transparent >= 0.02) return "logo";
+  // A wide wordmark often runs through both side edges. A landscape photo
+  // also has a wide aspect, but rarely has a mostly uniform perimeter.
+  return flatEdge >= (aspect >= 1.45 ? 0.55 : 0.72) ? "logo" : "cover";
 }
 
 type ImageArt = { kind: ImageKind; foreground?: HTMLCanvasElement };
@@ -123,18 +129,15 @@ function trimLogo(image: HTMLImageElement, matte?: number[]) {
   return result;
 }
 
-export function inspectImage(
-  image: HTMLImageElement,
-  hint: string | null,
-): ImageArt {
+export function inspectImage(image: HTMLImageElement): ImageArt {
   const src = image.src;
   const cached = eventImageCache.get(src);
   if (cached) return cached;
   const aspect = image.naturalWidth / image.naturalHeight;
-  let art: ImageArt = { kind: "logo" };
+  const art: ImageArt = { kind: "logo" };
   try {
     const sample = sampleEdges(image);
-    art.kind = decideImageKind(aspect, sample, hint);
+    art.kind = decideImageKind(aspect, sample);
     const { color, flatEdge, transparent } = sample;
     const neutral = Math.max(...color) - Math.min(...color) <= 18;
     const matte = flatEdge >= 0.72 && neutral ? color : undefined;
@@ -142,7 +145,7 @@ export function inspectImage(
       art.foreground = trimLogo(image, matte);
   } catch {
     // A blocked canvas readback leaves unclassified artwork safely contained.
-    if (hint === "poster_or_photo" && aspect < 1.45) art.kind = "cover";
+    art.kind = "logo";
   }
   eventImageCache.set(src, art);
   return art;

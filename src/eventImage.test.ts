@@ -1,18 +1,32 @@
+import sharp from "sharp";
+import events from "../data/events.json";
 import { describe, expect, it } from "vitest";
-import { decideImageKind } from "./eventImage";
+import { decideImageKind, hintedImageKind } from "./eventImage";
 
 describe("event artwork fit", () => {
-  const photo = { transparent: 0, flatEdge: 0.15 };
-  it("fills the box for opaque photos and posters", () => {
-    expect(decideImageKind(1, photo)).toBe("cover");
-    expect(
-      decideImageKind(0.65, { ...photo, flatEdge: 0.8 }, "poster_or_photo"),
-    ).toBe("cover");
+  it("uses a reviewed fit before the first image decode", () => {
+    expect(hintedImageKind("poster_or_photo")).toBe("cover");
+    expect(hintedImageKind("logo")).toBe("logo");
+    expect(hintedImageKind(null)).toBeUndefined();
   });
-  it("protects wide art, transparency and flat or identified logos", () => {
-    expect(decideImageKind(1.45, photo, "poster_or_photo")).toBe("logo");
-    expect(decideImageKind(0.85, { ...photo, transparent: 0.02 })).toBe("logo");
-    expect(decideImageKind(1, { ...photo, flatEdge: 0.72 })).toBe("logo");
-    expect(decideImageKind(1, photo, "logo")).toBe("logo");
+
+  it.each(["awardx", "mtg"])("ships the complete wide %s wordmark without square padding", async (name) => {
+    const path = `logos/${name}.webp`;
+    const metadata = await sharp("public/" + path).metadata();
+    expect(metadata.width / metadata.height).toBeGreaterThan(2);
+    expect(metadata.hasAlpha).toBe(true);
+    const uses = events.filter((event) => event.logo === path);
+    expect(uses.length).toBeGreaterThan(0);
+    expect(uses.every((event) => hintedImageKind(event.logo_kind) === "logo")).toBe(true);
+  });
+
+  it("distinguishes a landscape photograph from a wide wordmark without a hint", () => {
+    expect(decideImageKind(2, { transparent: 0, flatEdge: 0.15 })).toBe("cover");
+    expect(decideImageKind(2, { transparent: 0, flatEdge: 0.6 })).toBe("logo");
+  });
+
+  it("protects transparent and flat-edged unlabelled logos", () => {
+    expect(decideImageKind(0.85, { transparent: 0.02, flatEdge: 0 })).toBe("logo");
+    expect(decideImageKind(1, { transparent: 0, flatEdge: 0.72 })).toBe("logo");
   });
 });

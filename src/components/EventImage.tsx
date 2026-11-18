@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { eventImageCache, inspectImage } from "../eventImage";
+import { eventImageCache, hintedImageKind, inspectImage } from "../eventImage";
 
 export function EventImage({
   path,
@@ -13,11 +13,12 @@ export function EventImage({
   onError: () => void;
 }) {
   const src = import.meta.env.BASE_URL + path;
-  const [art, setArt] = useState(() =>
-    eventImageCache.get(new URL(src, document.baseURI).href),
+  const knownKind = hintedImageKind(hint);
+  const [sampled, setSampled] = useState(() =>
+    knownKind ? undefined : eventImageCache.get(new URL(src, document.baseURI).href),
   );
-  const kind = art?.kind || "logo";
-  const foreground = art?.foreground;
+  const kind = knownKind ?? sampled?.kind ?? "logo";
+  const foreground = knownKind ? undefined : sampled?.foreground;
   const paint = useCallback(
     (node: HTMLCanvasElement | null) => {
       if (node && foreground)
@@ -54,7 +55,7 @@ export function EventImage({
           alt=""
           loading={loading}
           decoding="async"
-          onLoad={(ev) => setArt(inspectImage(ev.currentTarget, hint))}
+          onLoad={knownKind ? undefined : (ev) => setSampled(inspectImage(ev.currentTarget))}
           onError={onError}
         />
       )}

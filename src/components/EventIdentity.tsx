@@ -25,7 +25,7 @@ export function Logo({ e, size = "md" }: { e: Event; size?: LogoSize }) {
         <GeneratedCover
           e={e}
           compact={size === "row" || size === "md"}
-          flag={<CountryFlag code={e.country_code} />}
+          flag={e.country_code && <CountryFlag code={e.country_code} />}
         />
       )}
     </span>

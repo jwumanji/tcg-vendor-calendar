@@ -115,7 +115,7 @@ export function GeneratedCover({
               return <Glyph key={game} />;
             })}
         </span>
-        <span className="cover-flag">{flag}</span>
+        {flag && <span className="cover-flag">{flag}</span>}
       </span>
       <span className={compact ? "cover-monogram" : "cover-name"}>
         {compact ? initials : e.name}

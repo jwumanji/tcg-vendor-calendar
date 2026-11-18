@@ -5,7 +5,7 @@ Exported from the Page **"SEA TCG Vendor Event Map 2027+"**
 
 - **Last updated:** 16 Nov 2026
 - **Refresh:** the weekly scan refreshes the data every Monday at about 9:00 AM Asia/Saigon (UTC+7).
-- **Files:** `events.json` (a JSON array with one object per event) and `logos/` (WebP thumbnails, 96×96, from the Page).
+- **Files:** `events.json` (a JSON array with one object per event) and `logos/` (WebP event artwork in its reviewed aspect ratio).
 
 ## Counts (97 events)
 

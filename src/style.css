@@ -1375,6 +1375,7 @@ legend {
   text-align: left;
 }
 .event-card > .logo-xl {
+  --logo-inset: 2px;
   contain: size;
   width: 100%;
   height: 100%;
@@ -1453,6 +1454,8 @@ legend {
   border-radius: 10px;
   background: #231e32;
 }
+/* Keep card hover sheen below the artwork, including in the light theme. */
+.holo .logo { z-index: 4; pointer-events: none; }
 .logo > :is(.image-face, .image-backdrop) {
   position: absolute;
   inset: 0;
@@ -1462,11 +1465,13 @@ legend {
 }
 .logo > .image-backdrop {
   transform: scale(1.4);
-  filter: blur(24px) brightness(.62);
+  filter: blur(14px) brightness(.55);
+  opacity: .32;
 }
 .logo > .image-face[data-kind="logo"] {
   object-fit: contain;
-  padding: 2px;
+  /* Allow for the curved corners on compact square thumbnails. */
+  padding: var(--logo-inset, 3px);
 }
 .generated-cover {
   position: absolute;
@@ -1488,7 +1493,8 @@ legend {
   right: -30%;
   width: 144%;
   height: 78%;
-  color: hsl(var(--cover-hue) 70% 82% / .28);
+  color: hsl(var(--cover-hue) 70% 82%);
+  opacity: .20;
 }
 .cover-marks {
   display: flex;
@@ -1511,14 +1517,11 @@ legend {
 .cover-flag .flag-img { width: clamp(8px, 12cqw, 19px); height: auto; }
 .cover-name {
   margin: 0 clamp(6px, 6cqw, 20px) clamp(10px, 10cqw, 24px);
-  font: 730 min(var(--cover-name-size), 12cqh, 46px) / 1.16 var(--font-display);
+  font: 730 min(max(13px, var(--cover-name-size)), 10.5cqh, 46px) / 1.16 var(--font-display);
   letter-spacing: -.045em;
   text-align: left;
   text-wrap: balance;
   overflow-wrap: anywhere;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 5;
   overflow: hidden;
 }
 .cover-monogram {
@@ -1976,6 +1979,7 @@ h4 > span {
   gap: 10px;
 }
 .pipeline-card .logo {
+  --logo-inset: 4px;
   width: 40px;
   height: 40px;
   border-radius: 12px;
@@ -2119,6 +2123,7 @@ footer > small {
 }
 .event-layout > .detail-body { min-width: 0; }
 .event-facts > .logo-detail {
+  --logo-inset: 5px;
   display: grid;
   width: 100%;
   height: 220px;
@@ -3234,7 +3239,7 @@ input[type="checkbox"]:indeterminate::after { content: ""; width: 10px; height: 
 .pick-meta { flex-wrap: wrap; gap: 6px; }
 .pick-meta .going-button { margin-left: auto; padding-inline: 7px; font-size: 13px; }
 .pick h3 { font-size: 17px; }
-.calendar-event .logo { width: 30px; height: 30px; border-radius: 5px; vertical-align: middle; margin-right: 5px; font-size: 11px; }
+.calendar-event .logo { --logo-inset: 2px; width: 30px; height: 30px; border-radius: 5px; vertical-align: middle; margin-right: 5px; font-size: 11px; }
 .calendar-event .place { display: flex; margin-block: 4px; }
 .tools-dialog { margin: auto; }
 .tool-settings { padding-block: 12px; }

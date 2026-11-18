@@ -147,10 +147,26 @@ export function dateLabel(e: Event) {
       : "")
   );
 }
+/** Regional-indicator emoji (kept for tests/exports); the UI uses flagFile() images instead. */
 export function flag(code: string | null) {
   return code && /^[A-Z]{2}$/.test(code)
     ? String.fromCodePoint(...[...code].map((c) => 127397 + c.charCodeAt(0)))
     : "◎";
+}
+/** Twemoji file name for a country code, e.g. "SG" -> "1f1f8-1f1ec.svg". */
+export function flagFile(code: string | null) {
+  if (!code || !/^[A-Z]{2}$/.test(code)) return null;
+  return [...code].map((c) => (127397 + c.charCodeAt(0)).toString(16)).join("-") + ".svg";
+}
+/** Place text without the country code: "Wan Chai, Hong Kong" / "Singapore" / "Location TBA". */
+export function placeLabel(
+  e: { city: string | null; country: string | null },
+  countryOnly = false,
+) {
+  if (countryOnly) return e.country || e.city || "Location TBA";
+  if (e.city && e.country && e.city.toLowerCase() !== e.country.toLowerCase())
+    return `${e.city}, ${e.country}`;
+  return e.country || e.city || "Location TBA";
 }
 export function deadlineDate(s: string | null) {
   if (!s) return null;

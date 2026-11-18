@@ -1,18 +1,21 @@
 import { StickyNote } from "lucide-react";
-import { flag, rarity, type Rarity } from "../utils";
+import { flagFile, placeLabel, rarity, type Rarity } from "../utils";
 import type { Event } from "../model";
-export function Logo({ e }: { e: Event }) {
+export type LogoSize = "md" | "row" | "xl" | "detail";
+export function Logo({ e, size = "md" }: { e: Event; size?: LogoSize }) {
+  const cls = "logo" + (size === "md" ? "" : " logo-" + size);
   return e.logo ? (
     <img
-      className="logo"
+      className={cls}
       src={import.meta.env.BASE_URL + e.logo}
       alt=""
       loading="lazy"
+      decoding="async"
       width={96}
       height={96}
     />
   ) : (
-    <span className="logo initials">
+    <span className={cls + " initials"}>
       {e.name
         .split(" ")
         .slice(0, 2)
@@ -33,11 +36,41 @@ export function Status({ e }: { e: Event }) {
   );
 }
 
+/**
+ * Flag as a self-hosted Twemoji SVG. Windows has no flag emoji font (Chrome
+ * there shows the letters "SG"), so the image is used on every platform.
+ */
 export function CountryFlag({ code }: { code: string | null }) {
+  const file = flagFile(code);
+  return file ? (
+    <img
+      className="flag-img"
+      src={import.meta.env.BASE_URL + "flags/" + file}
+      alt=""
+      aria-hidden="true"
+      width={20}
+      height={20}
+      loading="lazy"
+      decoding="async"
+    />
+  ) : (
+    <span className="flag-img flag-none" aria-hidden="true">
+      ◎
+    </span>
+  );
+}
+/** "🇸🇬 Singapore": flag plus place text. The country code is never printed. */
+export function Place({
+  e,
+  countryOnly = false,
+}: {
+  e: Pick<Event, "city" | "country" | "country_code">;
+  countryOnly?: boolean;
+}) {
   return (
-    <span>
-      <span aria-hidden="true">{flag(code)}</span>
-      {code && ` ${code}`}
+    <span className="place">
+      <CountryFlag code={e.country_code} />
+      <span>{placeLabel(e, countryOnly)}</span>
     </span>
   );
 }

@@ -50,6 +50,7 @@ export interface Event {
   priority_market: boolean;
   priority_market_level: string | null;
   website: string | null;
+  tickets?: string | null;
   instagram: string | null;
   instagram_followers: number | null;
   source_urls: string[];

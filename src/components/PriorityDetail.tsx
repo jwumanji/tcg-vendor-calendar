@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ChevronDown, Copy } from "lucide-react";
 import { explainScore, type ScoreResult } from "../scoring";
+import { eventPath } from "../route";
 import { PriorityChip } from "./PriorityChip";
 
 export function PriorityDetail({
@@ -25,7 +26,7 @@ export function PriorityDetail({
     Number(draft) <= 100;
   return (
     <section className="priority-detail" aria-labelledby="priority-title">
-      <h3 id="priority-title">Priority score</h3>
+      <h2 id="priority-title">Priority score</h2>
       <div className="score-summary">
         <PriorityChip result={result} />
         <div>
@@ -77,9 +78,16 @@ export function PriorityDetail({
           <ul>
             {result.clashes.map((c) => (
               <li key={c.id}>
-                <button className="text-button" onClick={() => openClash(c.id)}>
+                <a
+                  href={eventPath(c.id)}
+                  onClick={(ev) => {
+                    if (ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
+                    ev.preventDefault();
+                    openClash(c.id);
+                  }}
+                >
                   {c.name} · {c.score}
-                </button>
+                </a>
               </li>
             ))}
           </ul>

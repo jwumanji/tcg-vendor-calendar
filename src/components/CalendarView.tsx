@@ -31,7 +31,7 @@ export function CalendarView({
   initialMonth,
   today,
   setGoing,
-  setSelected,
+  open,
 }: {
   filtered: Event[];
   entries: Entries;
@@ -41,7 +41,7 @@ export function CalendarView({
   initialMonth: string;
   today: string;
   setGoing: SetGoing;
-  setSelected: (event: Event) => void;
+  open: (event: Event, occurrence?: string) => void;
 }) {
   function card(e: Event, occurrence?: string) {
     return (
@@ -53,7 +53,7 @@ export function CalendarView({
         entry={entries[e.id] || emptyEntry}
         occurrence={occurrence}
         setGoing={setGoing}
-        open={setSelected}
+        open={open}
       />
     );
   }
@@ -153,7 +153,7 @@ export function CalendarView({
                       "calendar-event " +
                       (e.section === "recurring_sg" ? "recurring" : "")
                     }
-                    onClick={() => setSelected(e)}
+                    onClick={() => open(e, e.occurrences ? prettyDate(date) : undefined)}
                   >
                     <Logo e={e} />
                     <ClashCue score={scores[e.id]} entries={entries} />
@@ -219,7 +219,7 @@ export function CalendarView({
           </h4>
           <div className="tba-links">
             {tba.map((e) => (
-              <button key={e.id} onClick={() => setSelected(e)}>
+              <button key={e.id} onClick={() => open(e)}>
                 {e.name}
                 <Place e={e} countryOnly />
                 <PriorityChip result={scores[e.id]} />

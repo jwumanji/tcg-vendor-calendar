@@ -1,3 +1,4 @@
+import { useEventRoute } from "./hooks/useEventRoute";
 import { usePriority } from "./hooks/usePriority";
 import { Modal } from "./components/Modal";
 import { EventRows, RowColumns, RowSortControl } from "./components/EventRows";
@@ -72,6 +73,10 @@ const ScoreSettings = lazy(async () => ({
   default: (await import("./components/ScoreSettings")).ScoreSettings,
 }));
 
+const defaultTitle = document.title;
+function focusHeading(node: HTMLHeadingElement | null) {
+  node?.focus({ preventScroll: true });
+}
 const quickCountries = [
   { country: "Singapore", code: "SG" },
   { country: "Hong Kong", code: "HK" },
@@ -107,8 +112,9 @@ export default function App() {
     canSave,
     acknowledgeRecovery,
   } = useEntries();
-  const { filters, setFilters, set } = useFilters(setStorageError);
-  const priority = usePriority(events, today, setStorageError);
+  const { route, openEvent, back, listContext } = useEventRoute();
+  const { filters, setFilters, set } = useFilters(setStorageError, listContext?.sessionFilters);
+  const priority = usePriority(allEvents, today, setStorageError);
   const { scores } = priority;
   const [toolsOpen, setToolsOpen] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
@@ -142,12 +148,25 @@ export default function App() {
       !["Pass", "Too expensive"].includes((entries[e.id] || emptyEntry).stage),
     [showPassed, filters.stages, entries],
   );
-  const closeDetail = useCallback(() => setSelected(null), []);
-  const [view, setView] = useState("List");
-  const [month, setMonth] = useState(initialMonth);
-  const [filterOpen, setFilterOpen] = useState(false);
-  const [selected, setSelected] = useState<Event | null>(null);
-  const [groupByStage, setGroupByStage] = useState(false);
+  const onEventPage = route.page === "event";
+  const selected = onEventPage
+    ? allEvents.find((event) => event.id === route.id)
+    : null;
+  useEffect(() => {
+    document.title = onEventPage
+      ? (selected?.name ?? "Event not found") + " – Holo Vault"
+      : defaultTitle;
+  }, [onEventPage, selected]);
+  const [view, setView] = useState(listContext?.view ?? "List");
+  const [month, setMonth] = useState(listContext?.month ?? initialMonth);
+  const [filterOpen, setFilterOpen] = useState(listContext?.filterOpen ?? false);
+  const [groupByStage, setGroupByStage] = useState(listContext?.groupByStage ?? false);
+  const { search, from, to } = filters;
+  const open = useCallback((event: Event, occurrence?: string) => {
+    openEvent(event.id, occurrence, {
+      view, month, filterOpen, groupByStage, sessionFilters: { search, from, to },
+    });
+  }, [openEvent, view, month, filterOpen, groupByStage, search, from, to]);
   const [theme, setTheme] = useState(
     () =>
       ["light", "dark"].includes(String(stored("tcg-theme")))
@@ -353,7 +372,7 @@ export default function App() {
         entries={entries}
         setGoing={setGoing}
         occurrence={occurrence}
-        open={setSelected}
+        open={open}
       />
     );
   }
@@ -406,7 +425,7 @@ export default function App() {
   );
   return (
     <>
-      <header className="header">
+      <header className="header" hidden={onEventPage}>
         <a
           className="brand"
           href="#main"
@@ -426,7 +445,7 @@ export default function App() {
           </button>
         </div>
       </header>
-      <main id="main" tabIndex={-1}>
+      <main id="main" tabIndex={-1} hidden={onEventPage}>
         {storageError && (
           <div role="alert" className="storage-warning">
             <p>
@@ -826,14 +845,14 @@ export default function App() {
               scores={scores}
               entries={entries}
               setGoing={setGoing}
-              open={setSelected}
+              open={open}
             />
           ) : view === "Pipeline" ? (
             <Pipeline
               events={sorted}
               scores={scores}
               entries={entries}
-              open={setSelected}
+              open={open}
               setGoing={setGoing}
               change={(e, stage) => update(e.id, "stage", stage)}
             />
@@ -847,7 +866,7 @@ export default function App() {
               setMonth={setMonth}
               initialMonth={initialMonth}
               today={today}
-              setSelected={setSelected}
+              open={open}
             />
           ) : view === "Timeline" ? (
             <div className="timeline">
@@ -934,7 +953,7 @@ export default function App() {
                     entries={entries}
                     scores={scores}
                     today={today}
-                    open={setSelected}
+                    open={open}
                   />
                 )
               ) : (
@@ -1000,7 +1019,7 @@ export default function App() {
           </small>
         </footer>
       </main>
-      {toolsOpen && (
+      {!onEventPage && toolsOpen && (
         <Modal
           title={
             <>
@@ -1051,34 +1070,46 @@ export default function App() {
           {toast}
         </Modal>
       )}
-      {!selected && !toolsOpen && toast}
+      {!onEventPage && !toolsOpen && toast}
       <Suspense fallback={null}>
-        {settingsOpen && (
+        {!onEventPage && settingsOpen && (
           <ScoreSettings
             weights={priority.weights}
             change={priority.setWeights}
             close={() => setSettingsOpen(false)}
           />
         )}
-        {selected && (
-          <Detail
-            toast={toast}
-            e={selected}
-            score={scores[selected.id]}
-            setOverride={(value) => priority.setOverride(selected.id, value)}
-            openClash={(id) =>
-              setSelected(events.find((e) => e.id === id) || null)
-            }
-            close={closeDetail}
-            key={selected.id}
-            entry={entries[selected.id] || emptyEntry}
-            saved={saved}
-            setGoing={setGoing}
-            onStage={(stage) => update(selected.id, "stage", stage)}
-            onNote={(note) => update(selected.id, "note", note)}
-          />
-        )}
       </Suspense>
+      {onEventPage && (
+        <main className="event-page">
+          <nav className="event-back" aria-label="Event navigation">
+            <button className="button" onClick={back}>← Back to events</button>
+          </nav>
+          {selected ? (
+            <Suspense fallback={<p role="status">Loading event…</p>}>
+              <Detail
+                toast={toast}
+                e={selected}
+                score={scores[selected.id]}
+                setOverride={(value) => priority.setOverride(selected.id, value)}
+                openClash={openEvent}
+                occurrence={route.occurrence}
+                key={selected.id}
+                entry={entries[selected.id] || emptyEntry}
+                saved={saved}
+                setGoing={setGoing}
+                onStage={(stage) => update(selected.id, "stage", stage)}
+                onNote={(note) => update(selected.id, "note", note)}
+              />
+            </Suspense>
+          ) : (
+            <section className="missing-event">
+              <h1 tabIndex={-1} ref={focusHeading}>Event not found</h1>
+              <p>This event link doesn’t match a show in the calendar.</p>
+            </section>
+          )}
+        </main>
+      )}
     </>
   );
 }

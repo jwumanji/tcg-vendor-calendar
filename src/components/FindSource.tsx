@@ -38,7 +38,7 @@ export function FindDetails({ e }: { e: Event }) {
     n == null ? "Unknown" : Math.round(n * 100) + "%";
   return (
     <section className="find-details" aria-label="Found by scanner">
-      <h3>Found by scanner</h3>
+      <h2>Found by scanner</h2>
       <SourceChip e={e} />
       <dl>
         <div className="detail-row">

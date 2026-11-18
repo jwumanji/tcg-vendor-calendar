@@ -32,7 +32,7 @@ export const EventCard = memo(function EventCard({
   score: ScoreResult;
   setGoing: SetGoing;
   occurrence?: string;
-  open: (e: Event) => void;
+  open: (e: Event, occurrence?: string) => void;
 }) {
   const tier = e.vendor_score !== null ? rarity(e.vendor_score).tier : "none";
   return (
@@ -47,7 +47,7 @@ export const EventCard = memo(function EventCard({
       <div className="card-details">
         <div className="card-heading">
           <h3 className="card-title">
-            <button className="stretched-button" onClick={() => open(e)}>
+            <button className="stretched-button" onClick={() => open(e, occurrence)}>
               {e.name}
               <span className="sr-only">
                 {" "}

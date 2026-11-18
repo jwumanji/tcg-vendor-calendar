@@ -44,10 +44,14 @@ export function normalizeFilters(value: unknown): Filters {
   // Search and date ranges are session-only, including on upgrades from old storage.
   return f;
 }
-export function useFilters(reportError: (error: string) => void) {
-  const [filters, setFilters] = useState(() =>
-    normalizeFilters(stored("tcg-filters")),
-  );
+export function useFilters(
+  reportError: (error: string) => void,
+  sessionFilters?: Pick<Filters, "search" | "from" | "to">,
+) {
+  const [filters, setFilters] = useState(() => ({
+    ...normalizeFilters(stored("tcg-filters")),
+    ...sessionFilters,
+  }));
   useEffect(() => {
     const { search: _search, from: _from, to: _to, ...stable } = filters;
     const error = saveValue("tcg-filters", stable);

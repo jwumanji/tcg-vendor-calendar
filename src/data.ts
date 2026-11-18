@@ -21,6 +21,7 @@ const nullableStrings = [
   "contact",
   "priority_market_level",
   "website",
+  "tickets",
   "instagram",
   "description",
   "audience",

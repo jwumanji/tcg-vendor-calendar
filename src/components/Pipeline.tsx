@@ -1,3 +1,4 @@
+import { GoingButton, type SetGoing } from "./GoingButton";
 import { PriorityChip } from "./PriorityChip";
 import { FindBadges } from "./FindSource";
 import type { ScoreResult } from "../scoring";
@@ -9,7 +10,6 @@ import {
   CircleDollarSign,
   CreditCard,
   Send,
-  MapPin,
   Sparkles,
   Star,
   type LucideIcon,
@@ -18,7 +18,7 @@ import type { Event } from "../model";
 import { stages, emptyEntry, type Stage, type Entries } from "../storage";
 import { dateLabel, games, gameKey, primaryGameKey, rarity } from "../utils";
 import { holo } from "../holo";
-import { Logo, Status, CountryFlag, ScoreGem, NoteTag } from "./EventIdentity";
+import { Logo, Status, Place, ScoreGem, NoteTag } from "./EventIdentity";
 
 /** Every stage has an icon as well as a label, so stages never rely on colour alone. */
 const stageIcons: Record<Stage, LucideIcon> = {
@@ -81,12 +81,14 @@ export function Pipeline({
   entries,
   scores,
   open,
+  setGoing,
   change,
 }: {
   events: Event[];
   entries: Entries;
   scores: Record<string, ScoreResult>;
   open: (event: Event) => void;
+  setGoing: SetGoing;
   change: (event: Event, stage: Stage) => void;
 }) {
   return (
@@ -112,6 +114,8 @@ export function Pipeline({
                 e={e}
                 score={scores[e.id]}
                 stage={stage}
+                going={!!entries[e.id]?.going}
+                setGoing={setGoing}
                 hasNote={!!entries[e.id]?.note.trim()}
                 open={open}
                 change={change}
@@ -132,25 +136,29 @@ export function Pipeline({
 const PipelineCard = memo(function PipelineCard({
   e,
   stage,
+  going,
   hasNote,
   score,
   open,
+  setGoing,
   change,
 }: {
   e: Event;
   stage: Stage;
+  going: boolean;
   hasNote: boolean;
   score: ScoreResult;
   open: (event: Event) => void;
+  setGoing: SetGoing;
   change: (event: Event, stage: Stage) => void;
 }) {
   const tier = e.vendor_score !== null ? rarity(e.vendor_score).tier : "none";
   const primary = games(e)[0];
-  const place = [e.city, e.country].filter(Boolean).join(", ");
   return (
     <article
       className={`pipeline-card holo status-${e.date_status}`}
       data-game={primaryGameKey(e)}
+      data-going={going}
       data-tier={tier}
       {...holo}
     >
@@ -174,10 +182,7 @@ const PipelineCard = memo(function PipelineCard({
           {dateLabel(e)}
         </span>
         <span className="pcard-line">
-          <MapPin size={14} aria-hidden="true" />
-          <span>
-            <CountryFlag code={e.country_code} /> {place || "Location TBA"}
-          </span>
+          <Place e={e} />
         </span>
       </div>
       <div className="pcard-foot">
@@ -193,6 +198,7 @@ const PipelineCard = memo(function PipelineCard({
         {hasNote && <NoteTag />}
       </div>
       <div className="pcard-actions">
+        <GoingButton e={e} going={going} setGoing={setGoing} />
         <StagePicker
           name={e.name}
           stage={stage}

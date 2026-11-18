@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+  applyGoing,
   backup,
   emptyEntry,
   loadEntries,
@@ -49,6 +50,11 @@ export function useEntries() {
     setSaved(!error);
     setStorageError(error);
   }, [entries, canSave]);
+  const setGoing = useCallback((ids: readonly string[], going: boolean) => {
+    const now = new Date().toISOString();
+    setSaved(false);
+    setEntries((current) => applyGoing(current, ids, going, now));
+  }, []);
   function acknowledgeRecovery() {
     if (!loaded.recoveryKey && loaded.raw)
       download(loaded.raw, "tcg-pipeline-original.json", "application/json");
@@ -62,6 +68,7 @@ export function useEntries() {
   return {
     entries,
     update,
+    setGoing,
     applyEntries,
     saved,
     storageError,

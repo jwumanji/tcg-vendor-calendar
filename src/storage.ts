@@ -11,6 +11,8 @@ export const stages = [
 ] as const;
 export type Stage = (typeof stages)[number];
 export interface Entry {
+  going: boolean;
+  goingUpdatedAt: string | null;
   stage: Stage;
   note: string;
   noteUpdatedAt: string | null;
@@ -18,11 +20,33 @@ export interface Entry {
 }
 export type Entries = Record<string, Entry>;
 export const emptyEntry: Entry = {
+  going: false,
+  goingUpdatedAt: null,
   stage: "New",
   note: "",
   noteUpdatedAt: null,
   stageUpdatedAt: null,
 };
+export function applyGoing(
+  entries: Entries,
+  ids: readonly string[],
+  going: boolean,
+  now: string,
+): Entries {
+  const next: Entries = Object.assign(Object.create(null), entries);
+  for (const id of ids) {
+    const entry = next[id] || emptyEntry;
+    if (entry.going === going) continue;
+    next[id] = {
+      ...entry,
+      going,
+      goingUpdatedAt: now,
+      ...(going &&
+        entry.stage === "New" && { stage: "Interested", stageUpdatedAt: now }),
+    };
+  }
+  return next;
+}
 export const STORAGE_KEY = "tcg-pipeline-v1";
 export const WEIGHTS_KEY = "tcg-priority-weights";
 export const OVERRIDES_KEY = "tcg-priority-overrides";
@@ -79,7 +103,13 @@ export function validateBackup(value: unknown): Backup {
       throw new Error(
         `Invalid entry ${id}: stageUpdatedAt must be null or an ISO UTC timestamp.`,
       );
+    if (e.going !== undefined && typeof e.going !== "boolean")
+      throw new Error(`Invalid entry ${id}: going must be a boolean.`);
+    if (e.goingUpdatedAt != null && !timestamp(e.goingUpdatedAt))
+      throw new Error(`Invalid entry ${id}: invalid Going timestamp.`);
     entries[id] = {
+      going: e.going === true,
+      goingUpdatedAt: e.goingUpdatedAt ?? null,
       stage: e.stage as Stage,
       note: e.note,
       noteUpdatedAt: e.noteUpdatedAt,
@@ -141,10 +171,12 @@ export function importEntries(
       result[id] = { ...next };
       continue;
     }
-    // Stage and note are independent edits; ties retain local values.
+    const going = (next.goingUpdatedAt || "") > (old.goingUpdatedAt || "");
     const stage = (next.stageUpdatedAt || "") > (old.stageUpdatedAt || "");
     const note = (next.noteUpdatedAt || "") > (old.noteUpdatedAt || "");
     result[id] = {
+      going: going ? next.going : old.going,
+      goingUpdatedAt: going ? next.goingUpdatedAt : old.goingUpdatedAt,
       stage: stage ? next.stage : old.stage,
       stageUpdatedAt: stage ? next.stageUpdatedAt : old.stageUpdatedAt,
       note: note ? next.note : old.note,

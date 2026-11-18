@@ -1,15 +1,15 @@
 import { usePriority } from "./hooks/usePriority";
-import { PriorityChip } from "./components/PriorityChip";
-import { EventRows } from "./components/EventRows";
-import { FindBadges } from "./components/FindSource";
+import { Modal } from "./components/Modal";
+import { EventRows, MobileRowSort } from "./components/EventRows";
 import { normalizeListView, normalizeRowSort } from "./rows";
-import { compareByScore, TIER_THRESHOLDS } from "./scoring";
+import { compareByScore } from "./scoring";
 import { CalendarView } from "./components/CalendarView";
 import { EventCard } from "./components/EventCard";
-import { Logo, CountryFlag, NoteTag } from "./components/EventIdentity";
 import { BrandLockup, BrandMark } from "./components/Brand";
 import { EmptyState } from "./components/EmptyState";
-import { Pipeline, StageBadge } from "./components/Pipeline";
+import { EventExports } from "./components/EventExports";
+import { TopPicks } from "./components/TopPicks";
+import { Pipeline } from "./components/Pipeline";
 import { BackupControls } from "./components/BackupControls";
 import { stages, emptyEntry, saveValue, type Stage } from "./storage";
 import {
@@ -24,20 +24,18 @@ import {
 } from "react";
 
 import {
-  ArrowUpRight,
   CalendarDays,
   SlidersHorizontal,
   Search,
   X,
-  Download,
   Sun,
   Moon,
   Bookmark,
-  Info,
+  Settings2,
+  ListChecks,
   SearchX,
   TriangleAlert,
   LayoutList,
-  Clock,
   Gem,
   RotateCcw,
   LayoutGrid,
@@ -56,22 +54,14 @@ import {
   compareText,
   dateSortKey,
   nextMonth,
-  upcoming,
   timelineGroups,
   gameRules,
   ranges,
   matches,
+  goingEvents,
   monthLabel,
   prettyDate,
-  dateLabel,
-  deadlineDate,
-  ics,
-  csv,
-  download,
-  primaryGameKey,
-  isUndated,
 } from "./utils";
-import { holo } from "./holo";
 import "./style.css";
 const Detail = lazy(async () => ({
   default: (await import("./components/Detail")).Detail,
@@ -88,6 +78,7 @@ export default function App() {
     entries,
     update,
     applyEntries,
+    setGoing,
     saved,
     storageError,
     setStorageError,
@@ -97,6 +88,8 @@ export default function App() {
   const { filters, setFilters, set } = useFilters(setStorageError);
   const priority = usePriority(events, today, setStorageError);
   const { scores } = priority;
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const [selectMode, setSelectMode] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [listView, setListView] = useState(() =>
     normalizeListView(stored("tcg-list-view")),
@@ -123,7 +116,7 @@ export default function App() {
     [showPassed, filters.stages, entries],
   );
   const closeDetail = useCallback(() => setSelected(null), []);
-  const [view, setView] = useState("Calendar");
+  const [view, setView] = useState("List");
   const [month, setMonth] = useState(initialMonth);
   const [filterOpen, setFilterOpen] = useState(false);
   const [selected, setSelected] = useState<Event | null>(null);
@@ -156,39 +149,9 @@ export default function App() {
       ),
     [events, filters, entries, view, visible, scores],
   );
-  const top = useMemo(
-    () =>
-      events
-        .filter((e) => visible(e) && !isUndated(e) && upcoming(e, today))
-        .sort((a, b) => compareByScore(scores[a.id], scores[b.id])),
-    [events, visible, today, scores],
-  );
-  const deadlines = useMemo(
-    () =>
-      events
-        .filter((e) => visible(e) && e.vendor_deadline && upcoming(e, today))
-        .sort((a, b) =>
-          (deadlineDate(a.vendor_deadline) || "9999").localeCompare(
-            deadlineDate(b.vendor_deadline) || "9999",
-          ),
-        )
-        .filter(
-          (e) =>
-            !deadlineDate(e.vendor_deadline) ||
-            deadlineDate(e.vendor_deadline)! >= today,
-        ),
-    [events, visible, today],
-  );
-  const datedDeadlines = deadlines.filter((e) =>
-    deadlineDate(e.vendor_deadline),
-  );
-  const countryCount = useMemo(
-    () => new Set(events.map((e) => e.country).filter(Boolean)).size,
-    [events],
-  );
-  const confirmedCount = useMemo(
-    () => events.filter((e) => e.date_status === "confirmed").length,
-    [events],
+  const attending = useMemo(
+    () => goingEvents(events, entries),
+    [events, entries],
   );
   const chips: { id: string; label: string; clear: () => void }[] = [];
   for (const c of filters.countries)
@@ -242,6 +205,12 @@ export default function App() {
           "stages",
           filters.stages.filter((s) => s !== stage),
         ),
+    });
+  if (filters.going)
+    chips.push({
+      id: "going",
+      label: `Going ${attending.length}`,
+      clear: () => set("going", false),
     });
   if (filters.newOnly)
     chips.push({
@@ -311,6 +280,7 @@ export default function App() {
         e={e}
         entry={entries[e.id] || emptyEntry}
         score={scores[e.id]}
+        setGoing={setGoing}
         occurrence={occurrence}
         open={setSelected}
       />
@@ -387,10 +357,6 @@ export default function App() {
           <BrandLockup />
         </a>
         <div className="header-right">
-          <span className="season-chip">
-            <span className="live-dot" />
-            2027<span className="chip-extra"> SEASON</span>
-          </span>
           <button
             className="icon-button"
             aria-label="Toggle light and dark theme"
@@ -416,312 +382,44 @@ export default function App() {
             )}
           </div>
         )}
-        <section className="stage-overview" aria-label="Pipeline overview">
-          <span className="tray-label" aria-hidden="true">
-            YOUR PIPELINE
-          </span>
-          {stages.map((stage) => (
-            <span key={stage}>
-              <StageBadge stage={stage} />{" "}
-              <strong>
-                {
-                  events.filter(
-                    (e) => (entries[e.id] || emptyEntry).stage === stage,
-                  ).length
-                }
-              </strong>
-            </span>
-          ))}
-        </section>
-        <section className="hero">
-          <div className="hero-copy">
-            <div className="eyebrow">
-              <Gem size={15} aria-hidden="true" />
-              2027 vendor season · SEA + HK + GCC
-            </div>
-            <h1>
-              Plan your{" "}
-              <span className="foil-underline">2027 vendor season</span> across
-              Southeast Asia, Hong Kong &amp; the Gulf.
-            </h1>
-            <p>
-              <strong>{events.length}</strong> TCG events in{" "}
-              <strong>{countryCount}</strong> countries
-              {confirmedCount > 0 && (
-                <>
-                  , <strong>{confirmedCount}</strong> with confirmed dates
-                </>
-              )}
-              {datedDeadlines.length > 0 && (
-                <>
-                  {" "}
-                  and <strong>{datedDeadlines.length}</strong> vendor{" "}
-                  {datedDeadlines.length === 1 ? "deadline" : "deadlines"} still
-                  open
-                </>
-              )}
-              . Compare vendor scores, track every booth application and commit
-              to the tables worth paying for.
-            </p>
-            <div className="hero-cta">
-              <a className="button primary" href="#workspace-title">
-                <CalendarDays size={18} aria-hidden="true" /> Open the calendar
-              </a>
-              <a className="button" href="#top-picks">
-                <Gem size={18} aria-hidden="true" /> See top picks
-              </a>
-            </div>
-          </div>
-          <div className="season-stage" aria-hidden="true">
-            <div className="season-card holo" {...holo}>
-              <div className="season-card-face">
-                <div className="season-card-head">
-                  <span>SEASON</span>
-                  <span>SEA·HK·GCC</span>
-                </div>
-                <div className="season-card-art">
-                  <CalendarDays size={34} strokeWidth={1.4} />
-                  <strong>2027</strong>
-                </div>
-                <div className="season-card-foot">
-                  <span>{events.length} EVENTS</span>
-                  <span>{countryCount} COUNTRIES</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-        <section className="stats" aria-label="Calendar statistics">
-          {[
-            [events.length, "Events on the radar"],
-            [confirmedCount, "Confirmed events"],
-            [datedDeadlines.length, "Upcoming deadline notices"],
-            [
-              top.filter((e) => scores[e.id].tier === "must").length,
-              "Must-do upcoming events",
-            ],
-          ].map(([n, label], i) => (
-            <div key={label} className={i === 3 ? "stat-secret" : undefined}>
-              <span className="stat-index">0{i + 1}</span>
-              <strong>{n}</strong>
-              <span>{label}</span>
-            </div>
-          ))}
-        </section>
-        <section className="overview">
-          <div className="picks" id="top-picks" tabIndex={-1}>
-            <div className="section-label">
-              <span>✦ TOP VENDOR PICKS</span>
-              <span>RANKED BY PRIORITY</span>
-            </div>
-            {top.length === 0 && (
-              <EmptyState icon={Gem} title="No scored events to show">
-                Upcoming events with announced or estimated dates appear here.
-                Check the “Show passed / too expensive” toggle below.
-              </EmptyState>
-            )}
-            <div className="pick-grid">
-              {top.slice(0, 3).map((e, i) => (
-                <article
-                  className="pick holo"
-                  key={e.id}
-                  data-game={primaryGameKey(e)}
-                  data-tier={scores[e.id].tier === "must" ? "secret" : "rare"}
-                  {...holo}
-                >
-                  <span className="pick-rank" aria-hidden="true">
-                    0{i + 1}
-                  </span>
-                  <div className="pick-meta">
-                    <Logo e={e} />
-                    <PriorityChip result={scores[e.id]} />
-                    <ArrowUpRight size={18} className="pick-arrow" />
-                  </div>
-                  <h3>
-                    <button
-                      className="stretched-button"
-                      onClick={() => setSelected(e)}
-                    >
-                      {e.name}
-                      <span className="sr-only">
-                        {" "}
-                        · {dateLabel(e)} · {(entries[e.id] || emptyEntry).stage}
-                      </span>
-                    </button>
-                  </h3>
-                  <StageBadge stage={(entries[e.id] || emptyEntry).stage} />
-                  {entries[e.id]?.note.trim() && <NoteTag />}
-                  <FindBadges e={e} />
-                  <p>
-                    <CountryFlag code={e.country_code} /> {e.city || e.country}{" "}
-                    <span>· {dateLabel(e)}</span>
-                  </p>
-                </article>
-              ))}
-            </div>
-            <ul className="rarity-legend" aria-label="Priority score tiers">
-              {[
-                ["Must-do", TIER_THRESHOLDS.must + "+", "secret"],
-                [
-                  "Strong",
-                  `${TIER_THRESHOLDS.strong}–${TIER_THRESHOLDS.must - 1}`,
-                  "ultra",
-                ],
-                [
-                  "Maybe",
-                  `${TIER_THRESHOLDS.maybe}–${TIER_THRESHOLDS.strong - 1}`,
-                  "rare",
-                ],
-                ["Skip", `under ${TIER_THRESHOLDS.maybe}`, "common"],
-              ].map(([label, range, tone]) => (
-                <li key={label} className={`gem-${tone}`}>
-                  <i aria-hidden="true" />
-                  {label}
-                  <span>{range}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="deadline-box">
-            <div className="section-label">
-              <span>
-                <Clock size={14} /> UPCOMING DEADLINES
-              </span>
-            </div>
-            {deadlines.length === 0 && (
-              <p className="deadline-empty">
-                No open vendor deadlines right now.
-              </p>
-            )}
-            {deadlines.slice(0, 2).map((e) => (
-              <button key={e.id} onClick={() => setSelected(e)}>
-                <span className="deadline-date">
-                  {deadlineDate(e.vendor_deadline)
-                    ? prettyDate(deadlineDate(e.vendor_deadline)!)
-                    : "CHECK DETAILS"}
-                </span>
-                <strong>{e.name}</strong>
-                <span className="card-tags">
-                  <PriorityChip result={scores[e.id]} />
-                  <StageBadge stage={(entries[e.id] || emptyEntry).stage} />
-                  {entries[e.id]?.note.trim() && <NoteTag />}
-                </span>
-                <span className="deadline-copy">{e.vendor_deadline}</span>
-                <ArrowUpRight size={15} />
-              </button>
-            ))}
-            <small>
-              Registration notes may include player dates. Check vendor details.
-            </small>
-          </div>
-        </section>
         <section className="workspace">
-          <div className="workspace-heading">
-            <div>
-              <div className="eyebrow">
-                BUILD YOUR 2027 CIRCUIT{" "}
-                <span className="source-chip">
-                  {events.filter((e) => e.is_new_find).length} new finds
-                </span>
-              </div>
-              <h2 id="workspace-title" tabIndex={-1}>
-                Explore the calendar<span>.</span>
-              </h2>
-            </div>
-            <div className="export-actions">
-              <button
-                className="button"
-                aria-haspopup="dialog"
-                onClick={() => setSettingsOpen(true)}
-              >
-                <SlidersHorizontal size={16} /> Score weights
-              </button>
-              <button
-                className="button"
-                onClick={() =>
-                  download(
-                    csv(filtered, entries),
-                    "tcg-events.csv",
-                    "text/csv;charset=utf-8",
-                  )
-                }
-              >
-                CSV
-              </button>
-              <button
-                className="button"
-                disabled={
-                  !filtered.some(
-                    (e) => e.date_status === "confirmed" && ranges(e).length,
-                  )
-                }
-                onClick={() =>
-                  download(
-                    ics(filtered),
-                    "tcg-calendar.ics",
-                    "text/calendar;charset=utf-8",
-                  )
-                }
-              >
-                <Download size={16} /> Export .ics (confirmed only)
-              </button>
-            </div>
-          </div>
-          <BackupControls
-            entries={entries}
-            ids={events.map((e) => e.id)}
-            apply={applyEntries}
-            priority={{
-              weights: priority.weights,
-              overrides: priority.overrides,
-            }}
-            applyPriority={(value) => {
-              priority.setWeights(value.weights);
-              priority.setOverrides(value.overrides);
-            }}
-          />
-          <label className="passed-toggle">
-            <input
-              type="checkbox"
-              checked={showPassed}
-              onChange={(e) => setShowPassed(e.target.checked)}
-            />{" "}
-            Show passed / too expensive
-          </label>
-          {view === "Pipeline" && (
-            <p className="view-note">
-              <Info size={16} aria-hidden="true" />
-              Pipeline includes passed / too expensive events. Search and
-              filters still apply.
-            </p>
-          )}
+          <h1 className="sr-only">Holo Vault vendor calendar</h1>
+          <h2 className="sr-only" id="workspace-title" tabIndex={-1}>
+            {view}
+          </h2>
           <nav className="tabs" aria-label="Event views">
             {[
+              "List",
+              "Top picks",
               "Calendar",
               "Timeline",
-              "List",
               "Watchlist",
               "Recurring SG",
               "Pipeline",
-            ].map((v, i) => (
+            ].map((v) => (
               <button
                 key={v}
                 className={view === v ? "active" : ""}
                 aria-current={view === v ? "page" : undefined}
-                onClick={() => setView(v)}
+                onClick={(ev) => {
+                  setView(v);
+                  setSelectMode(false);
+                  ev.currentTarget.scrollIntoView({
+                    block: "nearest",
+                    inline: "nearest",
+                  });
+                }}
               >
-                {i === 0 ? (
-                  <CalendarDays size={16} />
-                ) : i === 1 ? (
-                  <LayoutList size={16} />
-                ) : i === 5 ? (
-                  <Bookmark size={16} />
-                ) : null}
+                {v === "List" && <List size={16} />}
+                {v === "Top picks" && <Gem size={16} />}
+                {v === "Calendar" && <CalendarDays size={16} />}
+                {v === "Timeline" && <LayoutList size={16} />}
+                {v === "Pipeline" && <Bookmark size={16} />}
                 {v}
               </button>
             ))}
           </nav>
-          <div className="toolbar">
+          <div className="toolbar" hidden={view === "Top picks"}>
             <label className="search">
               <Search size={18} />
               <input
@@ -751,11 +449,25 @@ export default function App() {
               <Sparkles size={15} />
               New finds
             </button>
+            <button
+              className="button finds-toggle going-filter"
+              aria-pressed={filters.going}
+              onClick={() => set("going", !filters.going)}
+            >
+              Going <span className="going-count">{attending.length}</span>
+            </button>
+            <button
+              className="button tools-trigger"
+              aria-haspopup="dialog"
+              onClick={() => setToolsOpen(true)}
+            >
+              <Settings2 size={16} /> Tools
+            </button>
             <span className="result-count" role="status" aria-live="polite">
               {filtered.length} events
             </span>
           </div>
-          {filterOpen && (
+          {view !== "Top picks" && filterOpen && (
             <section
               className="filters"
               id="filters"
@@ -967,7 +679,7 @@ export default function App() {
               </div>
             </section>
           )}
-          {chips.length > 0 && (
+          {view !== "Top picks" && chips.length > 0 && (
             <div className="chips">
               {chips.map((c) => (
                 <button
@@ -1000,12 +712,23 @@ export default function App() {
               </label>
             </div>
           )}
-          {view === "Pipeline" ? (
+          {view === "Top picks" ? (
+            <TopPicks
+              events={events}
+              visible={visible}
+              today={today}
+              scores={scores}
+              entries={entries}
+              setGoing={setGoing}
+              open={setSelected}
+            />
+          ) : view === "Pipeline" ? (
             <Pipeline
               events={filtered}
               scores={scores}
               entries={entries}
               open={setSelected}
+              setGoing={setGoing}
               change={(e, stage) => update(e.id, "stage", stage)}
             />
           ) : view === "Calendar" ? (
@@ -1013,6 +736,7 @@ export default function App() {
               filtered={filtered}
               scores={scores}
               entries={entries}
+              setGoing={setGoing}
               month={month}
               setMonth={setMonth}
               initialMonth={initialMonth}
@@ -1046,19 +770,22 @@ export default function App() {
           ) : (
             <>
               <div className="list-heading">
-                <h3>
-                  {view === "List"
-                    ? "All opportunities"
-                    : view === "Watchlist"
-                      ? "Keep these on your radar"
-                      : view === "Recurring SG"
-                        ? "Your local circuit"
-                        : "Your season, taking shape"}
-                </h3>
                 <span className="list-count">
                   {visibleList.length}{" "}
                   {visibleList.length === 1 ? "event" : "events"}
                 </span>
+                {showRows && (
+                  <>
+                    <MobileRowSort sort={rowSort} setSort={setRowSort} />
+                    <button
+                      className="button select-mode"
+                      aria-pressed={selectMode}
+                      onClick={() => setSelectMode(!selectMode)}
+                    >
+                      <ListChecks size={16} /> Select
+                    </button>
+                  </>
+                )}
                 {view === "List" && (
                   <div
                     className="list-switch"
@@ -1067,7 +794,10 @@ export default function App() {
                   >
                     <button
                       aria-pressed={listView === "grid"}
-                      onClick={() => setListView("grid")}
+                      onClick={() => {
+                        setListView("grid");
+                        setSelectMode(false);
+                      }}
                     >
                       <LayoutGrid size={16} />
                       Grid
@@ -1087,6 +817,9 @@ export default function App() {
                 filtered.length > 0 && (
                   <EventRows
                     events={filtered}
+                    key={String(selectMode)}
+                    selectMode={selectMode}
+                    setGoing={setGoing}
                     sort={rowSort}
                     setSort={setRowSort}
                     entries={entries}
@@ -1128,23 +861,25 @@ export default function App() {
             </>
           )}
           {view === "Timeline" && groups.size === 0 && noResults}
-          <div className="calendar-foot">
-            <span className="legend" role="list" aria-label="Date status key">
-              <span role="listitem" className="badge confirmed">
-                ● Confirmed
+          {view !== "Top picks" && (
+            <div className="calendar-foot">
+              <span className="legend" role="list" aria-label="Date status key">
+                <span role="listitem" className="badge confirmed">
+                  ● Confirmed
+                </span>
+                <span role="listitem" className="badge estimated">
+                  ◷ Estimated
+                </span>
+                <span role="listitem" className="badge tba">
+                  ◇ TBA
+                </span>
+                <span role="listitem" className="badge recurring-key">
+                  Recurring SG
+                </span>
               </span>
-              <span role="listitem" className="badge estimated">
-                ◷ Estimated
-              </span>
-              <span role="listitem" className="badge tba">
-                ◇ TBA
-              </span>
-              <span role="listitem" className="badge recurring-key">
-                Recurring SG
-              </span>
-            </span>
-            <span>All dates are local to the event.</span>
-          </div>
+              <span>All dates are local to the event.</span>
+            </div>
+          )}
         </section>
         <footer>
           <span className="footer-brand">
@@ -1156,6 +891,55 @@ export default function App() {
           </small>
         </footer>
       </main>
+      {toolsOpen && (
+        <Modal
+          title={
+            <>
+              <Settings2 size={21} />
+              Tools
+            </>
+          }
+          titleId="tools-title"
+          closeLabel="Close tools"
+          close={() => setToolsOpen(false)}
+          className="tools-dialog"
+        >
+          <div className="tool-settings">
+            <button
+              className="button"
+              aria-haspopup="dialog"
+              onClick={() => setSettingsOpen(true)}
+            >
+              <SlidersHorizontal size={16} /> Score weights
+            </button>
+          </div>
+          <section className="tool-exports" aria-label="Event exports">
+            <EventExports events={filtered} entries={entries} />
+            <EventExports events={attending} entries={entries} goingOnly />
+          </section>
+          <BackupControls
+            entries={entries}
+            ids={events.map((e) => e.id)}
+            apply={applyEntries}
+            priority={{
+              weights: priority.weights,
+              overrides: priority.overrides,
+            }}
+            applyPriority={(value) => {
+              priority.setWeights(value.weights);
+              priority.setOverrides(value.overrides);
+            }}
+          />
+          <label className="passed-toggle">
+            <input
+              type="checkbox"
+              checked={showPassed}
+              onChange={(e) => setShowPassed(e.target.checked)}
+            />{" "}
+            Show passed / too expensive
+          </label>
+        </Modal>
+      )}
       <Suspense fallback={null}>
         {settingsOpen && (
           <ScoreSettings
@@ -1176,6 +960,7 @@ export default function App() {
             key={selected.id}
             entry={entries[selected.id] || emptyEntry}
             saved={saved}
+            setGoing={setGoing}
             onStage={(stage) => update(selected.id, "stage", stage)}
             onNote={(note) => update(selected.id, "note", note)}
           />

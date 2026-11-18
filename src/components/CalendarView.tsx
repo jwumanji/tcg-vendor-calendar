@@ -19,7 +19,8 @@ import {
 } from "../utils";
 import { EventCard } from "./EventCard";
 import { EmptyState } from "./EmptyState";
-import { NoteTag } from "./EventIdentity";
+import type { SetGoing } from "./GoingButton";
+import { NoteTag, Place, Logo } from "./EventIdentity";
 import { StageBadge } from "./Pipeline";
 export function CalendarView({
   filtered,
@@ -29,6 +30,7 @@ export function CalendarView({
   setMonth,
   initialMonth,
   today,
+  setGoing,
   setSelected,
 }: {
   filtered: Event[];
@@ -38,6 +40,7 @@ export function CalendarView({
   setMonth: (month: string) => void;
   initialMonth: string;
   today: string;
+  setGoing: SetGoing;
   setSelected: (event: Event) => void;
 }) {
   function card(e: Event, occurrence?: string) {
@@ -48,6 +51,7 @@ export function CalendarView({
         score={scores[e.id]}
         entry={entries[e.id] || emptyEntry}
         occurrence={occurrence}
+        setGoing={setGoing}
         open={setSelected}
       />
     );
@@ -150,8 +154,9 @@ export function CalendarView({
                     }
                     onClick={() => setSelected(e)}
                   >
-                    <span aria-hidden="true">●</span>
+                    <Logo e={e} />
                     <span className="calendar-event-name">{e.name}</span>{" "}
+                    <Place e={e} countryOnly />
                     <PriorityChip result={scores[e.id]} />
                     <StageBadge stage={(entries[e.id] || emptyEntry).stage} />
                     {entries[e.id]?.note.trim() && <NoteTag compact />}
@@ -214,6 +219,7 @@ export function CalendarView({
             {tba.map((e) => (
               <button key={e.id} onClick={() => setSelected(e)}>
                 {e.name}
+                <Place e={e} countryOnly />
                 <PriorityChip result={scores[e.id]} />
                 <StageBadge stage={(entries[e.id] || emptyEntry).stage} />
                 {entries[e.id]?.note.trim() && <NoteTag />}

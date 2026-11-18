@@ -1,24 +1,27 @@
+import { GoingButton, type SetGoing } from "./GoingButton";
 import { PriorityChip } from "./PriorityChip";
 import { FindBadges } from "./FindSource";
 import type { ScoreResult } from "../scoring";
 import { memo } from "react";
-import { CalendarDays, MapPin } from "lucide-react";
+import { CalendarDays } from "lucide-react";
 import type { Event } from "../model";
 import type { Entry } from "../storage";
 import { games, dateLabel, gameKey, primaryGameKey, rarity } from "../utils";
 import { holo } from "../holo";
-import { Logo, Status, CountryFlag, ScoreGem, NoteTag } from "./EventIdentity";
+import { Logo, Status, Place, ScoreGem, NoteTag } from "./EventIdentity";
 import { StageBadge } from "./Pipeline";
 export const EventCard = memo(function EventCard({
   e,
   entry,
   score,
+  setGoing,
   occurrence,
   open,
 }: {
   e: Event;
   entry: Entry;
   score: ScoreResult;
+  setGoing: SetGoing;
   occurrence?: string;
   open: (e: Event) => void;
 }) {
@@ -27,33 +30,39 @@ export const EventCard = memo(function EventCard({
     <article
       className={`event-card holo status-${e.date_status}`}
       data-game={primaryGameKey(e)}
+      data-going={entry.going}
       data-tier={tier}
       {...holo}
     >
       <div className="card-face">
-        <div className="card-top">
-          <Logo e={e} />
-          <h3 className="card-title">
-            <button className="stretched-button" onClick={() => open(e)}>
-              {e.name}
-              <span className="sr-only">
-                {" "}
-                · {occurrence || dateLabel(e)} · {entry.stage}
-              </span>
-            </button>
-          </h3>
+        <div className="logo-banner">
+          {e.logo && (
+            <img
+              className="banner-backdrop"
+              src={import.meta.env.BASE_URL + e.logo}
+              alt=""
+              loading="lazy"
+            />
+          )}
+          <Logo e={e} size="xl" />
         </div>
+        <GoingButton e={e} going={entry.going} setGoing={setGoing} />
+        <h3 className="card-title">
+          <button className="stretched-button" onClick={() => open(e)}>
+            {e.name}
+            <span className="sr-only">
+              {" "}
+              · {occurrence || dateLabel(e)} · {entry.stage}
+            </span>
+          </button>
+        </h3>
         <div className="card-art">
           <div className="card-when">
             <CalendarDays size={16} aria-hidden="true" />
             <span>{occurrence || dateLabel(e)}</span>
           </div>
           <div className="card-location">
-            <MapPin size={14} aria-hidden="true" />
-            <span>
-              <CountryFlag code={e.country_code} />{" "}
-              {[e.city, e.country].filter(Boolean).join(", ") || "Location TBA"}
-            </span>
+            <Place e={e} />
           </div>
           <div className="card-art-foot">
             <PriorityChip result={score} />

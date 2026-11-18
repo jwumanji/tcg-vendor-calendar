@@ -4,6 +4,7 @@ import { emptyEntry, stages, type Entries } from "./storage";
 import { compareText, dateSortKey, prettyDate, ranges } from "./utils";
 
 export const ROW_SORT_LABELS = {
+  going: "Going",
   name: "Event",
   dates: "Dates",
   city: "City / country",
@@ -31,14 +32,17 @@ export function normalizeRowSort(input: unknown): RowSort {
   return defaultRowSort;
 }
 export function normalizeListView(input: unknown): "rows" | "grid" {
-  return input === "rows" ? "rows" : "grid";
+  return input === "grid" ? "grid" : "rows";
 }
 export function nextRowSort(sort: RowSort, key: RowKey): RowSort {
   if (key === sort.key)
     return { key, direction: sort.direction === "asc" ? "desc" : "asc" };
   return {
     key,
-    direction: key === "priority" || key === "scanner" ? "desc" : "asc",
+    direction:
+      key === "priority" || key === "scanner" || key === "going"
+        ? "desc"
+        : "asc",
   };
 }
 export function rowDateLabel(e: Event, today: string) {
@@ -74,6 +78,8 @@ export function sortRows(
   function value(e: Event): string | number | null {
     const entry = entries[e.id] || emptyEntry;
     switch (sort.key) {
+      case "going":
+        return Number(entry.going);
       case "name":
         return e.name;
       case "city":
@@ -115,4 +121,30 @@ export function sortRows(
         (sort.key === "city" ? compare(a.e.country, b.e.country) : 0),
     )
     .map((row) => row.e);
+}
+
+export function selectAllVisible(visible: readonly string[], checked: boolean) {
+  return new Set(checked ? visible : []);
+}
+
+export function selectRange(
+  visible: readonly string[],
+  selected: ReadonlySet<string>,
+  target: string,
+  anchor: string | null,
+) {
+  const end = visible.indexOf(target);
+  const start = anchor === null ? end : visible.indexOf(anchor);
+  const next = new Set(visible.filter((id) => selected.has(id)));
+  if (end < 0) return next;
+  const checked = !selected.has(target);
+  const from = start < 0 ? end : start;
+  for (const id of visible.slice(
+    Math.min(from, end),
+    Math.max(from, end) + 1,
+  )) {
+    if (checked) next.add(id);
+    else next.delete(id);
+  }
+  return next;
 }

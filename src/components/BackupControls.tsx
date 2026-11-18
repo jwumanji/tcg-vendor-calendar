@@ -45,8 +45,8 @@ export function BackupControls({
           <HardDrive size={16} aria-hidden="true" /> Backup &amp; restore
         </span>
         <span>
-          Stages, notes and score settings are kept in this browser only. Export
-          a backup before switching devices.
+          Going choices, stages, notes and score settings are kept in this
+          browser only. Export a backup before switching devices.
         </span>
       </div>
       <div className="backup-actions">
@@ -113,7 +113,7 @@ export function BackupControls({
               onChange={(e) => setMode(e.target.value as typeof mode)}
             >
               <option value="merge">
-                Merge — keep the newest stage and note for each ID
+                Merge — keep the newest Going choice, stage and note for each ID
               </option>
               <option value="replace">
                 Replace — discard all existing entries, including absent IDs

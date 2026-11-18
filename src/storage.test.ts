@@ -8,6 +8,8 @@ import {
 } from "./storage";
 import { describe, it, expect, vi } from "vitest";
 import {
+  applyGoing,
+  stages,
   stashBeforeReplace,
   backup,
   validateBackup,
@@ -289,5 +291,69 @@ describe("priority preferences and backups", () => {
       expect(
         importPriority(current, validateBackup(backup({})).priority, mode),
       ).toBe(current);
+  });
+});
+
+describe("Going choices", () => {
+  const now = "2026-11-18T05:00:00.000Z";
+  it("loads pre-Going storage and backups with Going off", () => {
+    const old = {
+      ...backup({}),
+      entries: {
+        id: {
+          note: "Keep",
+          stage: "Contacted",
+          noteUpdatedAt: null,
+          stageUpdatedAt: null,
+        },
+      },
+    };
+    const normalized = validateBackup(old).entries;
+    expect(normalized.id).toEqual({
+      ...emptyEntry,
+      note: "Keep",
+      stage: "Contacted",
+    });
+    expect(loadEntries({ getItem: () => JSON.stringify(old) }).entries).toEqual(
+      normalized,
+    );
+  });
+  it.each(stages)("marks and unmarks an event from %s", (stage) => {
+    const marked = applyGoing({ id: { ...entry, stage } }, ["id"], true, now);
+    expect(marked.id).toEqual({
+      ...entry,
+      stage: stage === "New" ? "Interested" : stage,
+      stageUpdatedAt: stage === "New" ? now : entry.stageUpdatedAt,
+      going: true,
+      goingUpdatedAt: now,
+    });
+    const later = "2026-11-19T05:00:00.000Z";
+    expect(applyGoing(marked, ["id"], false, later).id).toEqual({
+      ...marked.id,
+      going: false,
+      goingUpdatedAt: later,
+    });
+  });
+  it("applies a bulk edit and restores the newest Going choice independently", () => {
+    const current = {
+      paid: { ...emptyEntry, stage: "Paid / attending" as const },
+      other: entry,
+    };
+    const marked = applyGoing(current, ["new", "paid"], true, now);
+    expect(marked.new.stage).toBe("Interested");
+    expect(marked.paid.stage).toBe("Paid / attending");
+    expect(marked.other).toBe(current.other);
+    const restored = validateBackup(
+      JSON.parse(JSON.stringify(backup(marked))),
+    ).entries;
+    expect(importEntries(current, restored, "replace")).toEqual(marked);
+    expect(importEntries(current, restored, "merge")).toEqual(marked);
+    const later = applyGoing(
+      marked,
+      ["paid"],
+      false,
+      "2026-11-19T05:00:00.000Z",
+    );
+    expect(importEntries(later, restored, "merge")).toEqual(later);
   });
 });

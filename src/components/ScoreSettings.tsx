@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { RotateCcw, SlidersHorizontal, X } from "lucide-react";
+import { useState, type CSSProperties } from "react";
+import { Modal } from "./Modal";
+import { RotateCcw, SlidersHorizontal } from "lucide-react";
 import {
   DEFAULT_WEIGHTS,
   FACTOR_META,
@@ -19,59 +20,23 @@ export function ScoreSettings({
   change: (weights: Weights) => void;
   close: () => void;
 }) {
-  const ref = useRef<HTMLDialogElement>(null);
   const [draft, setDraft] = useState(weights);
-  useEffect(() => {
-    const dialog = ref.current!;
-    const trigger = document.activeElement as HTMLElement | null;
-    dialog.showModal();
-    return () => {
-      dialog.close();
-      trigger?.focus({ preventScroll: true });
-    };
-  }, []);
   const apply = (next: Weights) => {
     setDraft(next);
     change(normalizeWeights(next));
   };
   return (
-    <dialog
-      ref={ref}
-      aria-labelledby="settings-title"
-      className="score-settings"
-      onCancel={(ev) => {
-        ev.preventDefault();
-        close();
-      }}
-      onKeyDown={(ev) => {
-        if (ev.key !== "Tab") return;
-        const controls =
-          ev.currentTarget.querySelectorAll<HTMLElement>("button,input");
-        const first = controls[0],
-          last = controls[controls.length - 1];
-        if (ev.shiftKey && document.activeElement === first) {
-          ev.preventDefault();
-          last.focus();
-        }
-        if (!ev.shiftKey && document.activeElement === last) {
-          ev.preventDefault();
-          first.focus();
-        }
-      }}
-    >
-      <div className="settings-head">
-        <h2 id="settings-title">
+    <Modal
+      title={
+        <>
           <SlidersHorizontal size={21} />
           Score settings
-        </h2>
-        <button
-          className="icon-button"
-          onClick={close}
-          aria-label="Close score settings"
-        >
-          <X size={20} />
-        </button>
-      </div>
+        </>
+      }
+      titleId="settings-title"
+      closeLabel="Close score settings"
+      close={close}
+    >
       <p>
         Adjust the relative weight of each factor. Effective percentages add up
         to 100% and update your priorities immediately.
@@ -122,6 +87,6 @@ export function ScoreSettings({
           Done
         </button>
       </div>
-    </dialog>
+    </Modal>
   );
 }

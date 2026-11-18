@@ -18,7 +18,7 @@ The development and preview URLs are served at `/` (or the configured `VITE_BASE
 
 ## Features
 
-- Hero summary with live counts (events, countries, confirmed dates, open deadlines) computed from `data/events.json`; its buttons jump to the calendar and the top picks.
+- List opens directly in Rows for fast scanning. Top picks ranks up to 12 upcoming dated events by Priority and includes the tier legend and up to six vendor deadline notices.
 - Month calendar (agenda on mobile), chronological timeline, sortable cards, watchlist, recurring Singapore shows and a seven-stage Pipeline board whose cards show logo, game-coloured edge, dates, location, date status, score rarity, note indicator and a stage picker.
 - Country/game multi-select, market, size, date, status, score and multi-select pipeline filters; free-text search and removable filter chips.
 - Confirmed, estimated and TBA dates have distinct labels and styling. Estimates never become booking dates or calendar exports.
@@ -27,15 +27,19 @@ The development and preview URLs are served at `/` (or the configured `VITE_BASE
 - "Holo Vault" visual design: dark-first (default when no theme is saved; a saved light/dark choice is respected), vendor scores shown as card-rarity tiers (Common <30, Uncommon 30–49, Rare 50–64, Ultra 65–79, Secret 80+) with the numeric score always visible, per-game colour accents, foil/tilt hover effects that are disabled under `prefers-reduced-motion`. Fonts (Unbounded, Figtree, Space Mono) are self-hosted latin subsets under `src/fonts/` (SIL OFL licences included).
 - Individual or filtered ICS export, exclusive all-day end dates, UTF-8 line folding and CSV export. Filtered export includes all occurrences of matching recurring shows.
 
-Filters, theme, notes, stages and the passed-event visibility toggle are stored in this browser’s localStorage. They do not sync between devices. Exports use the complete filtered set across views; a view tab or calendar month does not further narrow the export. Use the date filters to narrow the set. Unknown scores stay visible until a positive minimum score is selected.
+Filters, theme, notes, stages and the passed-event visibility toggle are stored in this browser’s localStorage. They do not sync between devices. Filtered exports use the complete filtered set across views; a view tab or calendar month does not further narrow the export. Use the date filters to narrow the set. Unknown scores stay visible until a positive minimum score is selected.
 
-Notes and stages use the versioned `tcg-pipeline-v1` key. Refreshes never prune saved IDs absent from the dataset. The old `tcg-plans` key is retained and migrated on first load: Interested → Interested, Planning to vend → Interested, Applied → Contacted, Accepted → Need to pay, Skip → Pass. Old entries have no recorded timestamps.
+Going choices, notes and stages use the versioned `tcg-pipeline-v1` key. Refreshes never prune saved IDs absent from the dataset. The old `tcg-plans` key is retained and migrated on first load: Interested → Interested, Planning to vend → Interested, Applied → Contacted, Accepted → Need to pay, Skip → Pass. Old entries have no recorded timestamps.
 
-Use **Export backup** for a JSON backup before switching devices. Import validates version 1 and previews absent IDs before confirmation. Merge takes the newest note and stage independently for each ID, retaining local edits on timestamp ties; Replace explicitly discards entries outside the backup. Unknown JSON fields are ignored. Pass and Too expensive are hidden by default outside Pipeline; use the persisted visibility toggle to include them. Pipeline always renders every stage column and honors search and filters. Timeline can group by stage; card views can sort by stage. CSV includes stage and notes. Storage errors leave edits in memory and display a warning so they can be exported.
+Use **Export backup** for a JSON backup before switching devices. Import validates version 1 and previews absent IDs before confirmation. Merge takes the newest Going choice, note and stage independently for each ID, retaining local edits on timestamp ties; Replace explicitly discards entries outside the backup. Unknown JSON fields are ignored. Pass and Too expensive are hidden by default outside Pipeline; use the persisted visibility toggle to include them. Pipeline always renders every stage column and honors search and filters. Timeline can group by stage; card views can sort by stage. CSV includes stage and notes. Storage errors leave edits in memory and display a warning so they can be exported.
 
 ## Views
 
-The List opens in **Grid**. Switch to **Rows** to compare dates, locations, stages, notes, sources and both scores in one table. Rows starts with the highest Priority score first. Select a column heading to sort, then select it again to reverse direction. On a phone, the sort menu and direction button sit above the two-line rows. With an event name focused, use ↑/↓ to move, Home/End to jump and Enter or Space to open its details. The browser remembers the layout in `tcg-list-view` and the column and direction in `tcg-rows-sort`.
+The List opens in **Rows** on a first visit. Switch to **Grid** for logo cards. Rows compares dates, locations, stages, notes, sources and both scores in one table. Rows starts with the highest Priority score first. Select a column heading to sort, then select it again to reverse direction. On a phone, the sort menu and direction button sit beside the layout controls. With an event name focused, use ↑/↓ to move, Home/End to jump and Enter or Space to open its details. The browser remembers the layout in `tcg-list-view` and the column and direction in `tcg-rows-sort`.
+
+**Going** marks events you plan to attend. Marking a New event moves its pipeline stage to Interested. All other stages stay as set, and removing Going keeps the current stage. Use the Going count in the toolbar to filter views, or sort Rows by Going to see marked events first. In Rows, **Select** enables bulk editing. Tap rows, Shift-click a range, or select all visible results, then mark or unmark Going.
+
+**Tools** contains score weights, passed-event visibility, backups and exports. Filtered CSV and calendar exports use the current filters. Going-only exports include every marked event in the dataset, across filters. Both calendar exports include only confirmed dates and all published recurring occurrences. Version-1 backups created before Going import with Going off. Merging one preserves newer local Going choices.
 
 **New finds** filters to scraper discoveries. Cards show the source, and event details include the discovery date, extraction confidence, relevance and a link to the listing when available. Check the organiser page before applying. Dated discoveries appear in their calendar month and on the timeline. Undated discoveries join the watchlist. Each discovery uses its stable ID for notes and pipeline stages. The new-finds toggle and minimum Priority tier are saved with the other filters in `tcg-filters`.
 
@@ -63,7 +67,7 @@ Effective weights are saved in `tcg-priority-weights` and event-ID overrides in 
 
 ## Refresh data
 
-Read [the data guide](data/DATA_README.md) before editing. Replace `data/events.json` with the refreshed array, preserving the documented schema and stable event IDs (notes and stages use IDs). Copy the matching WebP logos into `public/logos/`; event paths should remain relative, e.g. `logos/mtg.webp`. Assets resolve against Vite’s deployment base. Null logos receive an initials placeholder.
+Read [the data guide](data/DATA_README.md) before editing. Replace `data/events.json` with the refreshed array, preserving the documented schema and stable event IDs (notes and stages use IDs). Copy the matching WebP logos into `public/logos/`; event paths should remain relative, e.g. `logos/mtg.webp`. Assets resolve against Vite’s deployment base. Null logos receive an initials placeholder. Country flags are self-hosted Twemoji graphics by Twitter, Inc. and other contributors, licensed under CC BY 4.0. [Flag attribution and licence](public/flags/LICENSE.txt)
 
 Update the visible “Data last updated” note in `src/App.tsx` when refreshing. Run `npm test` and `npm run build` after changes. The app reads the JSON at build time; redeploy to publish new data. No live scraping occurs.
 

@@ -8,6 +8,8 @@ import {
   normalizeRowSort,
   rowDateLabel,
   sortRows,
+  selectRange,
+  selectAllVisible,
   type RowKey,
 } from "./rows";
 import { emptyEntry } from "./storage";
@@ -24,6 +26,7 @@ const entries = {
   a: {
     ...emptyEntry,
     stage: "Paid / attending" as const,
+    going: true,
     note: "Ask about booth",
   },
   b: { ...emptyEntry, stage: "Interested" as const, note: "  " },
@@ -32,6 +35,7 @@ const scores = { a: { score: 0 }, b: { score: 95 }, c: { score: 83 } };
 const events = [a, b, c];
 describe("row ordering", () => {
   it.each<[RowKey, string, string]>([
+    ["going", "bca", "abc"],
     ["name", "bca", "abc"],
     ["dates", "abc", "bac"],
     ["city", "bca", "acb"],
@@ -91,9 +95,11 @@ describe("row ordering", () => {
   });
 });
 describe("saved row preferences", () => {
-  it("defaults to grid with independent highest-priority row ordering", () => {
-    for (const value of [null, {}, "other", "grid"])
-      expect(normalizeListView(value)).toBe("grid");
+  it("defaults to rows with independent highest-priority row ordering", () => {
+    for (const value of [null, {}, "other"])
+      expect(normalizeListView(value)).toBe("rows");
+    expect(normalizeListView("grid")).toBe("grid");
+    expect(nextRowSort(defaultRowSort, "going").direction).toBe("desc");
     expect(normalizeListView("rows")).toBe("rows");
     for (const value of [
       null,
@@ -110,4 +116,16 @@ describe("saved row preferences", () => {
     expect(nextRowSort(defaultRowSort, "scanner").direction).toBe("desc");
     expect(nextRowSort(defaultRowSort, "name").direction).toBe("asc");
   });
+});
+
+it("selects visible IDs and toggles ranges in the current sort order", () => {
+  const ids = ["d", "c", "a", "b"];
+  expect([...selectAllVisible(ids, true)]).toEqual(ids);
+  expect(selectAllVisible(ids, false).size).toBe(0);
+  const first = selectRange(ids, new Set(["hidden"]), "c", null);
+  expect([...first]).toEqual(["c"]);
+  const range = selectRange(ids, first, "b", "c");
+  expect([...range]).toEqual(["c", "a", "b"]);
+  expect([...selectRange(ids, range, "c", "b")]).toEqual([]);
+  expect([...selectRange(ids, first, "b", "hidden")]).toEqual(["c", "b"]);
 });

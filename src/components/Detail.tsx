@@ -1,3 +1,4 @@
+import { GoingButton, type SetGoing } from "./GoingButton";
 import { PriorityDetail } from "./PriorityDetail";
 import { FindDetails } from "./FindSource";
 import type { ScoreResult } from "../scoring";
@@ -9,7 +10,6 @@ import {
   CheckCircle2,
   Instagram,
   LoaderCircle,
-  MapPin,
   X,
   Download,
 } from "lucide-react";
@@ -25,13 +25,14 @@ import {
   primaryGameKey,
   rarity,
 } from "../utils";
-import { Logo, Status, CountryFlag, ScoreGem } from "./EventIdentity";
+import { Logo, Status, Place, ScoreGem } from "./EventIdentity";
 import { StageBadge, StagePicker } from "./Pipeline";
 import type { Entry, Stage } from "../storage";
 export function Detail({
   e,
   close,
   entry,
+  setGoing,
   onStage,
   onNote,
   saved,
@@ -42,6 +43,7 @@ export function Detail({
   e: Event;
   close: () => void;
   entry: Entry;
+  setGoing: SetGoing;
   onStage: (s: Stage) => void;
   onNote: (s: string) => void;
   saved: boolean;
@@ -182,7 +184,7 @@ export function Detail({
           </button>
         </div>
         <div className="detail-body">
-          <Logo e={e} />
+          <Logo e={e} size="detail" />
           <div className="detail-badges">
             <Status e={e} />
             {e.priority_market && (
@@ -193,6 +195,7 @@ export function Detail({
             )}
           </div>
           <h2 id="detail-title">{e.name}</h2>
+          <GoingButton e={e} going={entry.going} setGoing={setGoing} />
           <p className="detail-date">
             <CalendarDays size={18} />
             {dateLabel(e)}
@@ -205,8 +208,7 @@ export function Detail({
             </p>
           )}
           <p>
-            <MapPin size={16} /> <CountryFlag code={e.country_code} />{" "}
-            {[e.city, e.country].filter(Boolean).join(", ") || "Location TBA"}
+            <Place e={e} />
           </p>
           <FindDetails e={e} />
           <PriorityDetail

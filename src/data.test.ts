@@ -1,5 +1,5 @@
 import finds from "../tests/fixtures/new-finds.json";
-import { ics, matches } from "./utils";
+import { flagFile, ics, matches } from "./utils";
 import { describe, expect, it } from "vitest";
 import { existsSync } from "node:fs";
 import raw from "../data/events.json";
@@ -9,6 +9,15 @@ import { normalizeFilters } from "./hooks/useFilters";
 import { emptyFilters } from "./model";
 
 describe("source data integrity", () => {
+  it.each([...new Set(raw.map((e) => e.country_code).filter(Boolean))])(
+    "ships a flag for %s",
+    (code) => {
+      expect(
+        existsSync(`public/flags/${flagFile(code)}`),
+        `Missing flag for ${code}`,
+      ).toBe(true);
+    },
+  );
   it("has a valid source snapshot date and unique nonempty identities", () => {
     expect(validDate(meta.updatedAt)).toBe(true);
     expect(new Set(raw.map((e) => e.id)).size).toBe(raw.length);
@@ -57,7 +66,9 @@ describe("source data integrity", () => {
     },
   );
   it("exports the current live snapshot date in calendar downloads", () => {
-    const dated = normalizeEvents(raw).filter((e) => e.date_status === "confirmed");
+    const dated = normalizeEvents(raw).filter(
+      (e) => e.date_status === "confirmed",
+    );
     expect(ics(dated)).toContain(
       `LAST-MODIFIED:${meta.updatedAt.replaceAll("-", "")}T000000Z`,
     );
@@ -184,4 +195,10 @@ describe("scanner discoveries and priority filters", () => {
       normalizeEvents([{ ...finds[2], source: null }])[0].is_new_find,
     ).toBe(true);
   });
+});
+
+it("restores only a boolean Going filter", () => {
+  expect(normalizeFilters({ going: true }).going).toBe(true);
+  for (const going of [undefined, false, "true", 1])
+    expect(normalizeFilters({ going }).going).toBe(false);
 });

@@ -60,6 +60,7 @@ export function ranges(e: Event) {
 const normalizeSearch = (s: string) =>
   s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 export function matches(e: Event, f: Filters, p: Entries, priorityScore = 0) {
+  if (f.going && !p[e.id]?.going) return false;
   if (f.newOnly && !e.is_new_find) return false;
   if (f.minTier !== "any" && priorityScore < TIER_THRESHOLDS[f.minTier])
     return false;
@@ -147,26 +148,24 @@ export function dateLabel(e: Event) {
       : "")
   );
 }
-/** Regional-indicator emoji (kept for tests/exports); the UI uses flagFile() images instead. */
-export function flag(code: string | null) {
-  return code && /^[A-Z]{2}$/.test(code)
-    ? String.fromCodePoint(...[...code].map((c) => 127397 + c.charCodeAt(0)))
-    : "◎";
-}
 /** Twemoji file name for a country code, e.g. "SG" -> "1f1f8-1f1ec.svg". */
 export function flagFile(code: string | null) {
   if (!code || !/^[A-Z]{2}$/.test(code)) return null;
-  return [...code].map((c) => (127397 + c.charCodeAt(0)).toString(16)).join("-") + ".svg";
+  return (
+    [...code].map((c) => (127397 + c.charCodeAt(0)).toString(16)).join("-") +
+    ".svg"
+  );
 }
 /** Place text without the country code: "Wan Chai, Hong Kong" / "Singapore" / "Location TBA". */
 export function placeLabel(
   e: { city: string | null; country: string | null },
   countryOnly = false,
 ) {
-  if (countryOnly) return e.country || e.city || "Location TBA";
-  if (e.city && e.country && e.city.toLowerCase() !== e.country.toLowerCase())
+  if (!e.country) return "Location TBA";
+  if (countryOnly) return e.country;
+  if (e.city && e.city.toLowerCase() !== e.country.toLowerCase())
     return `${e.city}, ${e.country}`;
-  return e.country || e.city || "Location TBA";
+  return e.country;
 }
 export function deadlineDate(s: string | null) {
   if (!s) return null;
@@ -247,8 +246,14 @@ export function foldLine(s: string) {
   }
   return lines + part;
 }
+export function goingEvents(events: Event[], entries: Entries) {
+  return events.filter((e) => entries[e.id]?.going);
+}
+export function hasConfirmedDates(e: Event) {
+  return e.date_status === "confirmed" && ranges(e).length > 0;
+}
 export function ics(events: Event[]) {
-  if (!events.some((e) => e.date_status === "confirmed" && ranges(e).length))
+  if (!events.some(hasConfirmedDates))
     throw new Error("No confirmed dates to export.");
   const lines = [
     "BEGIN:VCALENDAR",

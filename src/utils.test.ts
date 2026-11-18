@@ -12,6 +12,9 @@ import {
   upcoming,
   timelineGroups,
   ics,
+  placeLabel,
+  flagFile,
+  goingEvents,
   csv,
   foldLine,
   matches,
@@ -107,6 +110,7 @@ describe("filter semantics", () => {
     expect(
       matches(event, f, {
         [event.id]: {
+          ...emptyEntry,
           stage: "Contacted",
           note: "",
           noteUpdatedAt: null,
@@ -120,6 +124,7 @@ describe("filter semantics", () => {
         { ...f, score: 99 },
         {
           [event.id]: {
+            ...emptyEntry,
             stage: "Contacted",
             note: "",
             noteUpdatedAt: null,
@@ -144,6 +149,7 @@ describe("pipeline CSV export", () => {
     const note = 'Quoted "USD 250"\nFollow up';
     const result = csv([event], {
       [event.id]: {
+        ...emptyEntry,
         stage: "Too expensive",
         note,
         noteUpdatedAt: null,
@@ -341,4 +347,39 @@ describe("rarity tiers and game accents", () => {
     expect(gameKeyOf("sports cards")).toBe("other");
     expect(primaryGameKey({ ...event, games: ["Toys"] })).toBe("other");
   });
+});
+
+it("labels places and selects local flag assets", () => {
+  expect(flagFile("SG")).toBe("1f1f8-1f1ec.svg");
+  expect(flagFile("HK")).toBe("1f1ed-1f1f0.svg");
+  for (const code of [null, "", "sg", "123", "../SG"])
+    expect(flagFile(code)).toBeNull();
+  const hk = { city: "Wan Chai", country: "Hong Kong" };
+  expect(placeLabel(hk)).toBe("Wan Chai, Hong Kong");
+  expect(placeLabel(hk, true)).toBe("Hong Kong");
+  expect(placeLabel({ city: "singapore", country: "Singapore" })).toBe(
+    "Singapore",
+  );
+  expect(placeLabel({ city: "Unknown", country: null })).toBe("Location TBA");
+});
+
+it("filters to Going and exports only its confirmed occurrences", () => {
+  const recurring = raw.find((e) => e.section === "recurring_sg") as Event;
+  const tba = { ...event, id: "undated", date_status: "tba" as const };
+  const entries = Object.fromEntries(
+    [recurring, tba].map((e) => [e.id, { ...emptyEntry, going: true }]),
+  );
+  const events = [recurring, tba, event];
+  const going = goingEvents(events, entries);
+  expect(going).toEqual([recurring, tba]);
+  expect(
+    events.filter((e) => matches(e, { ...emptyFilters, going: true }, entries)),
+  ).toEqual(going);
+  const calendar = ics(going);
+  for (const r of ranges(recurring))
+    expect(calendar).toContain(`UID:${recurring.id}-${r.start_date}`);
+  expect(calendar.match(/BEGIN:VEVENT/g)).toHaveLength(
+    ranges(recurring).length,
+  );
+  expect(() => ics(goingEvents([event, tba], entries))).toThrow("No confirmed");
 });

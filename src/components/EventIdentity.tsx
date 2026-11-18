@@ -15,7 +15,7 @@ export function Logo({ e, size = "md" }: { e: Event; size?: LogoSize }) {
       height={96}
     />
   ) : (
-    <span className={cls + " initials"}>
+    <span className={cls + " initials"} aria-hidden="true">
       {e.name
         .split(" ")
         .slice(0, 2)
@@ -40,7 +40,7 @@ export function Status({ e }: { e: Event }) {
  * Flag as a self-hosted Twemoji SVG. Windows has no flag emoji font (Chrome
  * there shows the letters "SG"), so the image is used on every platform.
  */
-export function CountryFlag({ code }: { code: string | null }) {
+function CountryFlag({ code }: { code: string | null }) {
   const file = flagFile(code);
   return file ? (
     <img
@@ -63,14 +63,30 @@ export function CountryFlag({ code }: { code: string | null }) {
 export function Place({
   e,
   countryOnly = false,
+  stacked = false,
 }: {
   e: Pick<Event, "city" | "country" | "country_code">;
   countryOnly?: boolean;
+  stacked?: boolean;
 }) {
+  const label = placeLabel(e, countryOnly);
+  const split = stacked && e.country && e.city && label !== e.country;
   return (
     <span className="place">
-      <CountryFlag code={e.country_code} />
-      <span>{placeLabel(e, countryOnly)}</span>
+      <CountryFlag code={e.country ? e.country_code : null} />
+      <span>
+        {split ? (
+          <>
+            {e.city}
+            <small>
+              <span className="place-comma">, </span>
+              {e.country}
+            </small>
+          </>
+        ) : (
+          label
+        )}
+      </span>
     </span>
   );
 }

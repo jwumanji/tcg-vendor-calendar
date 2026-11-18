@@ -2996,6 +2996,13 @@ input[type="range"]::-moz-range-thumb {
   white-space: nowrap;
 }
 .priority-chip b { font: 700 15px/1 var(--font-mono); }
+.priority-chip .chip-label {
+  font: 700 9px/1 var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85; margin-right: -1px;
+}
+.score-summary .priority-chip .chip-label { font-size: 11px; }
+@media (max-width: 420px) {
+  .priority-chip .chip-label { font-size: 8px; letter-spacing: 0.04em; }
+}
 .priority-must { background: var(--foil); color: #17102a; border-color: transparent; }
 .priority-strong { background: #ddc6ff; color: #321d59; border-color: #a182cb; }
 .priority-maybe, .priority-skip { background: #e0dfe4; color: #393840; border-color: #b9b7c1; }

@@ -3,7 +3,7 @@ import { TIER_LABELS, type ScoreResult } from "../scoring";
 
 export function PriorityChip({ result }: { result: ScoreResult }) {
   const label = TIER_LABELS[result.tier];
-  const description = `Priority ${result.score} of 100, ${label}, ${result.confidence} confidence${result.overridden ? ", manually overridden" : ""}`;
+  const description = `Score ${result.score} of 100, ${label}, ${result.confidence} confidence${result.overridden ? ", manually overridden" : ""}`;
   return (
     <span
       role="img"
@@ -12,6 +12,7 @@ export function PriorityChip({ result }: { result: ScoreResult }) {
       className={`priority-chip priority-${result.tier}`}
       data-confidence={result.confidence}
     >
+      <span className="chip-label">Score</span>
       <b>
         {result.confidence === "low" && "~"}
         {result.score}

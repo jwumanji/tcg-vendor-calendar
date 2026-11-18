@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 import {
   mkdtempSync,
   mkdirSync,
+  existsSync,
   readFileSync,
   writeFileSync,
   rmSync,
@@ -19,7 +20,7 @@ it("imports raw Scanner records, refreshes logos, fails soft, and performs read-
   try {
     for (const sub of ["data", "public/logos", "scanner", "export/logos"])
       mkdirSync(join(dir, sub), { recursive: true });
-    const put = (path: string, s: string) => writeFileSync(join(dir, path), s);
+    const put = (path: string, s: string | Buffer) => writeFileSync(join(dir, path), s);
     const read = (path: string) => readFileSync(join(dir, path), "utf8");
     const original = JSON.parse(readFileSync("data/events.json", "utf8")).find(
       (e: Event) => !e.source,
@@ -28,15 +29,17 @@ it("imports raw Scanner records, refreshes logos, fails soft, and performs read-
       ...original,
       name: "Test Scanner import",
       id: "scanned-record",
+      logo: "logos/change.webp",
     };
     put("data/events.json", JSON.stringify([original]));
     put("data/meta.json", '{"updatedAt":"2020-01-01"}');
     put("export/events.json", JSON.stringify([imported]));
-    put("export/logos/same.webp", "same");
-    put("public/logos/same.webp", "same");
-    put("export/logos/change.webp", "changed");
+    const webp = readFileSync("public/logos/mtg.webp");
+    const preview = readFileSync("public/logos/afa.webp");
+    put("export/logos/change.webp", webp);
     put("public/logos/change.webp", "old");
-    put("export/logos/new.webp", "new");
+    put("export/logos/unreferenced.svg", "<svg/>");
+    put("export/logos/unreferenced.webp", webp);
     // Exercise the real executable without depending on public hosts or the current season.
     const date = localDay(new Date());
     const markup = `<article class="eventlist-event--upcoming"><h1 class="eventlist-title"><a class="eventlist-title-link" href="/show">Test Card Show</a></h1><time class="event-date" datetime="${date}"></time></article>`;
@@ -70,18 +73,33 @@ it("imports raw Scanner records, refreshes logos, fails soft, and performs read-
       imported,
     ]);
     expect(JSON.parse(read("data/meta.json")).updatedAt).toBe(date);
-    expect(read("public/logos/change.webp")).toBe("changed");
-    expect(read("public/logos/new.webp")).toBe("new");
+    expect(readFileSync(join(dir, "public/logos/change.webp"))).toEqual(webp);
+    for (const ext of ["svg", "webp"])
+      expect(existsSync(join(dir, "public/logos/unreferenced." + ext))).toBe(false);
     const summary = read("scanner/last-run.json");
-    put("export/logos/change.webp", "preview only");
+    put("export/logos/change.webp", preview);
     expect(run([...args, "--dry-run"]).status).toBe(0);
-    expect(read("public/logos/change.webp")).toBe("changed");
+    expect(readFileSync(join(dir, "public/logos/change.webp"))).toEqual(webp);
     expect(read("scanner/last-run.json")).toBe(summary);
     expect(run([]).status).toBe(0);
     expect(read("data/events.json")).toBe(snapshot);
     expect(run(args, true).status).toBe(1);
     expect(read("data/events.json")).toBe(snapshot);
-    expect(read("public/logos/change.webp")).toBe("changed");
+    expect(readFileSync(join(dir, "public/logos/change.webp"))).toEqual(webp);
+    put("export/events.json", "[]");
+    const empty = run(args);
+    expect(empty.stderr).toContain("Empty Scanner export");
+    expect(read("data/events.json")).toBe(snapshot);
+    put("export/events.json", JSON.stringify([{ ...imported, logo: "logos/unreferenced.svg" }]));
+    expect(run(args).stderr).toContain("Invalid Scanner logo");
+    put("export/events.json", JSON.stringify([imported]));
+    put("export/logos/change.webp", "<svg/>");
+    expect(run(args).stderr).toContain("Invalid WebP");
+    const broken = Buffer.from(webp);
+    broken.fill(0, 12);
+    put("export/logos/change.webp", broken);
+    expect(run(args).status).toBe(1);
+    expect(readFileSync(join(dir, "public/logos/change.webp"))).toEqual(webp);
     put("export/events.json", '[{"id":""}]');
     expect(run(args).status).toBe(1);
     expect(read("data/events.json")).toBe(snapshot);

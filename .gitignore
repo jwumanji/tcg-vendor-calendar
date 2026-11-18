@@ -3,3 +3,6 @@ dist/
 *.local
 
 *.tsbuildinfo
+
+/.vercel-deployed-sha
+/.vercel-deployed-sha.tmp

@@ -36,6 +36,7 @@ export type RawFind = Partial<
 };
 
 export interface Context {
+  warn(message: string): void;
   get(url: string): Promise<string>;
 }
 export interface Source {

@@ -49,7 +49,7 @@ const keys = Object.keys(DEFAULT_WEIGHTS) as FactorKey[];
 const clamp = (n: number, max = 1) => Math.min(max, Math.max(0, n));
 const finite = (v: unknown): v is number =>
   typeof v === "number" && Number.isFinite(v);
-const count = (v: unknown): v is number => finite(v) && v >= 0;
+const count = (v: unknown): v is number => finite(v) && Number.isSafeInteger(v) && v >= 0;
 
 export function normalizeWeights(input?: unknown): Weights {
   const raw = { ...DEFAULT_WEIGHTS } as Weights;
@@ -425,8 +425,16 @@ export function parseBoothCost(text?: string | null) {
     const code = match[1].toUpperCase().replace(".", "");
     const currency = aliases[code] ?? code;
     const amount = Number(match[2].replaceAll(",", ""));
-    if (finite(amount))
-      return { amount, currency, approxUsd: amount * fx[currency], note: text };
+    if (finite(amount)) {
+      // Scope years to the selected price, excluding separate alternatives
+      // and statements about an edition whose rates have yet to be published.
+      const prefix = text.slice(0, match.index).split(/[;.]/).at(-1) ?? "";
+      const suffix = after.split(/[;.]/)[0];
+      const year = suffix.match(/^\s*\((20\d\d)\)|^.{0,40}?\b(?:was (?:the )?|for )(20\d\d)\b/i)
+        ?? prefix.match(/\b(20\d\d)\b(?!.*\b20\d\d\b)(?![^:]*not published)/i);
+      const quoteYear = year ? Number(year[1] ?? year[2]) : null;
+      return { amount, currency, approxUsd: amount * fx[currency], note: text, quoteYear };
+    }
   }
   return null;
 }
@@ -469,7 +477,11 @@ function commercial(e: Event): Evidence {
   if (booth && e.vendor_booths) signals.push(e.vendor_booths);
   if (app && booth >= 0) signals.push(e.vendor_application!);
   value += booth < 0 ? -0.35 : booth * 0.06 + (app ? 0.04 : 0);
-  if (priced && !/unverified|not verified|agent price/i.test(cost.note))
+  const editionYear = Number((e.start_date ?? e.estimated_month)?.slice(0, 4)
+    ?? e.name.match(/\b(20\d\d)\b/)?.[1]);
+  const historical = cost && ((cost.quoteYear !== null && cost.quoteYear < editionYear) ||
+    /\b(?:prior|past|previous|last)[ -](?:edition|year)|historical rate/i.test(cost.note));
+  if (priced && !historical && !/unverified|not verified|unconfirmed|not (?:a )?confirmed|agent price/i.test(cost.note))
     return real(
       value,
       signals,
@@ -479,7 +491,9 @@ function commercial(e: Event): Evidence {
     return estimated(
       value,
       signals,
-      priced
+      historical
+        ? `Estimated from a prior-edition price${cost.quoteYear ? " quoted for " + cost.quoteYear : ""}.`
+        : priced
         ? "Price relies on an unverified quote."
         : "Cost per attendee unavailable. Estimated from a 0.5 baseline.",
     );
@@ -508,12 +522,12 @@ const months = [
   "nov",
   "dec",
 ];
-function deadline(text: string | null) {
+function deadlineInClause(text: string) {
   // The export also contains booking opening dates, past-edition examples
   // and player lottery deadlines. Only interpret a vendor closing date.
   if (
     !text ||
-    /player|lottery|not published|\bopen(?:s|ed|ing)?\b|past edition/i.test(
+    /artist[ -]alley|art(?:ist)? booths?|player|lottery|not published|\bopen(?:s|ed|ing)?\b|past edition/i.test(
       text,
     )
   )
@@ -526,6 +540,15 @@ function deadline(text: string | null) {
   return day(
     `${d[3]}-${String(month).padStart(2, "0")}-${d[1].padStart(2, "0")}`,
   );
+}
+function deadline(text: string | null) {
+  // A single field can describe separate applicant categories, including an
+  // expired Artist Alley and a still-open commercial exhibitor application.
+  for (const clause of (text ?? "").split(/(?:[;.\n]|,|\band\b)\s*(?=(?:commercial|vendor|exhibitor|artist|player|lottery)|$)|[;.\n]/i)) {
+    const date = deadlineInClause(clause);
+    if (date !== null) return { date, clause: clause.trim() };
+  }
+  return null;
 }
 const travelCities: Record<string, string> = {
   singapore: "SG",
@@ -571,7 +594,7 @@ function logistics(e: Event, today: number | null): Evidence {
   }
   const due = deadline(e.vendor_deadline);
   if (due !== null && today !== null) {
-    const days = due - today;
+    const days = due.date - today;
     const v =
       days < 0
         ? 0.1
@@ -583,7 +606,7 @@ function logistics(e: Event, today: number | null): Evidence {
     parts.push({
       v,
       w: 2,
-      signal: `${e.vendor_deadline} (${Math.abs(days)} days ${days < 0 ? "past" : "left"})`,
+      signal: `${due.clause} (${Math.abs(days)} days ${days < 0 ? "past" : "left"})`,
     });
   }
   if (!parts.length)

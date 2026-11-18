@@ -1,11 +1,45 @@
 import robotsParser from "robots-parser";
 import { setTimeout as pause } from "node:timers/promises";
 
+import { isIP } from "node:net";
+import { dispatcher } from "./network.ts";
+
 export const userAgent =
   "Mozilla/5.0 (compatible; GrailfoxEventScanner/1.0; +https://www.grailfoxtcg.com)";
 const agent = "GrailfoxEventScanner";
 
-export function createClient(fetchPage = fetch, interval = 1000) {
+const maxBytes = 8 * 1024 * 1024;
+class ResponseTooLarge extends Error {}
+
+async function readBody(res: Response) {
+  if (!res.ok || Number(res.headers.get("content-length")) > maxBytes) {
+    await res.body?.cancel();
+    if (res.ok) throw new ResponseTooLarge("Response exceeds scanner byte limit");
+    return "";
+  }
+  if (!res.body) return "";
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let bytes = 0;
+  let text = "";
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) return text + decoder.decode();
+      bytes += value.byteLength;
+      if (bytes > maxBytes) {
+        await reader.cancel();
+        throw new ResponseTooLarge("Response exceeds scanner byte limit");
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+export function createClient(sourceUrls: readonly string[], fetchPage = fetch, interval = 1000) {
+  const origins = new Set(sourceUrls.map((s) => new URL(s).origin));
   const queues = new Map<string, Promise<void>>();
   const next = new Map<string, number>();
   const delays = new Map<string, number>();
@@ -20,7 +54,8 @@ export function createClient(fetchPage = fetch, interval = 1000) {
       });
       const deadline = AbortSignal.any([signal, AbortSignal.timeout(15_000)]);
       try {
-        const res = await fetchPage(url, {
+        const options = {
+          dispatcher,
           redirect: "manual",
           signal: deadline,
           cache: "no-store",
@@ -29,11 +64,12 @@ export function createClient(fetchPage = fetch, interval = 1000) {
             "Cache-Control": "no-cache",
             Pragma: "no-cache",
           },
-        });
+        } satisfies RequestInit & { dispatcher: typeof dispatcher };
+        const res = await fetchPage(url, options);
         return {
           status: res.status,
           headers: res.headers,
-          body: await res.text(),
+          body: await readBody(res),
         };
       } finally {
         next.set(host, Date.now() + (delays.get(host) ?? interval));
@@ -57,9 +93,11 @@ export function createClient(fetchPage = fetch, interval = 1000) {
     if (
       !["http:", "https:"].includes(url.protocol) ||
       url.username ||
-      url.password
+      url.password ||
+      isIP(url.hostname.replace(/^\[|\]$/g, "")) ||
+      !origins.has(url.origin)
     )
-      throw Error("Invalid public URL");
+      throw Error("Origin not allowed for this source");
     if (!robots) {
       let policy = policies.get(url.origin);
       if (!policy) {
@@ -86,7 +124,7 @@ export function createClient(fetchPage = fetch, interval = 1000) {
       try {
         response = await request(url, signal);
       } catch (err) {
-        if (!attempt && !signal.aborted) continue;
+        if (!attempt && !signal.aborted && !(err instanceof ResponseTooLarge)) continue;
         throw err;
       }
       const { status, headers, body } = response;

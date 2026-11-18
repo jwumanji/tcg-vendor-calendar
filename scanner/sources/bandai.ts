@@ -74,7 +74,13 @@ export default {
     const finds = parse(await ctx.get(url));
     // The Singapore detail page publishes a single English venue for this stop.
     const sg = finds.find((f) => f.code === "SG");
-    if (sg?.website) Object.assign(sg, parseDetail(await ctx.get(sg.website)));
+    if (sg?.website) {
+      try {
+        Object.assign(sg, parseDetail(await ctx.get(sg.website)));
+      } catch (error) {
+        ctx.warn(`Singapore detail: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
     return finds;
   },
 } satisfies Source;

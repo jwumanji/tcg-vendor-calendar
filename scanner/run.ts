@@ -2,16 +2,20 @@ import {
   readFile,
   writeFile,
   rename,
-  readdir,
+  open,
   mkdir,
   rm,
 } from "node:fs/promises";
+import sharp from "sharp";
+import { constants } from "node:fs";
+import { scheduleNotice } from "./listing.ts";
+import type { Source } from "./types.ts";
 import { dirname, join, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { parseArgs } from "node:util";
 import { normalizeEvents, validDate } from "../src/data.ts";
 import type { Event } from "../src/model.ts";
-import { localDay, horizon } from "./dates.ts";
+import { localDay, horizon, parseDates } from "./dates.ts";
 import { createClient } from "./http.ts";
 import { normalize } from "./normalize.ts";
 import { relevance } from "./relevance.ts";
@@ -56,17 +60,29 @@ export function validate(value: unknown): asserts value is Event[] {
       throw Error(`Invalid event output: ${row.id}`);
   }
 }
-async function logoChanges(path: string) {
-  const from = join(dirname(resolve(path)), "logos");
+async function logoChanges(path: string, events: Event[]) {
+  const from = dirname(resolve(path));
   const changed = [];
-  for (const entry of await readdir(from, { withFileTypes: true })) {
-    if (
-      !entry.isFile() ||
-      !/^[\w.-]+\.(webp|png|jpe?g|gif|svg)$/i.test(entry.name)
-    )
-      continue;
-    const bytes = await readFile(join(from, entry.name));
-    const dest = join("public/logos", entry.name);
+  for (const logo of new Set(events.map((e) => e.logo))) {
+    if (!logo) continue;
+    if (!/^logos\/[\w.-]+\.webp$/i.test(logo))
+      throw Error(`Invalid Scanner logo: ${logo}; expected logos/<filename>.webp`);
+    const file = await open(join(from, logo), constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+    let bytes: Buffer;
+    try {
+      const stat = await file.stat();
+      if (!stat.isFile() || stat.size > 8 * 1024 * 1024) throw Error(`Invalid logo file: ${logo}`);
+      bytes = await file.readFile();
+    } finally {
+      await file.close();
+    }
+    if (bytes.toString("ascii", 0, 4) !== "RIFF" || bytes.toString("ascii", 8, 12) !== "WEBP" ||
+        bytes.readUInt32LE(4) !== bytes.length - 8) throw Error(`Invalid WebP: ${logo}`);
+    // Decode every referenced raster before any writes. Keep valid originals
+    // byte-identical so an unchanged Scanner export does not churn the logos.
+    const raster = sharp(bytes, { animated: true, limitInputPixels: 16_000_000, failOn: "warning" });
+    await raster.raw().toBuffer();
+    const dest = join("public", logo);
     const prev = await readFile(dest).catch((e: NodeJS.ErrnoException) => {
       if (e.code !== "ENOENT") throw e;
       return null;
@@ -75,6 +91,66 @@ async function logoChanges(path: string) {
   }
   return changed;
 }
+function reason(error: unknown): string {
+  if (!(error instanceof Error)) return String(error);
+  return error.cause instanceof Error ? `${error.message}: ${error.cause.message}` : error.message;
+}
+
+export async function scanSource(source: Source, get: (url: string) => Promise<string>, now: Date) {
+  const today = localDay(now), until = horizon(today);
+  const stats = {
+    source: source.id, fetched: 0, relevant: 0, new: 0, already_known: 0,
+    dropped_as_junk: 0, outside_window: 0, status: "OK", reason: "",
+  };
+  const warnings: string[] = [];
+  const events: Event[] = [], notices: Event[] = [];
+  try {
+    const raw = await source.run({ get, warn: (message) => warnings.push(message) });
+    stats.fetched = raw.length;
+    let invalid = 0;
+    for (const find of raw) {
+      try {
+        const notice = scheduleNotice(find.name, find.date);
+        if (notice) {
+          const e = normalize({ ...find, name: notice.name, date: find.date, date_status: "tba" }, source, now.toISOString());
+          // A notice that still carries its original dates can disambiguate
+          // occurrences sharing a listing. The persisted row is always undated.
+          const dates = parseDates(find.date);
+          e.start_date = dates?.start ?? null;
+          e.end_date = dates?.end ?? null;
+          e.date_note = notice.note;
+          notices.push(e);
+          continue;
+        }
+        if (relevance(find.name, find.evidence) < 0.5) {
+          stats.dropped_as_junk++;
+          continue;
+        }
+        const e = normalize(find, source, now.toISOString());
+        const month = e.estimated_month;
+        if ((e.end_date && e.end_date < today) || (e.start_date && e.start_date > until) ||
+            (month && (month < today.slice(0, 7) || month > until.slice(0, 7)))) {
+          stats.outside_window++;
+          continue;
+        }
+        stats.relevant++;
+        events.push(e);
+      } catch (error) {
+        invalid++;
+        warnings.push(reason(error));
+      }
+    }
+    if (warnings.length) {
+      stats.status = invalid > 0 && invalid === raw.length ? "FAILED" : "PARTIAL";
+      stats.reason = warnings.join(" | ");
+    }
+  } catch (error) {
+    stats.status = "FAILED";
+    stats.reason = reason(error);
+  }
+  return { stats, events, notices };
+}
+
 async function main() {
   const { values } = parseArgs({
     options: {
@@ -93,57 +169,19 @@ async function main() {
     validate(input);
     if (input.some((e) => e.source))
       throw Error("Scanner export contains scraper-owned events");
+    if (!input.length && existing.some((e) => !e.source))
+      throw Error("Empty Scanner export would replace a nonempty Scanner snapshot");
     imported = input;
   }
-  const logos = path ? await logoChanges(path) : [];
+  const logos = path && imported ? await logoChanges(path, imported) : [];
   const now = new Date(),
     today = localDay(now),
     until = horizon(today);
-  const get = createClient();
-  const results = await Promise.all(
-    sources.map(async (source) => {
-      const stats = {
-        source: source.id,
-        fetched: 0,
-        relevant: 0,
-        new: 0,
-        already_known: 0,
-        dropped_as_junk: 0,
-        outside_window: 0,
-        status: "OK",
-        reason: "",
-      };
-      const events: Event[] = [];
-      try {
-        const signal = AbortSignal.timeout(120_000);
-        const raw = await source.run({ get: (url) => get(url, signal) });
-        stats.fetched = raw.length;
-        for (const find of raw) {
-          if (relevance(find.name, find.evidence) < 0.5) {
-            stats.dropped_as_junk++;
-            continue;
-          }
-          const e = normalize(find, source, now.toISOString());
-          const month = e.estimated_month;
-          if (
-            (e.end_date && e.end_date < today) ||
-            (e.start_date && e.start_date > until) ||
-            (month && (month < today.slice(0, 7) || month > until.slice(0, 7)))
-          ) {
-            stats.outside_window++;
-            continue;
-          }
-          stats.relevant++;
-          events.push(e);
-        }
-      } catch (err) {
-        stats.status = "FAILED";
-        stats.reason = err instanceof Error ? err.message : String(err);
-        events.length = 0;
-      }
-      return { stats, events };
-    }),
-  );
+  const results = await Promise.all(sources.map((source) => {
+    const get = createClient([source.url]);
+    const signal = AbortSignal.timeout(120_000);
+    return scanSource(source, (url) => get(url, signal), now);
+  }));
   const allFailed = results.every((r) => r.stats.status === "FAILED");
   const merged = merge(
     existing,
@@ -151,6 +189,7 @@ async function main() {
     today,
     imported,
     sources.map((source) => source.id),
+    results.flatMap((r) => r.notices),
   );
   validate(merged.events);
   const rows = results.map(({ stats }) => ({

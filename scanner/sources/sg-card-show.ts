@@ -1,4 +1,5 @@
 import { clean, document, link, required } from "../html.ts";
+import { scheduleNotice } from "../listing.ts";
 import { pageSource, type RawFind } from "../types.ts";
 const url = "https://www.sgcardshow.com/";
 export function parse(html: string): RawFind[] {
@@ -11,12 +12,13 @@ export function parse(html: string): RawFind[] {
     text.match(/About the Event:\s*(Singapore Card Show[^\n]*)/i)?.[1],
     "event name",
   );
-  const date = required(
+  const notice = text.split("\n").find((s) => /^(?:event )?(?:cancelled|canceled|postponed)\b/i.test(s));
+  const date = notice ?? (scheduleNotice(name, null) ? null : required(
     text
       .split("\n")
       .find((s) => /^\d\d?(st|nd|rd|th)?\s*[-–].*20\d\d$/i.test(s)),
     "show date",
-  );
+  ));
   const venue = text.match(/Singapore Expo Hall[^\n]*/i)?.[0];
   const vendors = text.match(
     /Expected Number of Vendors:\s*([\d,]+(?: and counting|\+)?)/i,

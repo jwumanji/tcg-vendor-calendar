@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import frozen from "../scanner/fixtures/scoring-calibration.json";
+import { normalizeEvents } from "./data";
 import raw from "../data/events.json";
 import type { Event } from "./model";
 import {
@@ -19,8 +21,9 @@ import {
 
 const today = "2026-11-18";
 const dataset = raw as Event[];
+const calibration = normalizeEvents(frozen);
 const empty: Event = {
-  ...dataset[0],
+  ...calibration[0],
   id: "test",
   name: "Example",
   games: [],
@@ -258,7 +261,7 @@ describe("evidence and proxies", () => {
 });
 
 describe("booth economics", () => {
-  const prices = dataset.flatMap((e) => (e.vendor_cost ? [e.vendor_cost] : []));
+  const prices = calibration.flatMap((e) => (e.vendor_cost ? [e.vendor_cost] : []));
   it.each([
     ["HK$1,888 (Area", 1888, "HKD"],
     ["from S$450", 450, "SGD"],
@@ -512,6 +515,13 @@ it("scores the entire snapshot consistently, including past events", () => {
         );
     }
   }
+  expect(scoreEvents([show("past", 81, "2026-10-01")], options)[0].score).toBe(
+    81,
+  );
+});
+
+it("preserves tier calibration on the frozen November export", () => {
+  const scores = scoreEvents(calibration, { today });
   for (const [tier, min, max] of [
     ["must", 0.08, 0.17],
     ["strong", 0.23, 0.32],
@@ -522,7 +532,29 @@ it("scores the entire snapshot consistently, including past events", () => {
     expect(share).toBeGreaterThan(min);
     expect(share).toBeLessThan(max);
   }
-  expect(scoreEvents([show("past", 81, "2026-10-01")], options)[0].score).toBe(
-    81,
-  );
+});
+
+it("marks the Dubai prior-edition quote as estimated and retains the quoted year", () => {
+  const dubai = calibration.find((e) => e.name.includes("GameExpo"))!;
+  const current = { ...dubai, vendor_cost: "2027 rate: AED 1,750" };
+  expect(factor("commercial", dubai)).toMatchObject({ basis: "estimated", note: expect.stringContaining("2026") });
+  expect(factor("commercial", current).basis).toBe("real");
+  expect(scoreEvent(current, { today }).confidencePct - scoreEvent(dubai, { today }).confidencePct)
+    .toBe(DEFAULT_WEIGHTS.commercial);
+});
+
+it("applies only the commercial category's deadline", () => {
+  const color = calibration.find((e) => e.name.includes("Color Fiesta"))!;
+  const score = (vendor_deadline: string | null) => factor("logistics", { ...color, vendor_deadline });
+  expect(score(color.vendor_deadline)).toEqual(score(null));
+  for (const separator of ["; ", ", ", " and "]) {
+    const due = "Commercial booths close 21 Nov 2026";
+    expect(score("Artist Alley closed 23 Oct 2026" + separator + due)).toEqual(score(due));
+  }
+});
+
+it("keeps all scores finite with extreme or fractional counts", () => {
+  const result = scoreEvent({ ...empty, visitors: Number.MAX_VALUE, vendor_count: Number.MIN_VALUE, vendor_cost: "S$350" }, { today });
+  expect(Number.isInteger(result.score)).toBe(true);
+  expect(result.factors.every((f) => Number.isFinite(f.points))).toBe(true);
 });

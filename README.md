@@ -14,7 +14,7 @@ npm run build
 npm run preview
 ```
 
-The development and preview URLs include `/vendor-planner/` (or the configured `VITE_BASE`).
+The development and preview URLs are served at `/` (or the configured `VITE_BASE`).
 
 ## Features
 
@@ -67,33 +67,25 @@ Read [the data guide](data/DATA_README.md) before editing. Replace `data/events.
 
 Update the visible “Data last updated” note in `src/App.tsx` when refreshing. Run `npm test` and `npm run build` after changes. The app reads the JSON at build time; redeploy to publish new data. No live scraping occurs.
 
-## Deploying to grailfoxtcg.com/vendor-planner
+## Deploying to planner.grailfoxtcg.com
 
-The planner lives at https://www.grailfoxtcg.com/vendor-planner/. It is unlisted: a noindex meta tag and an X-Robots-Tag header discourage indexing, and it is not added to the sitemap, robots.txt or navigation. Anyone with the link can reach it; this is not access control.
+The planner is served at the root of https://planner.grailfoxtcg.com from its own Vercel project, `vendor-planner` (scope `justin-9436s-projects`). The main grailfoxtcg.com store is on Shopify and is not touched. The planner is unlisted: a noindex meta tag plus an `X-Robots-Tag: noindex, nofollow, noarchive` header (from `public/vercel.json`, copied into `dist/`) discourage indexing. Anyone with the link can reach it; this is not access control.
 
-With Node.js/npm, Python 3, curl and an authenticated Vercel CLI installed, run from this checkout:
-
-```sh
-scripts/deploy-grailfox.sh        # preview deployment
-scripts/deploy-grailfox.sh --prod # production deployment
+```bash
+export PATH=$HOME/.local/bin:$PATH
+scripts/deploy.sh               # tests, build, vercel deploy --prod of dist/ to project vendor-planner
+scripts/deploy.sh --skip-tests
 ```
 
-The script first re-syncs the current production site's Build Output files, verifying their SHA-1 hashes, so newer changes to other site pages are preserved. It then runs tests, builds the planner, replaces only its static directory, adds scoped routes and deploys the prebuilt site. It keeps the site's Vercel project link and does not edit robots.txt, sitemap.xml or other site pages. A final smoke check verifies the planner response and indexing header; protected previews returning 401, 302 or 403 produce a warning. Production checks use the real www host and retry briefly for alias propagation. The script prints the current production deployment ID and rollback command, and aborts if production changes between sync and deploy.
-
-Configuration is available through environment variables:
+`public/vercel.json` also sets the SPA fallback (deep links rewrite to `/index.html`, assets and logos are served as files) and long-lived caching for hashed assets. After the deploy the script checks the project's production URL (root, a deep link, and the noindex header) and then https://planner.grailfoxtcg.com, which may only warn while DNS propagates.
 
 | Variable | Default |
-| --- | --- |
-| `GRAILFOX_SITE` | `/workspace/grailfox-site` |
+|---|---|
 | `VERCEL_SCOPE` | `justin-9436s-projects` |
-| `VERCEL_TEAM_ID` | `team_E7PuNgRyzGwto2cmIFZZcrUX` |
-| `VERCEL_PROJECT` | `grailfoxtcg` (project label) |
-| `VERCEL_PROJECT_ID` | `prj_7k0k6RI7FbvlSAYGrNcLsM8vzroU` |
-| `PLANNER_PATH` | `vendor-planner` (relative URL path, without surrounding slashes) |
+| `VERCEL_PROJECT` | `vendor-planner` |
+| `PLANNER_URL` | `https://planner.grailfoxtcg.com` |
 
-The planner only exists in deployments made by this script. If the main Grailfox site is deployed another way (another CLI upload or a Git-connected pipeline), the planner disappears until this script is re-run. The script always re-syncs the live site first to preserve other site changes.
-
-Vite defaults to `/vendor-planner/`; set `VITE_BASE` to override it for local builds. The deployment script sets `VITE_BASE` from `PLANNER_PATH`. Bases are normalized to start and end with `/`.
+Vite's base defaults to `/`; set `VITE_BASE` (for example `/vendor-planner/`) to host under a sub-path. Bases are normalized to start and end with `/`.
 
 Application code lives in `src/App.tsx`, `src/components/`, `src/storage.ts`, `src/style.css`, `src/model.ts` and `src/utils.ts`; `src/main.tsx` is the bootstrap; the original event dataset remains in `data/`.
 
@@ -107,7 +99,7 @@ Use Node 24 and install dependencies with `npm ci`. Run from the repository root
 | `npm run scan` | Merge live finds, update the snapshot date when records change, and save the run report. |
 | `node scanner/run.ts --import-scanner /workspace/tcg-calendar/events.json` | Replace the Scanner export, copy changed sibling logos, deduplicate retained finds and run all sources. Add `--dry-run` to preview. |
 | `scripts/weekly-refresh.sh --no-push --no-deploy` | Refresh locally and run tests and the production build. |
-| `scripts/weekly-refresh.sh` | Refresh, test, build, commit changed data, rebase, push to main and deploy. `--force-deploy` deploys even with no data changes. |
+| `scripts/weekly-refresh.sh` | Refresh, test, build, commit changed data, rebase, push to main and deploy (`scripts/deploy.sh`). `--force-deploy` deploys even with no data changes. |
 
 The active sources are Singapore Card Show, Singapore EXPO, Suntec, HKCEC, Anime Festival Asia, Singapore Comic Con, Bandai Card Games Fest, Wizards’ Magic Play Events, Jump Festa, Supanova and Oz Comic-Con Sydney. The live window starts today in Asia/Saigon and extends 18 months. Smaller store events and unrelated venue bookings are filtered out. The source report records tested calendars, access failures, examples and the reasons for exclusions. [Source review](scanner/SOURCES.md)
 

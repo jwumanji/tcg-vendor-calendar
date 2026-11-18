@@ -1,4 +1,5 @@
 import type { Event } from "../src/model.ts";
+import { listingKey } from "./listing.ts";
 import { slug } from "./normalize.ts";
 import { fold } from "./relevance.ts";
 
@@ -99,6 +100,7 @@ export function merge(
   today: string,
   imported?: Event[],
   sourceOrder: readonly string[] = [],
+  notices: Event[] = [],
 ) {
   const rank = (id: string) => {
     const index = sourceOrder.indexOf(id);
@@ -107,10 +109,25 @@ export function merge(
   const scanner = imported ?? existing.filter((e) => !e.source);
   const old = existing.filter((e) => e.source);
   const retained = old.filter(
-    (e) =>
-      !scanner.some((s) => s.id === e.id || matches(s, e)) &&
-      (!e.end_date || stamp(today) - stamp(e.end_date) <= 30 * day),
+    (e) => !scanner.some((s) => s.id === e.id || matches(s, e)),
   );
+  const keys = new Map<string, number>();
+  for (const e of [...incoming, ...notices]) {
+    const key = listingKey(e);
+    if (key) keys.set(key, (keys.get(key) ?? 0) + 1);
+  }
+  function stableIndex(event: Event) {
+    const key = listingKey(event);
+    if (!key || keys.get(key) !== 1) return -1;
+    const first = retained.findIndex((e) => listingKey(e) === key);
+    return first >= 0 && !retained.slice(first + 1).some((e) => listingKey(e) === key)
+      ? first : -1;
+  }
+  function compatibleListing(a: Event, b: Event) {
+    if (a.source!.id !== b.source!.id) return true;
+    const x = listingKey(a), y = listingKey(b);
+    return !x || !y || x === y;
+  }
   const newIds = new Set<string>();
   const known: Record<string, number> = {};
   for (const event of incoming) {
@@ -118,20 +135,18 @@ export function merge(
     const scannerMatch = scanner.some(
       (s) => s.id === event.id || matches(s, event),
     );
-    const i = retained.findIndex(
-      (e) =>
+    let i = stableIndex(event);
+    if (i < 0) i = retained.findIndex((e) =>
+      compatibleListing(e, event) && (
         matches(e, event) ||
         (e.source!.id === owner &&
           e.name === event.name &&
           e.city === event.city &&
           e.country_code === event.country_code &&
           (!e.start_date || !event.start_date) &&
-          (!e.estimated_month ||
-            !event.estimated_month ||
-            e.estimated_month === event.estimated_month) &&
-          (e.date_status === "tba" ||
-            event.date_status === "tba" ||
-            e.id === event.id)),
+          (!e.estimated_month || !event.estimated_month || e.estimated_month === event.estimated_month) &&
+          (e.date_status === "tba" || event.date_status === "tba" || e.id === event.id))
+      ),
     );
     if (scannerMatch || i >= 0) known[owner] = (known[owner] ?? 0) + 1;
     if (scannerMatch) continue;
@@ -154,25 +169,46 @@ export function merge(
       // Keep the first identity and qualify a colliding slug using the listing.
       let id = event.id;
       if (retained.some((e) => e.id === id)) {
-        const month = id.slice(id.lastIndexOf("-") + 1);
-        const edition = slug(
-          [event.country_code, event.city, event.start_date?.slice(-2)]
-            .filter(Boolean)
-            .join(" "),
-        );
-        id = id.slice(0, id.lastIndexOf("-")) + "-" + edition + "-" + month;
+        const edition = slug([event.country_code, event.city, event.start_date?.slice(-2)]
+          .filter(Boolean).join(" "));
+        const suffix = id.lastIndexOf("-");
+        const qualified = id.slice(0, suffix) + "-" + edition + id.slice(suffix);
+        id = qualified;
+        for (let n = 2; retained.some((e) => e.id === id) || scanner.some((e) => e.id === id); n++)
+          id = qualified + "-" + n;
       }
       retained.push({ ...event, id });
       newIds.add(id);
     }
   }
+  for (const notice of notices) {
+    let i = stableIndex(notice);
+    if (i < 0) {
+      const candidates = retained.filter((e) => e.source!.id === notice.source!.id &&
+        compatibleListing(e, notice) && e.name === notice.name && e.city === notice.city &&
+        e.country_code === notice.country_code && notice.start_date && e.start_date === notice.start_date);
+      if (candidates.length === 1) i = retained.indexOf(candidates[0]);
+    }
+    if (i < 0 || newIds.has(retained[i].id)) continue;
+    const earlier = retained[i];
+    retained[i] = {
+      ...earlier, date_status: "tba", section: "watchlist", date_note: notice.date_note,
+      start_date: null, end_date: null, estimated_month: null,
+      source: { ...earlier.source!, confidence: 0.5 },
+    };
+    delete retained[i].occurrences;
+    known[notice.source!.id] = (known[notice.source!.id] ?? 0) + 1;
+  }
+  // Apply the grace period after reconciliation: a newly rescheduled show
+  // may have been discovered more than thirty days after its original date.
+  const active = retained.filter((e) => !e.end_date || stamp(today) - stamp(e.end_date) <= 30 * day);
   // Insert finds chronologically within the export sections; preserve the original
   // order of all Scanner records, including its manually positioned TBA entries.
   const section = { timeline: 0, recurring_sg: 1, watchlist: 2 };
   const key = (e: Event) =>
     e.start_date ?? (e.estimated_month ? e.estimated_month + "-15" : "9999");
   const ordered = [...scanner];
-  for (const e of retained.sort(
+  for (const e of active.sort(
     (a, b) => key(a).localeCompare(key(b)) || a.id.localeCompare(b.id),
   )) {
     const index = ordered.findIndex(
@@ -188,6 +224,6 @@ export function merge(
     events: ordered,
     added: ordered.filter((e) => newIds.has(e.id)),
     known,
-    removed: old.length - retained.filter((e) => !newIds.has(e.id)).length,
+    removed: old.length - active.filter((e) => !newIds.has(e.id)).length,
   };
 }

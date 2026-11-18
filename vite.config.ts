@@ -1,6 +1,8 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-const base = `/${(process.env.VITE_BASE ?? "/vendor-planner/").replace(/^\/+|\/+$/g, "")}/`.replace(/^\/\/$/, "/");
+// The planner is served at the root of planner.grailfoxtcg.com. Set VITE_BASE
+// (for example "/vendor-planner/") to host it under a sub-path instead.
+const base = `/${(process.env.VITE_BASE ?? "/").replace(/^\/+|\/+$/g, "")}/`.replace(/^\/\/$/, "/");
 
 export default defineConfig({
   plugins: [

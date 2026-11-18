@@ -3,26 +3,32 @@ import type { Entries } from "../storage";
 import { TriangleAlert, StickyNote } from "lucide-react";
 import { flagFile, placeLabel, rarity, type Rarity } from "../utils";
 import type { Event } from "../model";
+import { useState } from "react";
+import { EventImage } from "./EventImage";
+
 export type LogoSize = "md" | "row" | "xl" | "detail";
 export function Logo({ e, size = "md" }: { e: Event; size?: LogoSize }) {
   const cls = "logo" + (size === "md" ? "" : " logo-" + size);
-  return e.logo ? (
-    <img
-      className={cls}
-      src={import.meta.env.BASE_URL + e.logo}
-      alt=""
-      loading="lazy"
-      decoding="async"
-      width={96}
-      height={96}
-    />
-  ) : (
-    <span className={cls + " initials"} aria-hidden="true">
-      {e.name
-        .split(" ")
-        .slice(0, 2)
-        .map((s) => [...s][0] || "")
-        .join("")}
+  const [failed, setFailed] = useState<string | null>(null);
+  return (
+    <span className={cls} aria-hidden="true">
+      {e.logo && e.logo !== failed ? (
+        <EventImage
+          key={e.logo}
+          path={e.logo}
+          hint={e.logo_kind}
+          eager={size === "detail"}
+          onError={() => setFailed(e.logo)}
+        />
+      ) : (
+        <span className="initials">
+          {e.name
+            .split(/\s+/)
+            .slice(0, 2)
+            .map((word) => [...word][0])
+            .join("")}
+        </span>
+      )}
     </span>
   );
 }

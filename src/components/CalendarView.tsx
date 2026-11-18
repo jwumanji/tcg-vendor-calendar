@@ -14,6 +14,7 @@ import {
   monthEnd,
   monthLabel,
   prettyDate,
+  occurrenceOn,
   isUndated,
   primaryGameKey,
 } from "../utils";
@@ -153,7 +154,7 @@ export function CalendarView({
                       "calendar-event " +
                       (e.section === "recurring_sg" ? "recurring" : "")
                     }
-                    onClick={() => open(e, e.occurrences ? prettyDate(date) : undefined)}
+                    onClick={() => open(e, occurrenceOn(e, date))}
                   >
                     <Logo e={e} />
                     <ClashCue score={scores[e.id]} entries={entries} />

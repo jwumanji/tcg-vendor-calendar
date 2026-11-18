@@ -155,6 +155,11 @@ export function prettyDate(d: string) {
     year: "numeric",
   });
 }
+export function occurrenceOn(e: Event, day: string) {
+  const range = e.occurrences?.find((r) => r.start_date <= day && day <= r.end_date);
+  if (!range) return undefined;
+  return dateLabel({ ...e, ...range });
+}
 export function dateLabel(e: Event) {
   if (e.date_status === "estimated")
     return e.estimated_month ? monthLabel(e.estimated_month) : "Estimated";

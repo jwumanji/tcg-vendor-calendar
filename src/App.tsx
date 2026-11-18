@@ -150,7 +150,7 @@ export default function App() {
   );
   const onEventPage = route.page === "event";
   const selected = onEventPage
-    ? allEvents.find((event) => event.id === route.id)
+    ? events.find((event) => event.id === route.id) ?? allEvents.find((event) => event.id === route.id)
     : null;
   useEffect(() => {
     document.title = onEventPage
@@ -342,6 +342,19 @@ export default function App() {
       countries: f.countries.filter((c) => !quickCountries.some(({ country }) => country === c)),
     }));
   }
+  const storageWarning = storageError && (
+    <div role="alert" className="storage-warning">
+      <p>
+        <TriangleAlert size={18} aria-hidden="true" />
+        <span>{storageError}</span>
+      </p>
+      {!canSave && (
+        <button className="button" onClick={acknowledgeRecovery}>
+          Preserve original and resume saving
+        </button>
+      )}
+    </div>
+  );
   const toast = (
     <div role="status" aria-atomic="true" className="going-toast">
       {undo && (
@@ -426,11 +439,7 @@ export default function App() {
   return (
     <>
       <header className="header" hidden={onEventPage}>
-        <a
-          className="brand"
-          href="#main"
-          aria-label="Holo Vault, TCG Vendor Calendar"
-        >
+        <a className="brand" href="#main">
           <BrandLockup />
         </a>
         <div className="header-right">
@@ -446,19 +455,7 @@ export default function App() {
         </div>
       </header>
       <main id="main" tabIndex={-1} hidden={onEventPage}>
-        {storageError && (
-          <div role="alert" className="storage-warning">
-            <p>
-              <TriangleAlert size={18} aria-hidden="true" />
-              <span>{storageError}</span>
-            </p>
-            {!canSave && (
-              <button className="button" onClick={acknowledgeRecovery}>
-                Preserve original and resume saving
-              </button>
-            )}
-          </div>
-        )}
+        {storageWarning}
         <section className="workspace">
           <h1 className="sr-only">Holo Vault vendor calendar</h1>
           <h2 className="sr-only" id="workspace-title" tabIndex={-1}>
@@ -1083,8 +1080,11 @@ export default function App() {
       {onEventPage && (
         <main className="event-page">
           <nav className="event-back" aria-label="Event navigation">
-            <button className="button" onClick={back}>← Back to events</button>
+            <button className="button" onClick={back}>
+              {route.fromEvent ? "← Back to previous event" : "← Back to events"}
+            </button>
           </nav>
+          {storageWarning}
           {selected ? (
             <Suspense fallback={<p role="status">Loading event…</p>}>
               <Detail

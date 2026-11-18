@@ -1,4 +1,5 @@
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import type { Filters } from "../model";
 import { eventPath, parseRoute } from "../route";
 
@@ -13,6 +14,7 @@ type ListContext = {
 function currentRoute() {
   return {
     ...parseRoute(window.location.pathname),
+    fromEvent: history.state?.fromEvent === true,
     occurrence: typeof history.state?.occurrence === "string" ? history.state.occurrence : undefined,
   };
 }
@@ -34,16 +36,19 @@ export function useEventRoute() {
   }
 
   const openEvent = useCallback((id: string, occurrence?: string, list?: ListContext) => {
-    if (parseRoute(location.pathname).page === "events") {
+    const fromEvent = parseRoute(location.pathname).page === "event";
+    if (!fromEvent) {
       rememberList();
       history.replaceState({ ...history.state, eventsScrollY: window.scrollY }, "");
     }
     history.pushState({
       fromPlanner: true,
+      fromEvent,
       occurrence,
       listContext: list ?? history.state?.listContext,
     }, "", eventPath(id));
     setRoute(currentRoute());
+    window.scrollTo({ top: 0, behavior: "instant" });
   }, []);
 
   const back = useCallback(() => {
@@ -56,23 +61,20 @@ export function useEventRoute() {
   }, []);
 
   useLayoutEffect(() => {
-    const previous = history.scrollRestoration;
-    history.scrollRestoration = "manual";
     function onPop() {
       const next = currentRoute();
       if (previousPage.current === "events" && next.page === "event") rememberList();
-      setRoute(next);
+      // Render the destination before the browser restores this entry’s scroll.
+      flushSync(() => setRoute(next));
     }
     window.addEventListener("popstate", onPop);
     return () => {
-      history.scrollRestoration = previous;
       window.removeEventListener("popstate", onPop);
     };
   }, []);
 
   useLayoutEffect(() => {
     if (route.page === "event") {
-      window.scrollTo({ top: 0, behavior: "instant" });
       function onKey(ev: KeyboardEvent) {
         if (ev.key === "Escape" && !ev.defaultPrevented && !ev.repeat) {
           ev.preventDefault();

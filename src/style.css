@@ -2041,7 +2041,8 @@ footer > small {
 .header[hidden] { display: none; }
 .event-page {
   max-width: 1160px;
-  padding-bottom: max(40px, env(safe-area-inset-bottom));
+  /* Keep the final calendar action reachable above the fixed Undo toast. */
+  padding-bottom: calc(76px + env(safe-area-inset-bottom));
 }
 .event-back {
   position: sticky;

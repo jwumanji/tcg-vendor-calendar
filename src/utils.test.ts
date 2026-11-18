@@ -9,6 +9,7 @@ import {
   nextMonth,
   localDate,
   prettyDate,
+  occurrenceOn,
   upcoming,
   timelineGroups,
   ics,
@@ -30,6 +31,15 @@ import {
   primaryGameKey,
 } from "./utils";
 const event = raw[0] as Event;
+it("opens the full recurring weekend from either calendar day", () => {
+  const recurring = { ...event, date_status: "confirmed" as const, occurrences: [
+    { start_date: "2027-01-02", end_date: "2027-01-03" },
+    { start_date: "2027-03-13", end_date: "2027-03-14" },
+  ] };
+  expect(occurrenceOn(recurring, "2027-03-14")).toBe("13 Mar 2027 – 14 Mar 2027");
+  expect(occurrenceOn(recurring, "2027-03-15")).toBeUndefined();
+});
+
 describe("all-day calendar exports", () => {
   it("uses exclusive end dates and escapes user-facing text", () => {
     const result = ics([

@@ -215,7 +215,7 @@ export function Detail({
               Scanner score
               <ScoreGem score={e.vendor_score} large />
             </span>
-            <meter min="0" max="100" value={e.vendor_score} />
+            <meter aria-label="Scanner score" min="0" max="100" value={e.vendor_score} />
           </div>
         )}
         {e.description && <p className="description">{e.description}</p>}

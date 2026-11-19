@@ -54,5 +54,21 @@
     "contact": "support@zubculture.com",
     "contacted_at": "2026-11-19",
     "message_ref": "1a1f34bdb7831450"
+  },
+  {
+    "id": "mtg-sea-r2",
+    "status": "contacted",
+    "method": "form",
+    "contact": "https://www.mtgseachampionships.com/contact",
+    "contacted_at": "2026-11-19",
+    "notes": "The site also lists info@oracle-e.com."
+  },
+  {
+    "id": "comifuro24",
+    "status": "contacted",
+    "method": "form",
+    "contact": "https://comifuro.net/contact/",
+    "contacted_at": "2026-11-19",
+    "notes": "Submitted as Exhibitor. They reply in 1–3 days and have a Discord."
   }
 ]

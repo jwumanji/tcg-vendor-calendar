@@ -333,12 +333,12 @@
       "city": "Bangkok",
       "country": "Thailand",
       "organiser": "The Cardster",
-      "contact_type": "form",
-      "contact": "https://bangkokcardshow.com/Tablereservations",
+      "contact_type": "email",
+      "contact": "bangkokinternationalcardshow@gmail.com",
       "published_booth_price": "",
       "price_source_url": "",
       "deadline": "",
-      "notes": "Official table-reservation portal: https://bangkokcardshow.com/Tablereservations and home https://bangkokcardshow.com/Home. The site is JavaScript-rendered; exhibitor email and 2027 prices could not be verified from the official HTML in this research, so they are not quoted. Venue: QSNCC Exhibition Hall 8 (LG)."
+      "notes": "Also reachable by phone at 092-899-1614 and on Instagram @bangkokcardshow. Table reservations open 1 Dec 2026 at 12:00 PM GMT+7 via https://bangkokcardshow.com/Tablereservations. An outreach email is pending and has not been sent. Venue: QSNCC Exhibition Hall 8 (LG)."
     },
     {
       "id": "bcs-my",

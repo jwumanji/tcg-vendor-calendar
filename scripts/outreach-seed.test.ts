@@ -60,6 +60,21 @@ describe("outreach seed", () => {
     expect(seedOutreach(result, research, [...emailLog, ...formUpdates])).toEqual(result);
   });
 
+  it("applies corrected research to an event awaiting outreach", () => {
+    const original = seedOutreach(events, research, emailLog);
+    const correctedResearch = [
+      { ...research[0], contact_type: "email", contact: "vendor@example.com", published_booth_price: "$120", notes: "Email pending" },
+      ...research.slice(1),
+    ];
+    const result = seedOutreach(original, correctedResearch, emailLog);
+    expect(result[0].outreach).toMatchObject({
+      status: "not_contacted", method: null, contacted_at: null,
+      contact_type: "email", contact: "vendor@example.com",
+      published_booth_price: "$120", research_notes: "Email pending",
+    });
+    expect(result.slice(1)).toEqual(original.slice(1));
+  });
+
   it("rejects unknown IDs in research and in the log", () => {
     expect(() => seedOutreach(events, [...research, { id: "unknown" }], emailLog)).toThrow("Unknown event ID unknown");
     expect(() => seedOutreach(events, research, [...emailLog, { id: "unknown" }])).toThrow("Unknown event ID unknown");

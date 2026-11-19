@@ -60,6 +60,8 @@ export function matches(
   if (f.going && !p[e.id]?.going) return false;
   if (f.notGoing && p[e.id]?.going) return false;
   if (f.newOnly && !e.is_new_find) return false;
+  const contacted = (e.outreach?.status ?? "not_contacted") !== "not_contacted";
+  if (f.outreach && contacted !== (f.outreach === "contacted")) return false;
   if (f.minTier !== "any" && priorityScore < TIER_THRESHOLDS[f.minTier])
     return false;
   if (

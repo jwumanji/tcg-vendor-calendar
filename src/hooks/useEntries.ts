@@ -10,7 +10,9 @@ import {
   STORAGE_KEY,
   type Entries,
   type LoadedEntries,
+  type OutreachPatches,
 } from "../storage";
+import type { OutreachPatch } from "../model";
 import { download } from "../utils";
 
 export function useEntries() {
@@ -20,6 +22,7 @@ export function useEntries() {
     } catch {
       return {
         entries: {},
+        outreach: {},
         error: "Storage is unavailable. Export a backup to keep changes.",
         raw: null,
         recoveryKey: null,
@@ -32,11 +35,13 @@ export function useEntries() {
     patch: ReturnType<typeof inverseGoingPatch>;
     changedAt: string;
   };
-  const [{ entries, undo }, setState] = useState<{
+  const [{ entries, outreach, undo }, setState] = useState<{
     entries: Entries;
+    outreach: OutreachPatches;
     undo: Undo | null;
   }>({
     entries: loaded.entries,
+    outreach: loaded.outreach,
     undo: null,
   });
   const [storageError, setStorageError] = useState(loaded.error);
@@ -60,19 +65,29 @@ export function useEntries() {
     },
     [],
   );
+  const updateOutreach = useCallback((id: string, patch: OutreachPatch) => {
+    setSaved(false);
+    setState((current) => ({
+      ...current,
+      outreach: {
+        ...current.outreach,
+        [id]: { ...current.outreach[id], ...patch },
+      },
+    }));
+  }, []);
   useEffect(() => {
     if (!canSave) return;
-    const error = saveValue(STORAGE_KEY, backup(entries));
+    const error = saveValue(STORAGE_KEY, backup(entries, undefined, outreach));
     setSaved(!error);
     setStorageError(error);
-  }, [entries, canSave]);
+  }, [entries, outreach, canSave]);
   const setGoing = useCallback((ids: readonly string[], going: boolean) => {
     const now = new Date().toISOString();
     setState((current) => {
       const next = applyGoing(current.entries, ids, going, now);
       const patch = inverseGoingPatch(current.entries, next, ids);
       return patch.length
-        ? { entries: next, undo: { patch, going, changedAt: now } }
+        ? { ...current, entries: next, undo: { patch, going, changedAt: now } }
         : current;
     });
   }, []);
@@ -92,6 +107,7 @@ export function useEntries() {
     setState((current) => {
       if (!current.undo) return current;
       return {
+        ...current,
         entries: undoGoingPatch(
           current.entries,
           current.undo.patch,
@@ -108,13 +124,15 @@ export function useEntries() {
     setStorageError("");
     setCanSave(true);
   }
-  function applyEntries(value: Entries) {
+  function applyEntries(entries: Entries, outreach: OutreachPatches) {
     setSaved(false);
-    setState({ entries: value, undo: null });
+    setState({ entries, outreach, undo: null });
   }
   return {
     entries,
+    outreach,
     update,
+    updateOutreach,
     undo,
     undoGoing,
     setGoing,

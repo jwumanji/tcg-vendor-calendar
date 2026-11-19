@@ -106,7 +106,11 @@ export function merge(
     const index = sourceOrder.indexOf(id);
     return index === -1 ? Infinity : index;
   };
-  const scanner = imported ?? existing.filter((e) => !e.source);
+  const existingById = new Map(existing.map((event) => [event.id, event]));
+  const scanner: Event[] = imported?.map(({ outreach: _importedOutreach, ...event }) => {
+    const outreach = existingById.get(event.id)?.outreach;
+    return outreach === undefined ? event : { ...event, outreach };
+  }) ?? existing.filter((e) => !e.source);
   const old = existing.filter((e) => e.source);
   const retained = old.filter(
     (e) => !scanner.some((s) => s.id === e.id || matches(s, e)),
@@ -154,9 +158,11 @@ export function merge(
       const earlier = retained[i];
       const oldOwner = earlier.source!.id;
       if (oldOwner === owner || rank(owner) < rank(oldOwner)) {
+        const { outreach, ...update } = event;
         retained[i] = {
           ...earlier,
-          ...event,
+          ...update,
+          ...(outreach != null && { outreach }),
           id: earlier.id,
           source: {
             ...event.source!,

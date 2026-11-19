@@ -19,6 +19,7 @@ import { Logo, Place, NoteTag, ClashCue } from "./EventIdentity";
 import { GoingButton, type SetGoing } from "./GoingButton";
 import { StageBadge } from "./Pipeline";
 import { PriorityChip } from "./PriorityChip";
+import { OutreachChip } from "./OutreachChip";
 import { SectionHeading } from "./ListSections";
 import { SourceChip } from "./FindSource";
 
@@ -46,6 +47,7 @@ export function EventRows({
   open: (e: Event) => void;
 }) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const showOutreachColumn = columns.includes("outreach");
   const anchor = useRef<string | null>(null);
   const ids = useMemo(
     () => Array.from(groups.values()).flatMap((items) => items.map((e) => e.id)),
@@ -296,6 +298,7 @@ export function EventRows({
                             {entry.note.trim() && <NoteTag compact />}
                             {past && <span>Past</span>}
                             <ClashCue score={scores[e.id]} entries={entries} />
+                            {!showOutreachColumn && <OutreachChip outreach={e.outreach} />}
                           </div>
                         </div>
                       </div>
@@ -356,6 +359,11 @@ export function EventRows({
                     {columns.includes("notes") && (
                       <td role="cell" className="row-notes" title={entry.note}>
                         {entry.note || "—"}
+                      </td>
+                    )}
+                    {showOutreachColumn && (
+                      <td role="cell" className="row-outreach">
+                        <OutreachChip outreach={e.outreach} />
                       </td>
                     )}
                   </tr>

@@ -1,4 +1,4 @@
-import type { Event } from "./model";
+import { outreachStatuses, type Event } from "./model";
 import type { ScoreResult } from "./scoring";
 import { emptyEntry, stages, type Entries } from "./storage";
 import {
@@ -23,6 +23,7 @@ export const ROW_SORT_LABELS = {
   stage: "Stage",
   notes: "Notes",
   source: "Source",
+  outreach: "Outreach",
 };
 export type RowKey = keyof typeof ROW_SORT_LABELS;
 export type RowSort = { key: RowKey; direction: "asc" | "desc" };
@@ -136,6 +137,8 @@ export function sortRows(
         return Number(Boolean(entry.note.trim()));
       case "source":
         return e.is_new_find ? e.source?.name || null : "Scanner";
+      case "outreach":
+        return outreachStatuses.indexOf(e.outreach?.status ?? "not_contacted");
     }
   }
   function compare(a: ReturnType<typeof value>, b: ReturnType<typeof value>) {
@@ -173,7 +176,7 @@ export function sortRows(
     .map((row) => row.e);
 }
 
-export const optionalColumns = ["scanner", "source", "notes"] as const;
+export const optionalColumns = ["scanner", "source", "notes", "outreach"] as const;
 export type OptionalColumn = (typeof optionalColumns)[number];
 export function normalizeColumns(input: unknown): OptionalColumn[] {
   return optionalColumns.filter(

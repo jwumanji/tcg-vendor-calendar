@@ -4,9 +4,10 @@ import { describe, expect, it } from "vitest";
 import { existsSync } from "node:fs";
 import raw from "../data/events.json";
 import meta from "../data/meta.json";
-import { normalizeEvents, validDate } from "./data";
+import { mergeOutreach, normalizeEvents, outreachContactHref, validDate } from "./data";
 import { normalizeFilters } from "./hooks/useFilters";
-import { emptyFilters } from "./model";
+import { emptyFilters, emptyOutreach, outreachStatuses } from "./model";
+import { emptyEntry } from "./storage";
 
 describe("source data integrity", () => {
   it.each([...new Set(raw.map((e) => e.country_code).filter(Boolean))])(
@@ -124,6 +125,67 @@ describe("stored filters", () => {
       score: 100,
       priority: "top",
     });
+  });
+});
+
+describe("outreach records and filters", () => {
+  it("validates dates, route types and links while preserving outreach and event fields", () => {
+    const [valid, invalid, missing, absent] = normalizeEvents([
+      {
+        id: "valid", name: "Valid", contact: "Original organizer", vendor_cost: "Original cost",
+        outreach: {
+          status: "quoted", method: "form", contact: "https://example.com/contact",
+          contact_type: "form", contacted_at: "2026-11-19", response_at: "2026-11-21",
+          message_ref: "confirmation", quoted_price: "$200", notes: "Includes a table",
+          published_booth_price: "$160", price_source_url: "https://example.com/booths",
+          research_notes: "Includes two badges", unrelated: true,
+        },
+      },
+      {
+        id: "invalid", name: "Invalid",
+        outreach: {
+          status: "waiting", method: "fax", contact: "javascript:alert(1)",
+          contact_type: "phone", contacted_at: "2026-02-30", response_at: 5,
+          quoted_price: 200, notes: false, price_source_url: "file:///tmp/data",
+        },
+      },
+      { id: "missing", name: "Missing" },
+      { id: "absent", name: "Absent", outreach: null },
+    ]);
+    expect(valid).toMatchObject({
+      contact: "Original organizer", vendor_cost: "Original cost",
+      outreach: {
+        status: "quoted", method: "form", contact: "https://example.com/contact",
+        contact_type: "form", contacted_at: "2026-11-19", response_at: "2026-11-21",
+        message_ref: "confirmation", quoted_price: "$200", notes: "Includes a table",
+        published_booth_price: "$160", price_source_url: "https://example.com/booths",
+        research_notes: "Includes two badges",
+      },
+    });
+    expect(valid.outreach).not.toHaveProperty("unrelated");
+    expect(invalid.outreach).toEqual(emptyOutreach);
+    expect(missing.outreach).toBeUndefined();
+    expect(absent.outreach).toBeNull();
+    expect(mergeOutreach(null, { method: "email" }).method).toBeNull();
+    expect(outreachContactHref("sales+booths@example.com")).toBe("mailto:sales%2Bbooths@example.com");
+  });
+
+  it("restores supported outreach filters and matches them independently of the pipeline stage", () => {
+    const contacted = normalizeFilters({ outreach: "contacted" });
+    const notContacted = normalizeFilters({ outreach: "not_contacted" });
+    expect(normalizeFilters({ outreach: true })).toEqual(emptyFilters);
+    expect(contacted.outreach).toBe("contacted");
+    expect(notContacted.outreach).toBe("not_contacted");
+    const [event] = normalizeEvents([{ id: "outreach", name: "Outreach" }]);
+    const pipeline = { [event.id]: { ...emptyEntry, stage: "Contacted" as const } };
+    expect(matches(event, contacted, pipeline)).toBe(false);
+    expect(matches(event, notContacted, pipeline)).toBe(true);
+    for (const status of outreachStatuses) {
+      const withStatus = { ...event, outreach: mergeOutreach(null, { status }) };
+      expect(matches(withStatus, contacted, {})).toBe(status !== "not_contacted");
+      expect(matches(withStatus, notContacted, {})).toBe(status === "not_contacted");
+      expect(matches(withStatus, { ...contacted, stages: ["Contacted"] }, {})).toBe(false);
+    }
   });
 });
 

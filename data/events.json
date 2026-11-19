@@ -593,7 +593,20 @@
     ],
     "logo": "logos/mtg.webp",
     "logo_kind": "logo",
-    "section": "timeline"
+    "section": "timeline",
+    "outreach": {
+      "status": "not_contacted",
+      "method": null,
+      "contact": "https://www.mtgseachampionships.com/contact",
+      "contact_type": "form",
+      "contacted_at": null,
+      "response_at": null,
+      "message_ref": null,
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": null,
+      "research_notes": "Official contact form on mtgseachampionships.com. No vendor/exhibitor email was visible in the page HTML (the address is masked). No public vendor programme found; this is a competitive championship weekend at The Royal River Hotel. Enquire via the form only if seeking a vendors' area."
+    }
   },
   {
     "id": "urban",
@@ -645,7 +658,21 @@
     ],
     "logo": "logos/urban.webp",
     "logo_kind": "poster_or_photo",
-    "section": "timeline"
+    "section": "timeline",
+    "outreach": {
+      "status": "not_contacted",
+      "method": null,
+      "contact": "cardloverhk1111@gmail.com",
+      "contact_type": "email",
+      "contacted_at": null,
+      "response_at": null,
+      "message_ref": null,
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": "Area 1 HK$1,888 / Area 2 HK$1,488 per 150×60 cm table for both days (2 chairs + 1 card box included). Extra chair HK$50; extra card box (about 80×60 cm) HK$300. Early-bird has ended.",
+      "price_source_url": "https://urbanops.hk/urban-card-show-2027-01/",
+      "research_notes": "Official page also has a Google Form: https://docs.google.com/forms/d/e/1FAIpQLSeulGNKHBEi5UgHtx-IBqt6NyjihmQAyrXSBOYCKF953o62Jg/viewform. Vendor enquiries: Cardlover WhatsApp +852 5926 9384, Instagram @cardlover_hk_1111. Venue enquiries: Urban Ops inquire@urbanops.hk, WhatsApp/phone +852 9157 9717, Instagram @urbanopshk."
+    }
   },
   {
     "id": "color18",
@@ -696,7 +723,20 @@
     ],
     "logo": "logos/colorfiesta.webp",
     "logo_kind": "logo",
-    "section": "timeline"
+    "section": "timeline",
+    "outreach": {
+      "status": "contacted",
+      "method": "email",
+      "contact": "contact@colorfiesta.vn",
+      "contact_type": "email",
+      "contacted_at": "2026-11-19",
+      "response_at": null,
+      "message_ref": "1a1f34bb1e70beec",
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": null,
+      "research_notes": "Email and phone +84 789 829 891 published on https://colorfiesta.vn/ and the #18 page. Venue confirmed as V.E.C Hà Nội, Đông Anh. This is primarily an artist event; commercial booth rates were not published. Instagram @colorfiestavn / official fanpage."
+    }
   },
   {
     "id": "poke-showdown-my",
@@ -747,7 +787,20 @@
     ],
     "logo": "logos/showdown26.webp",
     "logo_kind": "poster_or_photo",
-    "section": "timeline"
+    "section": "timeline",
+    "outreach": {
+      "status": "not_contacted",
+      "method": null,
+      "contact": null,
+      "contact_type": "none",
+      "contacted_at": null,
+      "response_at": null,
+      "message_ref": null,
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": null,
+      "research_notes": "Official page https://asia.pokemon-card.com/my/event-search/13133/ is a players-only lottery/tournament (Academia Intercollege Cup) at Hype Kartel, Ombak KLCC. No vendor or exhibitor programme found. Do not treat player registration as a booth route."
+    }
   },
   {
     "id": "hktdc",
@@ -800,7 +853,21 @@
     ],
     "logo": "logos/hktdc.webp",
     "logo_kind": "logo",
-    "section": "timeline"
+    "section": "timeline",
+    "outreach": {
+      "status": "contacted",
+      "method": "email",
+      "contact": "exhibitions@hktdc.org",
+      "contact_type": "email",
+      "contacted_at": "2026-11-19",
+      "response_at": null,
+      "message_ref": "1a1f34bb7db7b9c5",
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": null,
+      "price_source_url": "https://www.hktdc.com/event/hktoyfair/en/participation-fee-format",
+      "research_notes": "General exhibitions desk +852 1830668 and exhibitions@hktdc.org are in the official 2027 Exhibitor Package (https://hktoyfair.hktdc.com/pdf/2027/exhibitor-package-1.pdf). Named sales contacts in that PDF include john.yy.lam@hktdc.org, jess.lh.hui@hktdc.org, ben.cy.ng@hktdc.org, ceci.ly.lam@hktdc.org, anna.wl.lai@hktdc.org, queena.mw.lo@hktdc.org; Pop & Play zone: alex.cf.lee@hktdc.org, melody.tn.wan@hktdc.org. This is a B2B trade fair (HKCEC), not a consumer card-table show. Official participation-fee page exists but was blocked (HTTP 403) from this environment, so stand rates are not quoted here. Apply via the HKTDC exhibitor portal."
+    }
   },
   {
     "id": "bandai-asia",
@@ -855,7 +922,20 @@
     ],
     "logo": "logos/bandaiasia2.webp",
     "logo_kind": "poster_or_photo",
-    "section": "timeline"
+    "section": "timeline",
+    "outreach": {
+      "status": "not_contacted",
+      "method": null,
+      "contact": null,
+      "contact_type": "none",
+      "contacted_at": null,
+      "response_at": null,
+      "message_ref": null,
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": null,
+      "research_notes": "Official event info: https://asia-en.onepiece-cardgame.com/events/championship-26-27.html. Competitive championship; no public third-party vendor application found. Distributor emails circulating in earlier planner notes were not re-verified on a live official page in this research, so they are omitted."
+    }
   },
   {
     "id": "nexus-suntec",
@@ -908,7 +988,20 @@
     ],
     "logo": "logos/nexus.webp",
     "logo_kind": "logo",
-    "section": "timeline"
+    "section": "timeline",
+    "outreach": {
+      "status": "not_contacted",
+      "method": null,
+      "contact": "https://www.instagram.com/thenexustradeshow/",
+      "contact_type": "DM",
+      "contacted_at": null,
+      "response_at": null,
+      "message_ref": null,
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": null,
+      "research_notes": "No official website or published email found. Instagram @thenexustradeshow is the organiser account (also listed on Suntec event pages). Vendor tables are offered; 2027 Suntec Hall 405 rates not published."
+    }
   },
   {
     "id": "ycs-hk",
@@ -959,7 +1052,20 @@
     ],
     "logo": "logos/ygo_hk.webp",
     "logo_kind": "logo",
-    "section": "timeline"
+    "section": "timeline",
+    "outreach": {
+      "status": "not_contacted",
+      "method": null,
+      "contact": null,
+      "contact_type": "none",
+      "contacted_at": null,
+      "response_at": null,
+      "message_ref": null,
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": null,
+      "research_notes": "Official event pages: https://www.sakasakaevent.com/ygo. No public vendor programme or published exhibitor email found on the official pages checked. Player pre-registration is separate and is not a booth route. Ask Saka Saka via the official site if a vendors' area exists."
+    }
   },
   {
     "id": "scan-suntec-asia-comic-expo-005-202701",
@@ -1019,7 +1125,21 @@
       "relevance": 0.88
     },
     "is_new_find": true,
-    "verification": "unverified"
+    "verification": "unverified",
+    "outreach": {
+      "status": "not_contacted",
+      "method": null,
+      "contact": "sccsquare.office@gmail.com",
+      "contact_type": "email",
+      "contacted_at": null,
+      "response_at": null,
+      "message_ref": null,
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": "$350/- for 2 days (120cm × 60cm table, 2 chairs, 2 exhibitor passes). Early Bird $320/- with 2 passes or $330/- with 3 passes, purchase before 20 Nov 2026. Currency as published: $ (Singapore event; treat as SGD unless the organiser says otherwise).",
+      "price_source_url": "https://www.asiacomicsexpo.com/register",
+      "research_notes": "Email published on https://www.asiacomicsexpo.com/contact. Register/book at the official booth registration page. Terms: art, cosplay, animation, games, comics, toys only; own work (no AI art); one brand per booth; bookings non-refundable. Event is ticketed for visitors ($10/day, $18 for 2 days). Suntec Hall 403, 12:00–19:30 Sat / 12:00–19:00 Sun."
+    }
   },
   {
     "id": "connectcon2",
@@ -1073,7 +1193,20 @@
     ],
     "logo": "logos/connectcon.webp",
     "logo_kind": "logo",
-    "section": "timeline"
+    "section": "timeline",
+    "outreach": {
+      "status": "contacted",
+      "method": "email",
+      "contact": "teamconnecttcg@gmail.com",
+      "contact_type": "email",
+      "contacted_at": "2026-11-19",
+      "response_at": null,
+      "message_ref": "1a1f34bc1af58964",
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": null,
+      "research_notes": "Email and WhatsApp +60 10-896 2361 published on https://www.connectcon.asia/ under 'Vend at Connect Con 2' / Register Interest. 2027 rates and vendor line-up 'announced soon'. Starhill Atrium, Bukit Bintang."
+    }
   },
   {
     "id": "lioncity",
@@ -1127,7 +1260,20 @@
     ],
     "logo": "logos/lioncity.webp",
     "logo_kind": "logo",
-    "section": "timeline"
+    "section": "timeline",
+    "outreach": {
+      "status": "not_contacted",
+      "method": null,
+      "contact": "https://lioncitycollectorfest.base44.app/VendorPortal",
+      "contact_type": "form",
+      "contacted_at": null,
+      "response_at": null,
+      "message_ref": null,
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": null,
+      "research_notes": "Official site https://lioncitycollectorfest.base44.app/. Vendor Portal and Book Table pages require sign-in; public rates and a contact email were not published on the open pages. Also: https://lioncitycollectorfest.base44.app/BookTable. Melati Ballroom, Marina Bay Sands."
+    }
   },
   {
     "id": "jkt-toys-22",
@@ -1180,7 +1326,20 @@
     ],
     "logo": "logos/jkttoys.webp",
     "logo_kind": "poster_or_photo",
-    "section": "timeline"
+    "section": "timeline",
+    "outreach": {
+      "status": "not_contacted",
+      "method": null,
+      "contact": "https://www.instagram.com/jakartatoysfair/",
+      "contact_type": "DM",
+      "contacted_at": null,
+      "response_at": null,
+      "message_ref": null,
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": null,
+      "research_notes": "No published exhibitor email found on official pages checked. Instagram @jakartatoysfair. Vendor booths expected; 2027 rates not published. Listing also appears on ruangcosplay.com (third-party)."
+    }
   },
   {
     "id": "bcs-sg",
@@ -1233,7 +1392,20 @@
     ],
     "logo": "logos/bcs.webp",
     "logo_kind": "logo",
-    "section": "timeline"
+    "section": "timeline",
+    "outreach": {
+      "status": "not_contacted",
+      "method": null,
+      "contact": null,
+      "contact_type": "none",
+      "contacted_at": null,
+      "response_at": null,
+      "message_ref": null,
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": null,
+      "research_notes": "Official BCS hub previously listed as https://en.bushiroad.com/events/bcs2627/ (that URL returned 404 during this check). No public vendor programme found. Competitive official play event at Suntec Level 3 Concourse."
+    }
   },
   {
     "id": "lorcana-sg",
@@ -1284,7 +1456,20 @@
     ],
     "logo": "logos/lorcana.webp",
     "logo_kind": "logo",
-    "section": "timeline"
+    "section": "timeline",
+    "outreach": {
+      "status": "not_contacted",
+      "method": null,
+      "contact": null,
+      "contact_type": "none",
+      "contacted_at": null,
+      "response_at": null,
+      "message_ref": null,
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": null,
+      "research_notes": "Official pages: https://www.sakasakaevent.com/disney-Lorcana. No public vendor programme or published exhibitor email found. Venue TBA in planner data (2025 edition was at Marina Bay Sands). Ask Saka Saka via the official site if a vendors' area exists."
+    }
   },
   {
     "id": "jet-2027",
@@ -1337,7 +1522,20 @@
     ],
     "logo": "logos/jet.webp",
     "logo_kind": "poster_or_photo",
-    "section": "timeline"
+    "section": "timeline",
+    "outreach": {
+      "status": "contacted",
+      "method": "email",
+      "contact": "info@gyucreative.com",
+      "contact_type": "email",
+      "contacted_at": "2026-11-19",
+      "response_at": null,
+      "message_ref": "1a1f34bc9759df88",
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": null,
+      "research_notes": "Exhibitor applications stated as open on https://www.japanexpothailand.com/how-to-exhibit/. Tel +66 2 658 0557. Booth rates not published on that page. centralwOrld, Bangkok. Free admission event. Thai, Japanese and English enquiries welcome."
+    }
   },
   {
     "id": "grade10-2027",
@@ -1390,7 +1588,20 @@
     ],
     "logo": "logos/grade10.webp",
     "logo_kind": "logo",
-    "section": "timeline"
+    "section": "timeline",
+    "outreach": {
+      "status": "not_contacted",
+      "method": null,
+      "contact": "https://grade10.com/gems",
+      "contact_type": "form",
+      "contacted_at": null,
+      "response_at": null,
+      "message_ref": null,
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": null,
+      "research_notes": "Official shows page: https://grade10.com/shows. Table Booking System at grade10.com/gems requires sign-in; 2027 rates not shown on the public page. Premium table reservations have been directed to Instagram DM @grade10hk. No exhibitor email was published on the official pages checked."
+    }
   },
   {
     "id": "hobbycon-sg-2027",
@@ -1447,7 +1658,20 @@
     ],
     "logo": "logos/hobbycon.webp",
     "logo_kind": "logo",
-    "section": "timeline"
+    "section": "timeline",
+    "outreach": {
+      "status": "not_contacted",
+      "method": null,
+      "contact": "https://www.instagram.com/hobbyconasia/",
+      "contact_type": "DM",
+      "contacted_at": null,
+      "response_at": null,
+      "message_ref": null,
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": null,
+      "research_notes": "Official site https://www.hobbyconasia.com/ links Instagram @hobbyconasia. No exhibitor email was visible on the official pages retrieved in this research (an address appearing in third-party summaries was not first-hand verified, so it is omitted). 2027 booth rates were not published. Suntec Singapore; hall not yet published."
+    }
   },
   {
     "id": "bcs-my",
@@ -1499,7 +1723,20 @@
     ],
     "logo": "logos/bcs.webp",
     "logo_kind": "logo",
-    "section": "timeline"
+    "section": "timeline",
+    "outreach": {
+      "status": "not_contacted",
+      "method": null,
+      "contact": null,
+      "contact_type": "none",
+      "contacted_at": null,
+      "response_at": null,
+      "message_ref": null,
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": null,
+      "research_notes": "No public vendor programme found on official pages checked. Competitive official play event."
+    }
   },
   {
     "id": "bkk-card-show",
@@ -1552,7 +1789,20 @@
     ],
     "logo": "logos/bkkcardshow.webp",
     "logo_kind": "poster_or_photo",
-    "section": "timeline"
+    "section": "timeline",
+    "outreach": {
+      "status": "not_contacted",
+      "method": null,
+      "contact": "https://bangkokcardshow.com/Tablereservations",
+      "contact_type": "form",
+      "contacted_at": null,
+      "response_at": null,
+      "message_ref": null,
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": null,
+      "research_notes": "Official table-reservation portal: https://bangkokcardshow.com/Tablereservations and home https://bangkokcardshow.com/Home. The site is JavaScript-rendered; exhibitor email and 2027 prices could not be verified from the official HTML in this research, so they are not quoted. Venue: QSNCC Exhibition Hall 8 (LG)."
+    }
   },
   {
     "id": "cq-bkk",
@@ -1603,7 +1853,21 @@
     ],
     "logo": "logos/cq10.webp",
     "logo_kind": "poster_or_photo",
-    "section": "timeline"
+    "section": "timeline",
+    "outreach": {
+      "status": "not_contacted",
+      "method": null,
+      "contact": "info@enterdock.com",
+      "contact_type": "email",
+      "contacted_at": null,
+      "response_at": null,
+      "message_ref": null,
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": "Exhibitor (2 days, VAT included): 2 SP EXTRA 4,800฿; 4 SP EXTRA 9,600฿; Shell-scheme 2×2 9,500฿; Shell-scheme 2×2 corner 12,500฿. Brand & Corporate shell-scheme 3×3 corner 32,100฿. Circle booths (typically for independent creators, not shops): 1 SP 950฿/day or 1,900฿/2 days, up to 4 SP 7,600฿/2 days. Overseas Stripe payments add 7%.",
+      "price_source_url": "https://cq.enterdock.com/en/regulation/",
+      "research_notes": "info@enterdock.com is Enterdock's published general inquiry address (https://www.enterdock.com/contact/); biz@enterdock.com is also listed for HQ. Official booth application: https://cq.enterdock.com/en/regulation/booth-application/ (applications already closed). No Comic Square-specific public email was found on the CQ pages. Exhibitor/shop booths are the relevant category for a TCG vendor. Wi-Fi is not provided in the hall; power is included on EXTRA/shell booths only. Union Hall 1-2, Union Mall."
+    }
   },
   {
     "id": "hktcs-spring",
@@ -1709,7 +1973,20 @@
     ],
     "logo": "logos/bcs.webp",
     "logo_kind": "logo",
-    "section": "timeline"
+    "section": "timeline",
+    "outreach": {
+      "status": "not_contacted",
+      "method": null,
+      "contact": null,
+      "contact_type": "none",
+      "contacted_at": null,
+      "response_at": null,
+      "message_ref": null,
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": null,
+      "research_notes": "No public vendor programme found on official pages checked. Competitive official play event."
+    }
   },
   {
     "id": "ics-vol6",
@@ -1760,7 +2037,20 @@
     ],
     "logo": "logos/ics.webp",
     "logo_kind": "poster_or_photo",
-    "section": "timeline"
+    "section": "timeline",
+    "outreach": {
+      "status": "not_contacted",
+      "method": null,
+      "contact": "https://www.instagram.com/indonesiacardshow/",
+      "contact_type": "DM",
+      "contacted_at": null,
+      "response_at": null,
+      "message_ref": null,
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": null,
+      "research_notes": "Official site https://indonesiacardshow.com did not publish an exhibitor email in the retrieved HTML. Instagram @indonesiacardshow. 2027 booth rates not published. Venue: NICE PIK 2 / PIK 2 area."
+    }
   },
   {
     "id": "mefcc-2027",
@@ -1814,7 +2104,20 @@
     ],
     "logo": "logos/mefcc.webp",
     "logo_kind": "logo",
-    "section": "timeline"
+    "section": "timeline",
+    "outreach": {
+      "status": "contacted",
+      "method": "email",
+      "contact": "sales@mefcc.com",
+      "contact_type": "email",
+      "contacted_at": "2026-11-19",
+      "response_at": null,
+      "message_ref": "1a1f34bd0d91d997",
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": null,
+      "research_notes": "Also info@mefcc.com. Partnering page: https://www.mefcc.com/home/partnering/. Official site: https://www.mefcc.com/home/. 2027 exhibitor packages are tailored / brochure on request; prices not published. Artist Alley is a separate track (artistalley@mefcc.com was listed in earlier planner notes; only sales@ and info@ were re-verified on the official partnering/contact HTML this session). ADNEC Centre Abu Dhabi."
+    }
   },
   {
     "id": "cardcon3",
@@ -1869,7 +2172,21 @@
     ],
     "logo": "logos/cardconfav.webp",
     "logo_kind": "logo",
-    "section": "timeline"
+    "section": "timeline",
+    "outreach": {
+      "status": "not_contacted",
+      "method": null,
+      "contact": "cardcon@myrepublic.net",
+      "contact_type": "email",
+      "contacted_at": null,
+      "response_at": null,
+      "message_ref": null,
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": "Normal Table 1.8m × 0.7m S$350; L Table 2.5m × 1.8m S$680; prices include 9% GST. Includes table for both days, two chairs, floor-plan choice, and WiFi for up to three devices. Optional 13A power point S$150 for both days (bring your own extension, max 3 sockets). Card Con 2 exhibitors get S$150 off the first table. Max 10 tables per account. Pavilions (empty 6m × 6m) sold by enquiry.",
+      "price_source_url": "https://cardcon.asia/pricing",
+      "research_notes": "Book at https://cardcon.asia/pricing (sign in with email, pick a table on the floor plan, pay to confirm). Official support email cardcon@myrepublic.net is published in the site content. Suntec Hall 403-404, 11:00–21:00, set-up 10:00–11:00."
+    }
   },
   {
     "id": "lorcana-hk",
@@ -1920,7 +2237,20 @@
     ],
     "logo": "logos/lorcana.webp",
     "logo_kind": "logo",
-    "section": "timeline"
+    "section": "timeline",
+    "outreach": {
+      "status": "not_contacted",
+      "method": null,
+      "contact": null,
+      "contact_type": "none",
+      "contacted_at": null,
+      "response_at": null,
+      "message_ref": null,
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": null,
+      "research_notes": "Official pages: https://www.sakasakaevent.com/disney-Lorcana. No public vendor programme or published exhibitor email found. Ask Saka Saka via the official site if a vendors' area exists."
+    }
   },
   {
     "id": "zubculture",
@@ -1971,7 +2301,21 @@
     ],
     "logo": "logos/zub.webp",
     "logo_kind": "logo",
-    "section": "timeline"
+    "section": "timeline",
+    "outreach": {
+      "status": "contacted",
+      "method": "email",
+      "contact": "support@zubculture.com",
+      "contact_type": "email",
+      "contacted_at": "2026-11-19",
+      "response_at": null,
+      "message_ref": "1a1f34bdb7831450",
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": "VTuber Spotlight package S$400 (10 slots, not a standard merch table). Standard merch/TCG booth rates were not itemised on the public homepage.",
+      "price_source_url": "https://zubculture.com/",
+      "research_notes": "Email published on https://zubculture.com/ (Mon–Fri 10:00–19:00). The Cathay, free entry, 100+ booths including a TCG & collectibles area. Instagram @zub.culture. Ask support@ for merch/TCG table options, sizes and inclusions."
+    }
   },
   {
     "id": "scan-supanova-supanova-comic-con-gaming-gold-coast-202704",
@@ -2030,7 +2374,21 @@
       "relevance": 0.82
     },
     "is_new_find": true,
-    "verification": "unverified"
+    "verification": "unverified",
+    "outreach": {
+      "status": "not_contacted",
+      "method": null,
+      "contact": "exhibitor@supanova.com.au",
+      "contact_type": "email",
+      "contacted_at": null,
+      "response_at": null,
+      "message_ref": null,
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": "2027 shell-scheme one booth (3×3m), GST included: Early Bird AUD $1,606 / Full AUD $2,414 (Melbourne, Gold Coast & Perth band). Furniture not included (6ft trestle AUD $31; chair AUD $7). Single 240V power point to 1000W AUD $162. The Alley / Supa-Market early bird AUD $847 / full AUD $1,271 (same city band). Larger booths listed in the sales kit.",
+      "price_source_url": "https://exhibitors.supanova.com.au/wp-content/uploads/Exhibitor-info-deck2027.pdf",
+      "research_notes": "Apply at https://www.supanova.com.au/exhibitors/ or https://exhibitors.supanova.com.au/ (new exhibitors need approval before booking). Official 2027 Exhibition Sales Kit. Venue: Gold Coast Convention & Exhibition Centre. partners@supanova.com.au for sponsorship/promotions."
+    }
   },
   {
     "id": "tte-2027",
@@ -2142,7 +2500,21 @@
       "relevance": 0.82
     },
     "is_new_find": true,
-    "verification": "unverified"
+    "verification": "unverified",
+    "outreach": {
+      "status": "not_contacted",
+      "method": null,
+      "contact": "exhibitor@supanova.com.au",
+      "contact_type": "email",
+      "contacted_at": null,
+      "response_at": null,
+      "message_ref": null,
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": "2027 shell-scheme one booth (3×3m), GST included: Early Bird AUD $1,606 / Full AUD $2,414 (Melbourne, Gold Coast & Perth band). Furniture not included. See Gold Coast row / official sales kit for full size ladder, Alley rates and power add-ons.",
+      "price_source_url": "https://exhibitors.supanova.com.au/wp-content/uploads/Exhibitor-info-deck2027.pdf",
+      "research_notes": "Apply at https://www.supanova.com.au/exhibitors/ or https://exhibitors.supanova.com.au/. 3-day event including Level Up Friday. Melbourne Showgrounds."
+    }
   },
   {
     "id": "caps-apr",
@@ -2197,7 +2569,20 @@
     ],
     "logo": "logos/caps.webp",
     "logo_kind": "logo",
-    "section": "timeline"
+    "section": "timeline",
+    "outreach": {
+      "status": "not_contacted",
+      "method": null,
+      "contact": "https://www.instagram.com/ctrl.alt.play.show/",
+      "contact_type": "DM",
+      "contacted_at": null,
+      "response_at": null,
+      "message_ref": null,
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": null,
+      "research_notes": "Same organiser contact as other CAPS editions. Instagram @ctrl.alt.play.show. Suntec Hall 401/402. Table rates not published. Date sourced from Cardian calendar; confirm with CAPS."
+    }
   },
   {
     "id": "def-gameexpo",
@@ -2248,7 +2633,20 @@
     ],
     "logo": "logos/def.webp",
     "logo_kind": "logo",
-    "section": "timeline"
+    "section": "timeline",
+    "outreach": {
+      "status": "not_contacted",
+      "method": null,
+      "contact": null,
+      "contact_type": "none",
+      "contacted_at": null,
+      "response_at": null,
+      "message_ref": null,
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": null,
+      "research_notes": "Official site https://www.dubaiesportsfestival.com/ was blocked (HTTP 403) during this research, so no 2027 exhibitor email, form or price could be verified first-hand. Earlier planner notes cited a 2026 The Narrows table rate (AED 1,750 + VAT) via uprizing.ae — that is a 2026 figure, not a confirmed 2027 price, and is not repeated as current. Re-check the official site or DFRE for exhibitor registration."
+    }
   },
   {
     "id": "mbl-hk",
@@ -2457,7 +2855,20 @@
     ],
     "logo": "logos/comifuro.webp",
     "logo_kind": "logo",
-    "section": "timeline"
+    "section": "timeline",
+    "outreach": {
+      "status": "not_contacted",
+      "method": null,
+      "contact": "https://comifuro.net/contact/",
+      "contact_type": "form",
+      "contacted_at": null,
+      "response_at": null,
+      "message_ref": null,
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": null,
+      "research_notes": "Official site https://comifuro.net and contact form https://comifuro.net/contact/ (English, Bahasa Indonesia, or Japanese). No exhibitor email was visible in the retrieved HTML. Primarily a creator/circle (doujin) event; a corporate/dealer booth programme was not confirmed for CF24 on the pages retrieved (an older corporate-registration URL returned 404). ICE BSD City."
+    }
   },
   {
     "id": "mbl-th",
@@ -2663,7 +3074,20 @@
     ],
     "logo": "logos/crbwcs.webp",
     "logo_kind": "logo",
-    "section": "timeline"
+    "section": "timeline",
+    "outreach": {
+      "status": "not_contacted",
+      "method": null,
+      "contact": null,
+      "contact_type": "none",
+      "contacted_at": null,
+      "response_at": null,
+      "message_ref": null,
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": null,
+      "research_notes": "Official site https://www.cookierunbraverse.com/. Competitive world championship at QSNCC. No vendor or exhibitor programme announced on official pages checked."
+    }
   },
   {
     "id": "sgcard-mid",
@@ -2825,7 +3249,21 @@
       "relevance": 0.82
     },
     "is_new_find": true,
-    "verification": "unverified"
+    "verification": "unverified",
+    "outreach": {
+      "status": "not_contacted",
+      "method": null,
+      "contact": "exhibitor@supanova.com.au",
+      "contact_type": "email",
+      "contacted_at": null,
+      "response_at": null,
+      "message_ref": null,
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": "2027 shell-scheme one booth (3×3m), GST included: Early Bird AUD $1,745 / Full AUD $2,622 (Sydney & Brisbane band). Furniture not included. Alley / Supa-Market early bird AUD $932 / full AUD $1,416. See official sales kit for the full size ladder and power/furniture add-ons.",
+      "price_source_url": "https://exhibitors.supanova.com.au/wp-content/uploads/Exhibitor-info-deck2027.pdf",
+      "research_notes": "Apply at https://www.supanova.com.au/exhibitors/ or https://exhibitors.supanova.com.au/. 3-day event including Level Up Friday. Sydney Showground, Olympic Park. Note: official sales kit dates are 18–20 Jun 2027 in planner data / 19–21 Jun appears on an older exhibitors webpage for 2026 — use the 2027 kit and planner dates, and confirm when booking."
+    }
   },
   {
     "id": "scan-supanova-supanova-comic-con-gaming-perth-202706",
@@ -2884,7 +3322,21 @@
       "relevance": 0.82
     },
     "is_new_find": true,
-    "verification": "unverified"
+    "verification": "unverified",
+    "outreach": {
+      "status": "not_contacted",
+      "method": null,
+      "contact": "exhibitor@supanova.com.au",
+      "contact_type": "email",
+      "contacted_at": null,
+      "response_at": null,
+      "message_ref": null,
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": "2027 shell-scheme one booth (3×3m), GST included: Early Bird AUD $1,606 / Full AUD $2,414 (Melbourne, Gold Coast & Perth band). Furniture not included. See official sales kit for full size ladder and add-ons.",
+      "price_source_url": "https://exhibitors.supanova.com.au/wp-content/uploads/Exhibitor-info-deck2027.pdf",
+      "research_notes": "Apply at https://www.supanova.com.au/exhibitors/ or https://exhibitors.supanova.com.au/. Perth Convention & Exhibition Centre."
+    }
   },
   {
     "id": "hobby-horizon",
@@ -2990,7 +3442,20 @@
     ],
     "logo": "logos/acghk.webp",
     "logo_kind": "logo",
-    "section": "timeline"
+    "section": "timeline",
+    "outreach": {
+      "status": "not_contacted",
+      "method": null,
+      "contact": "information@ani-com.hk",
+      "contact_type": "email",
+      "contacted_at": null,
+      "response_at": null,
+      "message_ref": null,
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": null,
+      "research_notes": "Email, tel +852 2344 0415 and fax +852 2951 4142 published on https://ani-com.hk/en/contact/. Exhibitor zone: https://ani-com.hk/en/exhibitor/. The live site still brands some pages as 2026; use it as the official channel and confirm 2027 forms. Current 2027 booth rates were not published on the pages retrieved. A 2021 rate should not be used as a 2027 figure. HKCEC Hall 1."
+    }
   },
   {
     "id": "playgrounds",
@@ -3098,7 +3563,20 @@
     ],
     "logo": "logos/worlds.webp",
     "logo_kind": "logo",
-    "section": "timeline"
+    "section": "timeline",
+    "outreach": {
+      "status": "not_contacted",
+      "method": null,
+      "contact": null,
+      "contact_type": "none",
+      "contacted_at": null,
+      "response_at": null,
+      "message_ref": null,
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": null,
+      "research_notes": "No official vendor or exhibitor programme has been published for Singapore 2027. Venue: Singapore EXPO, with Championship Sunday finals also at Singapore Indoor Stadium. Official news has been via pokemon.com / TPCi; no booth application found. Same weekend as CAPS at Suntec."
+    }
   },
   {
     "id": "caps-worlds",
@@ -3150,7 +3628,20 @@
     ],
     "logo": "logos/caps.webp",
     "logo_kind": "logo",
-    "section": "timeline"
+    "section": "timeline",
+    "outreach": {
+      "status": "not_contacted",
+      "method": null,
+      "contact": "https://www.instagram.com/ctrl.alt.play.show/",
+      "contact_type": "DM",
+      "contacted_at": null,
+      "response_at": null,
+      "message_ref": null,
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": null,
+      "research_notes": "Same CAPS contact as other editions. Runs the same weekend as Pokémon World Championships 2027, at Suntec Hall 403-405 (per Cardian). Table rates not published. Worth prioritising if Worlds itself has no public vendor programme."
+    }
   },
   {
     "id": "funslah",
@@ -3366,7 +3857,21 @@
       "relevance": 0.6
     },
     "is_new_find": true,
-    "verification": "unverified"
+    "verification": "unverified",
+    "outreach": {
+      "status": "not_contacted",
+      "method": null,
+      "contact": "info@expertiseevents.com.au",
+      "contact_type": "email",
+      "contacted_at": null,
+      "response_at": null,
+      "message_ref": null,
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": null,
+      "price_source_url": "https://ozcomiccon.com/artist-alley-fees-and-inclusions/",
+      "research_notes": "Exhibitor / sponsorship expressions of interest: https://ozcomiccon.com/expressions-of-interest/ (form; the sales team follows up). Email published on the organiser page https://expertiseevents.com.au/comic-con/. Event site: https://ozcomiccon.com/sydney/. 2027 exhibitor (trade) booth prices were not published. 2026 Artist Alley / Collect-tables rates are on the fees page (Sydney Artist Alley AUD $551.25 plus GST; Collect-tables AUD $550 plus GST) — these are 2026 figures for artist/collector tables, not a confirmed 2027 trade-booth price. Power and lighting sold separately."
+    }
   },
   {
     "id": "paperworld",
@@ -3418,7 +3923,20 @@
     ],
     "logo": "logos/paperworld.webp",
     "logo_kind": "logo",
-    "section": "timeline"
+    "section": "timeline",
+    "outreach": {
+      "status": "not_contacted",
+      "method": null,
+      "contact": "paperworld@uae.messefrankfurt.com",
+      "contact_type": "email",
+      "contacted_at": null,
+      "response_at": null,
+      "message_ref": null,
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": null,
+      "research_notes": "B2B stationery/paper/gifts trade fair at Dubai World Trade Centre, not a consumer card-table show. Official contact page https://paperworld-middle-east.ae.messefrankfurt.com/dubai/en/contact.html also lists Head of Sales wellah.ellis@uae.messefrankfurt.com and sales managers felipe.jaramillo@uae.messefrankfurt.com, nour.alkordi@uae.messefrankfurt.com. Exhibit page: https://paperworld-middle-east.ae.messefrankfurt.com/dubai/en/exhibitors.html. FAQ tells exhibitors to fill a booking-stand form; stand prices are quoted after enquiry, not published. Operations: ops-paperworldgiftsandlifestyle@uae.messefrankfurt.com."
+    }
   },
   {
     "id": "comfest-kw",
@@ -3525,7 +4043,20 @@
     ],
     "logo": "logos/caps.webp",
     "logo_kind": "logo",
-    "section": "timeline"
+    "section": "timeline",
+    "outreach": {
+      "status": "not_contacted",
+      "method": null,
+      "contact": "https://www.instagram.com/ctrl.alt.play.show/",
+      "contact_type": "DM",
+      "contacted_at": null,
+      "response_at": null,
+      "message_ref": null,
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": null,
+      "research_notes": "Same CAPS contact as other editions. Singapore EXPO (hall not specified on Cardian). Table rates not published."
+    }
   },
   {
     "id": "bkk-cardcon",
@@ -4002,7 +4533,21 @@
       "relevance": 0.82
     },
     "is_new_find": true,
-    "verification": "unverified"
+    "verification": "unverified",
+    "outreach": {
+      "status": "not_contacted",
+      "method": null,
+      "contact": "exhibitor@supanova.com.au",
+      "contact_type": "email",
+      "contacted_at": null,
+      "response_at": null,
+      "message_ref": null,
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": "2027 shell-scheme one booth (3×3m), GST included: Early Bird AUD $1,433 / Full AUD $2,149 (Adelaide band). Furniture not included. Alley / Supa-Market early bird AUD $775 / full AUD $1,162. See official sales kit for the full size ladder and add-ons.",
+      "price_source_url": "https://exhibitors.supanova.com.au/wp-content/uploads/Exhibitor-info-deck2027.pdf",
+      "research_notes": "Apply at https://www.supanova.com.au/exhibitors/ or https://exhibitors.supanova.com.au/. 3-day event including Level Up Friday. Adelaide Showground."
+    }
   },
   {
     "id": "scan-supanova-supanova-comic-con-gaming-brisbane-202711",
@@ -4061,7 +4606,21 @@
       "relevance": 0.82
     },
     "is_new_find": true,
-    "verification": "unverified"
+    "verification": "unverified",
+    "outreach": {
+      "status": "not_contacted",
+      "method": null,
+      "contact": "exhibitor@supanova.com.au",
+      "contact_type": "email",
+      "contacted_at": null,
+      "response_at": null,
+      "message_ref": null,
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": "2027 shell-scheme one booth (3×3m), GST included: Early Bird AUD $1,745 / Full AUD $2,622 (Sydney & Brisbane band). Furniture not included. Alley / Supa-Market early bird AUD $932 / full AUD $1,416. See official sales kit for the full size ladder and add-ons.",
+      "price_source_url": "https://exhibitors.supanova.com.au/wp-content/uploads/Exhibitor-info-deck2027.pdf",
+      "research_notes": "Apply at https://www.supanova.com.au/exhibitors/ or https://exhibitors.supanova.com.au/. 3-day event including Level Up Friday. Brisbane Convention & Exhibition Centre."
+    }
   },
   {
     "id": "tcgkl-2027",
@@ -5157,7 +5716,20 @@
     ],
     "logo": "logos/awardx.webp",
     "logo_kind": "logo",
-    "section": "recurring_sg"
+    "section": "recurring_sg",
+    "outreach": {
+      "status": "not_contacted",
+      "method": null,
+      "contact": "https://www.instagram.com/award.x/",
+      "contact_type": "DM",
+      "contacted_at": null,
+      "response_at": null,
+      "message_ref": null,
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": null,
+      "research_notes": "No official website or published email found. Instagram @award.x is the organiser handle listed by Singapore card-show directories (e.g. BAW Vault). Recurring weekend show at Tan Boon Liat #15-04. Booth rates not published."
+    }
   },
   {
     "id": "r-tradeting",
@@ -5248,7 +5820,20 @@
     ],
     "logo": "logos/tradeting.webp",
     "logo_kind": "poster_or_photo",
-    "section": "recurring_sg"
+    "section": "recurring_sg",
+    "outreach": {
+      "status": "not_contacted",
+      "method": null,
+      "contact": "https://www.instagram.com/thetradetin_sg/",
+      "contact_type": "DM",
+      "contacted_at": null,
+      "response_at": null,
+      "message_ref": null,
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": null,
+      "research_notes": "No official website or published email found. Instagram @thetradetin_sg is the organiser account used across public listings. Community fair at Kallang Leisure Park Atrium. Table rates not published (community reports say tables are relatively cheap; not an official figure)."
+    }
   },
   {
     "id": "r-sunday",
@@ -5307,7 +5892,20 @@
     ],
     "logo": null,
     "logo_kind": null,
-    "section": "recurring_sg"
+    "section": "recurring_sg",
+    "outreach": {
+      "status": "contacted",
+      "method": "email",
+      "contact": "contact@collectfun.co",
+      "contact_type": "email",
+      "contacted_at": "2026-11-19",
+      "response_at": null,
+      "message_ref": "1a1f34ba631e0fff",
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": null,
+      "research_notes": "Email published on the official site https://collectfun.co/ (and play.collectfun.co). Instagram @collectfun.tcg. Recurring Sunday show at Grantral Mall #04-22. Booth rates not published."
+    }
   },
   {
     "id": "r-kip",
@@ -5366,7 +5964,20 @@
     ],
     "logo": "logos/kipvenue.webp",
     "logo_kind": "poster_or_photo",
-    "section": "recurring_sg"
+    "section": "recurring_sg",
+    "outreach": {
+      "status": "not_contacted",
+      "method": null,
+      "contact": "https://www.instagram.com/kipncollecttcgshow/",
+      "contact_type": "DM",
+      "contacted_at": null,
+      "response_at": null,
+      "message_ref": null,
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": null,
+      "research_notes": "No official website or published email found. Instagram @kipncollecttcgshow. Planner lists #3 and #4 as one record dated 9–10 Jan 2027; public calendars list #3 on 9–10 Jan and #4 on 16–17 Jan 2027 at the same venue (Kallang Leisure Park Atrium). Confirm both weekends with the organiser. Rates not published."
+    }
   },
   {
     "id": "r-nexus",
@@ -5429,7 +6040,20 @@
     ],
     "logo": "logos/nexus.webp",
     "logo_kind": "logo",
-    "section": "recurring_sg"
+    "section": "recurring_sg",
+    "outreach": {
+      "status": "not_contacted",
+      "method": null,
+      "contact": "https://www.instagram.com/thenexustradeshow/",
+      "contact_type": "DM",
+      "contacted_at": null,
+      "response_at": null,
+      "message_ref": null,
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": null,
+      "research_notes": "Same organiser as the Suntec edition. Instagram @thenexustradeshow. Venue: The Centrepoint #03-07 (Play United). Rates not published."
+    }
   },
   {
     "id": "r-caps",
@@ -5492,7 +6116,20 @@
     ],
     "logo": "logos/caps.webp",
     "logo_kind": "logo",
-    "section": "recurring_sg"
+    "section": "recurring_sg",
+    "outreach": {
+      "status": "not_contacted",
+      "method": null,
+      "contact": "https://www.instagram.com/ctrl.alt.play.show/",
+      "contact_type": "DM",
+      "contacted_at": null,
+      "response_at": null,
+      "message_ref": null,
+      "quoted_price": null,
+      "notes": "",
+      "published_booth_price": null,
+      "research_notes": "No official website or published email found. Instagram @ctrl.alt.play.show; some directories also mention @capsshow.sg. Planner also lists Telegram t.me/CrtlAltPlayShow (spelling as in planner data; confirm the handle). Junction 8 and City Square Mall. Table rates not published."
+    }
   },
   {
     "id": "watch-card-fest",

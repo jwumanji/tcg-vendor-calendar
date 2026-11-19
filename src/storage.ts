@@ -1,4 +1,6 @@
 import { normalizeWeights, type Weights } from "./scoring";
+import { normalizeOutreachPatch } from "./data";
+import type { OutreachPatch } from "./model";
 
 export const stages = [
   "New",
@@ -19,6 +21,7 @@ export interface Entry {
   stageUpdatedAt: string | null;
 }
 export type Entries = Record<string, Entry>;
+export type OutreachPatches = Record<string, OutreachPatch>;
 export const emptyEntry: Entry = {
   going: false,
   goingUpdatedAt: null,
@@ -115,12 +118,21 @@ export interface PriorityPreferences {
 }
 export interface Backup {
   priority?: PriorityPreferences;
+  outreach?: OutreachPatches;
   version: 1;
   exportedAt: string;
   entries: Entries;
 }
 const object = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === "object" && !Array.isArray(v);
+function validateOutreachEntry(id: string, value: unknown): OutreachPatch {
+  if (!id.trim()) throw new Error("Outreach ID must not be empty.");
+  try {
+    return normalizeOutreachPatch(value, true);
+  } catch (error) {
+    throw new Error(`Invalid outreach for ${id}. ${(error as Error).message}`);
+  }
+}
 const timestamp = (v: unknown): v is string =>
   typeof v === "string" &&
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(v) &&
@@ -166,6 +178,15 @@ export function validateBackup(value: unknown): Backup {
     };
   }
   const result: Backup = { version: 1, exportedAt: value.exportedAt, entries };
+  if (value.outreach !== undefined) {
+    if (!object(value.outreach)) throw new Error("Invalid outreach in backup.");
+    result.outreach = Object.assign(
+      Object.create(null),
+      Object.fromEntries(
+        Object.entries(value.outreach).map(([id, patch]) => [id, validateOutreachEntry(id, patch)]),
+      ),
+    );
+  }
   if (value.priority !== undefined) {
     if (
       !object(value.priority) ||
@@ -183,12 +204,14 @@ export function validateBackup(value: unknown): Backup {
 export function backup(
   entries: Entries,
   priority?: PriorityPreferences,
+  outreach?: OutreachPatches,
 ): Backup {
   return {
     version: 1,
     exportedAt: new Date().toISOString(),
     entries,
     ...(priority && { priority }),
+    ...(outreach && { outreach }),
   };
 }
 export function importPriority(
@@ -234,14 +257,27 @@ export function importEntries(
   }
   return result;
 }
+export function importOutreach(
+  current: OutreachPatches,
+  incoming: OutreachPatches | undefined,
+  mode: "merge" | "replace",
+): OutreachPatches {
+  if (!incoming) return current;
+  if (mode === "replace") return incoming;
+  const result: OutreachPatches = Object.assign(Object.create(null), current);
+  for (const [id, patch] of Object.entries(incoming))
+    result[id] = { ...result[id], ...patch };
+  return result;
+}
 export function unknownIds(
   entries: Entries,
   ids: string[],
   overrides: Record<string, number> = {},
+  outreach: OutreachPatches = {},
 ) {
   const known = new Set(ids);
   return [
-    ...new Set([...Object.keys(entries), ...Object.keys(overrides)]),
+    ...new Set([...Object.keys(entries), ...Object.keys(overrides), ...Object.keys(outreach)]),
   ].filter((id) => !known.has(id));
 }
 export function migrateLegacy(value: unknown): Entries {
@@ -261,6 +297,7 @@ export function migrateLegacy(value: unknown): Entries {
 }
 export interface LoadedEntries {
   entries: Entries;
+  outreach: OutreachPatches;
   error: string;
   raw: string | null;
   recoveryKey: string | null;
@@ -272,6 +309,7 @@ export function loadEntries(
   let raw: string | null = null;
   const result: LoadedEntries = {
     entries: Object.create(null),
+    outreach: Object.create(null),
     error: "",
     raw: null,
     recoveryKey: null,
@@ -288,7 +326,8 @@ export function loadEntries(
       };
     const value: unknown = JSON.parse(raw);
     try {
-      return { ...result, entries: validateBackup(value).entries };
+      const { entries, outreach = result.outreach } = validateBackup(value);
+      return { ...result, entries, outreach };
     } catch {
       if (object(value) && object(value.entries)) {
         for (const [id, entry] of Object.entries(value.entries)) {
@@ -298,6 +337,15 @@ export function loadEntries(
               validateBackup({ ...backup({}), entries: { [id]: entry } })
                 .entries,
             );
+          } catch {
+            result.dropped++;
+          }
+        }
+      }
+      if (object(value) && object(value.outreach)) {
+        for (const [id, patch] of Object.entries(value.outreach)) {
+          try {
+            result.outreach[id] = validateOutreachEntry(id, patch);
           } catch {
             result.dropped++;
           }
@@ -317,15 +365,17 @@ export function loadEntries(
       /* Saving stays locked until the original can be preserved. */
     }
   }
-  result.error = `Saved pipeline needs recovery. Recovered ${Object.keys(result.entries).length} entries; dropped ${result.dropped} invalid entries. Automatic saving is paused. ${result.recoveryKey ? "The original is preserved on this device." : "Export the original before continuing."}`;
+  const recovered = Object.keys(result.entries).length + Object.keys(result.outreach).length;
+  result.error = `Saved planner data needs recovery. Recovered ${recovered} entries and outreach patches. Dropped ${result.dropped} invalid records. Automatic saving is paused. ${result.recoveryKey ? "The original is preserved on this device." : "Export the original before continuing."}`;
   return result;
 }
 export function stashBeforeReplace(
   entries: Entries,
   priority?: PriorityPreferences,
+  outreach?: OutreachPatches,
 ): string {
   const key = `${STORAGE_KEY}-before-replace-${Date.now()}`;
-  localStorage.setItem(key, JSON.stringify(backup(entries, priority)));
+  localStorage.setItem(key, JSON.stringify(backup(entries, priority, outreach)));
   return key;
 }
 export function saveValue(key: string, value: unknown): string {

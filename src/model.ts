@@ -11,6 +11,41 @@ export interface EventSource {
   /** 0-1: how relevant the event is to a TCG vendor. */
   relevance: number | null;
 }
+export const outreachStatuses = ["not_contacted", "contacted", "replied", "quoted", "declined"] as const;
+export const outreachMethods = ["email", "form", "instagram_dm", "other"] as const;
+export const outreachContactTypes = ["email", "form", "DM", "none"] as const;
+export type OutreachStatus = (typeof outreachStatuses)[number];
+export type OutreachMethod = (typeof outreachMethods)[number];
+export type OutreachContactType = (typeof outreachContactTypes)[number];
+
+export interface Outreach {
+  status: OutreachStatus;
+  method: OutreachMethod | null;
+  contact: string | null;
+  contact_type: OutreachContactType | null;
+  contacted_at: string | null;
+  response_at: string | null;
+  message_ref: string | null;
+  quoted_price: string | null;
+  notes: string;
+  published_booth_price: string | null;
+  price_source_url?: string | null;
+  research_notes?: string;
+}
+export type OutreachPatch = Partial<Outreach>;
+export const emptyOutreach: Outreach = {
+  status: "not_contacted",
+  method: null,
+  contact: null,
+  contact_type: null,
+  contacted_at: null,
+  response_at: null,
+  message_ref: null,
+  quoted_price: null,
+  notes: "",
+  published_booth_price: null,
+};
+
 export interface Event {
   id: string;
   name: string;
@@ -45,6 +80,7 @@ export interface Event {
   vendor_cost: string | null;
   booth_detail: string | null;
   contact: string | null;
+  outreach?: Outreach | null;
   vendor_score: number | null;
   shortlist_priority: number | null;
   priority_market: boolean;
@@ -81,6 +117,7 @@ export interface Filters {
   newOnly: boolean;
   minTier: "any" | "strong" | "must";
   status: string;
+  outreach: "" | "contacted" | "not_contacted";
   stages: import("./storage").Stage[];
 }
 export const emptyFilters: Filters = {
@@ -99,5 +136,6 @@ export const emptyFilters: Filters = {
   newOnly: false,
   minTier: "any",
   status: "",
+  outreach: "",
   stages: [],
 };

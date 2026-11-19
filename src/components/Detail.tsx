@@ -27,6 +27,9 @@ import {
 import { Logo, Status, Place } from "./EventIdentity";
 import { StageBadge, StagePicker } from "./Pipeline";
 import type { Entry, Stage } from "../storage";
+import type { Outreach, OutreachPatch } from "../model";
+import { OutreachChip } from "./OutreachChip";
+import { OutreachSection } from "./OutreachSection";
 export function Detail({
   e,
   occurrence,
@@ -34,6 +37,8 @@ export function Detail({
   setGoing,
   onStage,
   onNote,
+  knownOutreach,
+  onOutreach,
   saved,
   score,
   setOverride,
@@ -46,6 +51,8 @@ export function Detail({
   setGoing: SetGoing;
   onStage: (s: Stage) => void;
   onNote: (s: string) => void;
+  knownOutreach?: Outreach | null;
+  onOutreach: (patch: OutreachPatch) => void;
   saved: boolean;
   score: ScoreResult;
   setOverride: (value: number | null) => void;
@@ -104,6 +111,7 @@ export function Detail({
         <div className="detail-badges">
           <Status e={e} />
           <FindBadges e={e} />
+          <OutreachChip outreach={e.outreach} showUncontacted />
           {e.priority_market && (
             <span className="badge priority">
               ✦ {e.priority_market_level ? `${e.priority_market_level} ` : ""}
@@ -141,6 +149,12 @@ export function Detail({
           result={score}
           setOverride={setOverride}
           openClash={openClash}
+        />
+        <OutreachSection
+          outreach={e.outreach ?? undefined}
+          knownOutreach={knownOutreach}
+          onSave={onOutreach}
+          saved={saved}
         />
         <div className="planning">
           <label htmlFor="detail-stage">PIPELINE STAGE</label>

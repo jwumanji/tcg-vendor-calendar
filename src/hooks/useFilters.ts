@@ -34,6 +34,8 @@ export function normalizeFilters(value: unknown): Filters {
       f[key] = v[key];
   }
   if (v.minTier === "must" || v.minTier === "strong") f.minTier = v.minTier;
+  if (v.outreach === "contacted" || v.outreach === "not_contacted")
+    f.outreach = v.outreach;
   f.going = v.going === true;
   f.notGoing = !f.going && v.notGoing === true;
   f.next90 = v.next90 === true;

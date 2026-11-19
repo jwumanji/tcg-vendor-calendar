@@ -14,30 +14,36 @@ import {
   stashBeforeReplace,
   validateBackup,
   importEntries,
+  importOutreach,
   unknownIds,
   type Entries,
+  type OutreachPatches,
 } from "../storage";
 import { download } from "../utils";
 export function BackupControls({
   entries,
+  outreach,
   ids,
   apply,
   priority,
   applyPriority,
 }: {
   entries: Entries;
+  outreach: OutreachPatches;
   ids: string[];
   priority: PriorityPreferences;
   applyPriority: (value: PriorityPreferences) => void;
-  apply: (entries: Entries) => void;
+  apply: (entries: Entries, outreach: OutreachPatches) => void;
 }) {
   const [preview, setPreview] = useState<Backup | null>(null);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
   const [mode, setMode] = useState<"merge" | "replace">("merge");
   const absent = preview
-    ? unknownIds(preview.entries, ids, preview.priority?.overrides)
+    ? unknownIds(preview.entries, ids, preview.priority?.overrides, preview.outreach)
     : [];
+  const outreachCount = Object.keys(preview?.outreach ?? {}).length;
+  const outreachSummary = `${outreachCount} outreach ${outreachCount === 1 ? "patch" : "patches"}`;
   return (
     <div className="backup-controls">
       <div className="backup-intro">
@@ -45,7 +51,7 @@ export function BackupControls({
           <HardDrive size={16} aria-hidden="true" /> Backup &amp; restore
         </span>
         <span>
-          Going choices, stages, notes and score settings are kept in this
+          Going choices, stages, notes, outreach edits and score settings are kept in this
           browser only. Export a backup before switching devices.
         </span>
       </div>
@@ -54,7 +60,7 @@ export function BackupControls({
           className="button"
           onClick={() =>
             download(
-              JSON.stringify(backup(entries, priority), null, 2),
+              JSON.stringify(backup(entries, priority, outreach), null, 2),
               "tcg-pipeline-backup.json",
               "application/json",
             )
@@ -101,6 +107,9 @@ export function BackupControls({
           <strong className="preview-title">
             Preview: {Object.keys(preview.entries).length} entries
           </strong>
+          {preview.outreach && (
+            <p>{outreachSummary}</p>
+          )}
           <p>
             {absent.length} IDs absent from current data (kept):{" "}
             {absent.slice(0, 20).join(", ") || "none"}
@@ -125,6 +134,13 @@ export function BackupControls({
               ? "Only imported entries will remain. Your current entries will be backed up on this device first."
               : "Other saved entries will remain, including absent IDs."}
           </p>
+          <p>
+            {!preview.outreach
+              ? "This backup leaves your outreach edits as they are."
+              : mode === "merge"
+                ? "Imported outreach edits take precedence for matching fields."
+                : "Imported outreach edits replace your current device edits. Shared outreach data still applies."}
+          </p>
           {preview.priority && (
             <p>
               Imported score weights will apply to all events.{" "}
@@ -138,13 +154,16 @@ export function BackupControls({
               className="button primary"
               onClick={() => {
                 try {
-                  if (mode === "replace") stashBeforeReplace(entries, priority);
-                  apply(importEntries(entries, preview.entries, mode));
+                  if (mode === "replace") stashBeforeReplace(entries, priority, outreach);
+                  apply(
+                    importEntries(entries, preview.entries, mode),
+                    importOutreach(outreach, preview.outreach, mode),
+                  );
                   applyPriority(
                     importPriority(priority, preview.priority, mode),
                   );
                   setStatus(
-                    `Imported ${Object.keys(preview.entries).length} entries (${mode}).`,
+                    `Imported ${Object.keys(preview.entries).length} entries${preview.outreach ? " and " + outreachSummary : ""} (${mode}).`,
                   );
                   setError("");
                   setPreview(null);

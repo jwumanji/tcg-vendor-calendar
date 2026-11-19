@@ -1,0 +1,58 @@
+[
+  {
+    "id": "r-sunday",
+    "status": "contacted",
+    "method": "email",
+    "contact": "contact@collectfun.co",
+    "contacted_at": "2026-11-19",
+    "message_ref": "1a1f34ba631e0fff"
+  },
+  {
+    "id": "color18",
+    "status": "contacted",
+    "method": "email",
+    "contact": "contact@colorfiesta.vn",
+    "contacted_at": "2026-11-19",
+    "message_ref": "1a1f34bb1e70beec"
+  },
+  {
+    "id": "hktdc",
+    "status": "contacted",
+    "method": "email",
+    "contact": "exhibitions@hktdc.org",
+    "contacted_at": "2026-11-19",
+    "message_ref": "1a1f34bb7db7b9c5"
+  },
+  {
+    "id": "connectcon2",
+    "status": "contacted",
+    "method": "email",
+    "contact": "teamconnecttcg@gmail.com",
+    "contacted_at": "2026-11-19",
+    "message_ref": "1a1f34bc1af58964"
+  },
+  {
+    "id": "jet-2027",
+    "status": "contacted",
+    "method": "email",
+    "contact": "info@gyucreative.com",
+    "contacted_at": "2026-11-19",
+    "message_ref": "1a1f34bc9759df88"
+  },
+  {
+    "id": "mefcc-2027",
+    "status": "contacted",
+    "method": "email",
+    "contact": "sales@mefcc.com",
+    "contacted_at": "2026-11-19",
+    "message_ref": "1a1f34bd0d91d997"
+  },
+  {
+    "id": "zubculture",
+    "status": "contacted",
+    "method": "email",
+    "contact": "support@zubculture.com",
+    "contacted_at": "2026-11-19",
+    "message_ref": "1a1f34bdb7831450"
+  }
+]

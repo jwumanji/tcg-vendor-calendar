@@ -1,5 +1,6 @@
 import { DEFAULT_WEIGHTS, normalizeWeights } from "./scoring";
 import { stored } from "./hooks/useFilters";
+import { mergeOutreach } from "./data";
 import {
   importPriority,
   normalizeOverrides,
@@ -20,9 +21,11 @@ import {
   loadEntries,
   saveValue,
   importEntries,
+  importOutreach,
   unknownIds,
   STORAGE_KEY,
 } from "./storage";
+import type { OutreachPatches } from "./storage";
 const entry = {
   ...emptyEntry,
   stage: "Interested" as const,
@@ -67,6 +70,51 @@ describe("versioned pipeline backup validation", () => {
       '{"__proto__":{"stage":"New","note":"","noteUpdatedAt":null,"stageUpdatedAt":null}}',
     );
     expect(Object.keys(validateBackup(value).entries)).toEqual(["__proto__"]);
+  });
+});
+
+describe("outreach backup patches", () => {
+  const current: OutreachPatches = {
+    event: { method: "form", notes: "Old notes", contacted_at: "2026-11-19" },
+    absent: { status: "declined" },
+  };
+  const incoming: OutreachPatches = {
+    event: { status: "quoted", notes: "", quoted_price: "$185", response_at: "2026-11-20" },
+  };
+  it("round trips patches through local storage and merges only fields supplied by the import", () => {
+    const { outreach } = validateBackup(JSON.parse(JSON.stringify(backup({}, undefined, incoming))));
+    expect(outreach).toEqual(incoming);
+    const patches = importOutreach(current, outreach, "merge");
+    expect(patches.event).toEqual({ ...current.event, ...incoming.event });
+    expect(patches.absent).toEqual(current.absent);
+    const loaded = loadEntries({ getItem: () => JSON.stringify(backup({}, undefined, patches)) });
+    expect(loaded.outreach).toEqual(patches);
+    expect(unknownIds({}, ["event"], {}, loaded.outreach)).toEqual(["absent"]);
+    const shared = mergeOutreach(null, {
+      contact_type: "form", contact: "https://example.com/apply",
+      published_booth_price: "$150", notes: "Original", price_source_url: "https://example.com/prices",
+    });
+    expect(mergeOutreach(shared, loaded.outreach.event)).toEqual({ ...shared, ...patches.event });
+    expect(importOutreach(current, outreach, "replace")).toEqual(incoming);
+  });
+
+  it("accepts old backups and distinguishes an absent outreach block from an empty one", () => {
+    const legacy = validateBackup(backup({ event: entry }));
+    expect(legacy.outreach).toBeUndefined();
+    expect(importOutreach(current, legacy.outreach, "replace")).toBe(current);
+    expect(importOutreach(current, {}, "replace")).toEqual({});
+  });
+
+  it("rejects invalid patch values and recovers valid local outreach from a damaged backup", () => {
+    const raw = {
+      ...backup({ event: entry }, undefined, incoming),
+      outreach: { ...incoming, broken: { response_at: "2026-02-30" } },
+    };
+    expect(() => validateBackup(raw)).toThrow("Invalid outreach for broken");
+    const recovered = loadEntries({ getItem: () => JSON.stringify(raw) });
+    expect(recovered.entries.event).toEqual(entry);
+    expect(recovered.outreach).toEqual(incoming);
+    expect(recovered.dropped).toBe(1);
   });
 });
 describe("storage and refresh persistence", () => {

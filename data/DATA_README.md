@@ -51,6 +51,15 @@ Unknown values are `null`; nothing is invented.
   - `vendor_deadline`
   - `vendor_cost`: text in local currency. A past year's rate is labelled with its year.
   - `booth_detail`, `contact`
+- **Outreach**
+  - `outreach` is optional or `null`. An absent record is treated as `not_contacted`.
+  - `status`: `not_contacted`, `contacted`, `replied`, `quoted`, or `declined`. The Contacted quick filter includes the last four. Pipeline stages are independent.
+  - `method`: `email`, `form`, `instagram_dm`, `other`, or `null`. Records the channel used and is `null` for `not_contacted`.
+  - `contact`: email address or web URL used or known, or `null`. `contact_type` is the researched route type (`email`, `form`, `DM`, `none`, or `null` when unresearched).
+  - `contacted_at` and `response_at`: ISO `YYYY-MM-DD` dates or `null`. The response date records a reply, quote, or decline separately from the original contact date.
+  - `message_ref`: optional message or submission identifier, represented by `null` when absent.
+  - `quoted_price`: free text or `null`. `notes` is editable free text. Optional `research_notes` holds the separate research notes.
+  - `published_booth_price`: free text or `null`, with optional `price_source_url`. The existing event-level `vendor_cost` and `contact` fields retain their original meanings.
 - **Scoring**
   - `vendor_score`: 0–100, the Page's Vendor Score; timeline only
   - `shortlist_priority`: 1–3 from the Page
@@ -67,6 +76,30 @@ Unknown values are `null`; nothing is invented.
   - `logo_kind`: `logo` or `poster_or_photo`
 
 Thumbnails can be shared, so one file may serve several events (for example CAPS and NEXUS).
+
+## Seeding outreach
+
+`outreach-contacts.json` snapshots the 48 researched events from
+`/workspace/vendor-outreach/contacts.json`. `outreach-log.json` records actual
+outreach in order. The first seven entries are emails sent on 2026-11-19 from
+`justin@grailfoxtcg.com`.
+
+After sending a form, append an object to `outreach-log.json` with the existing
+event ID, `"status": "contacted"`, `"method": "form"`, the actual
+`contacted_at` date, and `message_ref` if available. Omit `contact` to use the
+researched route already on the event. Use `mtg-sea-r2`, `bkk-card-show`, or
+`comifuro24` for the three researched forms. Append further entries for replies
+or quotes with the relevant `status`, `response_at`, `quoted_price`, and `notes`.
+Later entries update only the fields they supply. Run `node scripts/outreach-seed.ts`
+with Node 24. The seed rejects unknown IDs before writing and can be rerun
+against the same inputs without changing the file again.
+
+The app loads shared outreach from `events.json`, then applies this browser's
+saved edits field by field. JSON backups include the browser's outreach
+patches. Merge restores prefer imported values for overlapping fields. Older
+backups that omit outreach preserve the browser's existing patches.
+Scanner imports retain the planner's outreach for matching IDs, and scraper
+updates without outreach retain the saved record.
 
 ## App metadata and publishing
 

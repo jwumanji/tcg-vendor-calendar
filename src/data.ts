@@ -1,4 +1,12 @@
-import type { Event } from "./model";
+import {
+  emptyOutreach,
+  outreachContactTypes,
+  outreachMethods,
+  outreachStatuses,
+  type Event,
+  type Outreach,
+  type OutreachPatch,
+} from "./model.ts";
 const nullableStrings = [
   "games_note",
   "date_note",
@@ -45,6 +53,59 @@ export function validDate(value: unknown): value is string {
     new Date(value + "T00:00:00Z").toISOString().slice(0, 10) === value
   );
 }
+
+const record = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === "object" && !Array.isArray(value);
+const isText = (value: unknown): value is string => typeof value === "string";
+const httpUrl = (value: unknown): value is string =>
+  isText(value) && /^https?:\/\//i.test(value) && URL.canParse(value);
+
+export function outreachContactHref(value: unknown): string | undefined {
+  if (httpUrl(value)) return value;
+  if (isText(value) && /^[a-z\d.!#$%&'*+/=?^`{|}~-]+@[a-z\d.-]+\.[a-z\d-]+$/i.test(value))
+    return "mailto:" + encodeURIComponent(value).replace("%40", "@");
+}
+
+const oneOf = (allowed: readonly string[]) =>
+  (value: unknown) => isText(value) && allowed.includes(value);
+const nullable = (valid: (value: unknown) => boolean) =>
+  (value: unknown) => value === null || valid(value);
+const outreachFields: Record<keyof Outreach, (value: unknown) => boolean> = {
+  status: oneOf(outreachStatuses),
+  method: nullable(oneOf(outreachMethods)),
+  contact: nullable((value) => Boolean(outreachContactHref(value))),
+  contact_type: nullable(oneOf(outreachContactTypes)),
+  contacted_at: nullable(validDate),
+  response_at: nullable(validDate),
+  message_ref: nullable(isText),
+  quoted_price: nullable(isText),
+  notes: isText,
+  published_booth_price: nullable(isText),
+  price_source_url: nullable(httpUrl),
+  research_notes: isText,
+};
+
+export function normalizeOutreachPatch(value: unknown, strict = false): OutreachPatch {
+  if (!record(value)) {
+    if (strict) throw new Error("Expected an outreach object.");
+    return {};
+  }
+  return Object.fromEntries(
+    Object.entries(value).filter(([key, field]) => {
+      if (!Object.hasOwn(outreachFields, key)) return false;
+      if (outreachFields[key as keyof Outreach](field)) return true;
+      if (strict) throw new Error(`Invalid outreach field ${key}.`);
+      return false;
+    }),
+  );
+}
+
+export function mergeOutreach(base?: Outreach | null, patch?: OutreachPatch): Outreach {
+  const outreach = { ...emptyOutreach, ...base, ...patch };
+  if (outreach.status === "not_contacted") outreach.method = null;
+  return outreach;
+}
+
 export function normalizeEvents(value: unknown): Event[] {
   if (!Array.isArray(value)) throw new Error("Event data must be an array.");
   const ids = new Set<string>();
@@ -72,6 +133,8 @@ export function normalizeEvents(value: unknown): Event[] {
     };
     for (const key of nullableStrings)
       e[key] = typeof v[key] === "string" ? v[key] : null;
+    if (record(v.outreach)) e.outreach = mergeOutreach(null, normalizeOutreachPatch(v.outreach));
+    else if (v.outreach === null) e.outreach = null;
     for (const key of nullableNumbers)
       e[key] =
         typeof v[key] === "number" && Number.isFinite(v[key]) ? v[key] : null;

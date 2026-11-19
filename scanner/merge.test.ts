@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { merge, matches } from "./merge.ts";
 import { normalize } from "./normalize.ts";
 import type { Event } from "../src/model.ts";
+import { mergeOutreach } from "../src/data.ts";
 import { validate } from "./run.ts";
 import sg from "./sources/sg-card-show.ts";
 
@@ -112,6 +113,30 @@ it("replaces the Scanner portion and drops a find the new export covers", () => 
     merge([scanner({ id: "obsolete" }), base, other], [], today, [fresh])
       .events,
   ).toEqual([fresh, other]);
+});
+it("carries only planner outreach onto replacement Scanner records with the same ID", () => {
+  const outreach = mergeOutreach(null, { status: "quoted", method: "form", quoted_price: "$200" });
+  const previous = scanner({ outreach, vendor_cost: "Old cost", contact: "old@example.com" });
+  const imported = scanner({ vendor_cost: "New cost", contact: "new@example.com" });
+  const foreign = scanner({ id: "different", outreach });
+  const { events } = merge([previous, scanner({ id: "removed", outreach })], [], today, [imported, foreign]);
+  expect(events).toEqual([
+    { ...imported, outreach },
+    scanner({ id: "different" }),
+  ]);
+  expect(merge([previous], [], today, [{ ...imported, outreach: null }]).events[0].outreach).toEqual(outreach);
+  expect(imported.outreach).toBeUndefined();
+});
+
+it.each([undefined, null])("keeps outreach when a scraper update supplies %s", (incomingOutreach) => {
+  const outreach = mergeOutreach(null, { status: "replied", method: "email", notes: "Follow up" });
+  const previous = find({ outreach });
+  const update = find({ vendor_count: 320, outreach: incomingOutreach });
+  expect(merge([previous], [update], today).events[0]).toMatchObject({
+    id: previous.id,
+    outreach,
+    vendor_count: 320,
+  });
 });
 it("retains unlisted finds through day 30 after the end, including confirmed multi-day shows", () => {
   expect(merge([base], [], "2027-01-12").events).toEqual([base]);

@@ -49,7 +49,7 @@ import { useFilters, stored } from "./hooks/useFilters";
 import { CountryFilter } from "./components/CountryFilter";
 import { CountryFlag } from "./components/EventIdentity";
 import { useToday } from "./hooks/useToday";
-import { normalizeEvents } from "./data";
+import { mergeOutreach, normalizeEvents } from "./data";
 import meta from "../data/meta.json";
 import type { Event } from "./model";
 import { emptyFilters } from "./model";
@@ -85,7 +85,30 @@ const quickCountries = [
 ];
 
 export default function App() {
-  const allEvents = useMemo(() => normalizeEvents(raw), []);
+  const shippedEvents = useMemo(() => normalizeEvents(raw), []);
+  const {
+    entries,
+    outreach,
+    update,
+    updateOutreach,
+    applyEntries,
+    setGoing,
+    undo,
+    undoGoing,
+    saved,
+    storageError,
+    setStorageError,
+    canSave,
+    acknowledgeRecovery,
+  } = useEntries();
+  const allEvents = useMemo(
+    () => shippedEvents.map((event) =>
+      Object.hasOwn(outreach, event.id)
+        ? { ...event, outreach: mergeOutreach(event.outreach, outreach[event.id]) }
+        : event,
+    ),
+    [shippedEvents, outreach],
+  );
   const [show2026, setShow2026] = useState(
     () => stored("tcg-show-2026-v1") === true,
   );
@@ -100,22 +123,9 @@ export default function App() {
     show2026 || firstMonth >= SEASON_START.slice(0, 7)
       ? firstMonth
       : SEASON_START.slice(0, 7);
-  const {
-    entries,
-    update,
-    applyEntries,
-    setGoing,
-    undo,
-    undoGoing,
-    saved,
-    storageError,
-    setStorageError,
-    canSave,
-    acknowledgeRecovery,
-  } = useEntries();
   const { route, openEvent, back, listContext } = useEventRoute();
   const { filters, setFilters, set } = useFilters(setStorageError, listContext?.sessionFilters);
-  const priority = usePriority(allEvents, today, setStorageError);
+  const priority = usePriority(shippedEvents, today, setStorageError);
   const { scores } = priority;
   const [toolsOpen, setToolsOpen] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
@@ -297,6 +307,16 @@ export default function App() {
       toggle: () =>
         set("status", filters.status === "confirmed" ? "" : "confirmed"),
     },
+    ...([
+      ["contacted", "Contacted"],
+      ["not_contacted", "Not contacted"],
+    ] as const).map(([status, label]) => ({
+      id: status,
+      label,
+      outreach: true,
+      active: filters.outreach === status,
+      toggle: () => set("outreach", filters.outreach === status ? "" : status),
+    })),
     ...quickCountries.map(({ country, code }) => ({
       code,
       id: "country:" + country,
@@ -325,7 +345,7 @@ export default function App() {
   ];
   const activeQuick = quick.filter((q) => q.active);
   for (const q of activeQuick.filter(
-    (q) => q.id === "next90" || q.id === "notGoing",
+    (q) => q.id === "next90" || q.id === "notGoing" || "outreach" in q,
   ))
     chips.push({ id: q.id, label: q.label, clear: q.toggle });
   const otherChips = chips.filter(
@@ -340,6 +360,7 @@ export default function App() {
       status: f.status === "confirmed" ? "" : f.status,
       next90: false,
       notGoing: false,
+      outreach: "",
       countries: f.countries.filter((c) => !quickCountries.some(({ country }) => country === c)),
     }));
   }
@@ -577,7 +598,13 @@ export default function App() {
                 aria-label="Quick filters"
               >
                 {quick.map((q) => (
-                  <button key={q.id} aria-pressed={q.active} onClick={q.toggle}>
+                  <button
+                    key={q.id}
+                    aria-pressed={q.active}
+                    onClick={q.toggle}
+                    className={"outreach" in q ? "outreach-filter" : undefined}
+                    title={"outreach" in q ? "Outreach status" : undefined}
+                  >
                     {"code" in q && <CountryFlag code={q.code} />}
                     {q.label}
                   </button>
@@ -1049,6 +1076,7 @@ export default function App() {
           </label>
           <BackupControls
             entries={entries}
+            outreach={outreach}
             ids={allEvents.map((e) => e.id)}
             apply={applyEntries}
             priority={{
@@ -1106,6 +1134,8 @@ export default function App() {
                 setGoing={setGoing}
                 onStage={(stage) => update(selected.id, "stage", stage)}
                 onNote={(note) => update(selected.id, "note", note)}
+                knownOutreach={shippedEvents.find((e) => e.id === selected.id)?.outreach}
+                onOutreach={(patch) => updateOutreach(selected.id, patch)}
               />
             </Suspense>
           ) : (

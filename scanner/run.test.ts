@@ -13,6 +13,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { localDay } from "./dates.ts";
 import type { Event } from "../src/model.ts";
+import { mergeOutreach } from "../src/data.ts";
 
 const entry = fileURLToPath(new URL("./run.ts", import.meta.url));
 it("imports raw Scanner records, refreshes logos, fails soft, and performs read-only dry runs", () => {
@@ -22,16 +23,17 @@ it("imports raw Scanner records, refreshes logos, fails soft, and performs read-
       mkdirSync(join(dir, sub), { recursive: true });
     const put = (path: string, s: string | Buffer) => writeFileSync(join(dir, path), s);
     const read = (path: string) => readFileSync(join(dir, path), "utf8");
-    const original = JSON.parse(readFileSync("data/events.json", "utf8")).find(
-      (e: Event) => !e.source,
-    );
+    const raw = JSON.parse(readFileSync("data/events.json", "utf8")) as Event[];
+    const { outreach: _existingOutreach, ...original } = raw.find((e) => !e.source)!;
+    const id = "scanned-record";
+    const outreach = mergeOutreach(null, { status: "contacted", method: "email", notes: "Planner note" });
     const imported = {
       ...original,
       name: "Test Scanner import",
-      id: "scanned-record",
+      id,
       logo: "logos/change.webp",
     };
-    put("data/events.json", JSON.stringify([original]));
+    put("data/events.json", JSON.stringify([{ ...original, id, outreach }]));
     put("data/meta.json", '{"updatedAt":"2020-01-01"}');
     put("export/events.json", JSON.stringify([imported]));
     const webp = readFileSync("public/logos/mtg.webp");
@@ -70,7 +72,7 @@ it("imports raw Scanner records, refreshes logos, fails soft, and performs read-
     expect(report.new_count).toBe(1);
     const snapshot = read("data/events.json");
     expect(JSON.parse(snapshot).filter((e: Event) => !e.source)).toEqual([
-      imported,
+      { ...imported, outreach },
     ]);
     expect(JSON.parse(read("data/meta.json")).updatedAt).toBe(date);
     expect(readFileSync(join(dir, "public/logos/change.webp"))).toEqual(webp);

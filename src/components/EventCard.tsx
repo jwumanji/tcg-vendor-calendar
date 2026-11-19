@@ -1,5 +1,6 @@
 import { GoingButton, type SetGoing } from "./GoingButton";
 import { PriorityChip } from "./PriorityChip";
+import { OutreachChip } from "./OutreachChip";
 import { FindBadges } from "./FindSource";
 import type { ScoreResult } from "../scoring";
 import { memo } from "react";
@@ -72,6 +73,7 @@ export const EventCard = memo(function EventCard({
         <div className="card-tags">
           <ClashCue score={score} entries={entries} />
           <Status e={e} />
+          <OutreachChip outreach={e.outreach} />
           <FindBadges e={e} />
           {games(e)
             .slice(0, 3)

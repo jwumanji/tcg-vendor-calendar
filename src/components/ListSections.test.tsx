@@ -2,8 +2,8 @@ import { load } from "cheerio";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import fixtures from "../../tests/fixtures/new-finds.json";
-import { normalizeEvents } from "../data";
-import { defaultRowSort, groupSortedRows, listCardDate, sortRows, type RowSort } from "../rows";
+import { mergeOutreach, normalizeEvents } from "../data";
+import { defaultRowSort, groupSortedRows, listCardDate, sortRows, type OptionalColumn, type RowSort } from "../rows";
 import { scoreEvents } from "../scoring";
 import { emptyEntry } from "../storage";
 import { Detail } from "./Detail";
@@ -20,7 +20,7 @@ const events = [event, kowloon, pasar, { ...pasar, id: "estimate", estimated_mon
 const scores = Object.fromEntries(scoreEvents(events, { today }).map((score) => [score.id, score]));
 const shared = { entries: {}, open: vi.fn(), setGoing: vi.fn() };
 
-function layouts(sort: RowSort, scanner = false, list = events) {
+function layouts(sort: RowSort, columns: OptionalColumn[] = [], list = events) {
   const sorted = sortRows(list, sort, {}, scores, today);
   const groups = groupSortedRows(sorted, sort.key, today);
   const grid = (
@@ -32,7 +32,7 @@ function layouts(sort: RowSort, scanner = false, list = events) {
     </CardSections>
   );
   const rows = (
-    <EventRows groups={groups} sort={sort} setSort={vi.fn()} columns={scanner ? ["scanner"] : []}
+    <EventRows groups={groups} sort={sort} setSort={vi.fn()} columns={columns}
       today={today} scores={scores} selectMode={false} {...shared} />
   );
   return { grid: load(renderToStaticMarkup(grid)), rows: load(renderToStaticMarkup(rows)) };
@@ -70,7 +70,7 @@ describe("Grid and Rows sections", () => {
     };
     const estimate = events[3];
     expect(estimate.date_status).toBe("tba");
-    const { grid, rows } = layouts(defaultRowSort, false, [recurring, estimate]);
+    const { grid, rows } = layouts(defaultRowSort, [], [recurring, estimate]);
     expect(grid(".list-section-heading").text()).toBe("January 2027 · 2 events");
     expect(grid(".card-when").map((_, el) => grid(el).text()).get())
       .toEqual(["31 Jan 2027 – 1 Feb 2027", "Est. January 2027"]);
@@ -89,15 +89,61 @@ it("shows only priority chips on list cards, rows, pipeline cards and top picks"
     expect($(".gem, .gem-tier, [data-tier], [title^='Scanner score']")).toHaveLength(0);
   }
   expect(rows(".row-scanner")).toHaveLength(0);
-  const { rows: optedIn } = layouts(defaultRowSort, true);
+  const { rows: optedIn } = layouts(defaultRowSort, ["scanner"]);
   expect(optedIn(".row-scanner").first().contents().last().text()).toBe("51");
   expect(optedIn(".gem")).toHaveLength(0);
+});
+
+it("shows outreach wording in Grid and Rows with an opt-in sortable column and no quiet list chips", () => {
+  const list = [
+    { ...event, outreach: mergeOutreach(null, { status: "contacted", method: "email" }) },
+    { ...kowloon, outreach: mergeOutreach(null, { status: "replied", method: "form" }) },
+    { ...pasar, outreach: mergeOutreach(null, { status: "quoted", method: "email" }) },
+    events[3],
+  ];
+  const sort = { key: "outreach", direction: "asc" } as const;
+  const { grid, rows } = layouts(sort, [], list);
+  for (const $ of [grid, rows]) {
+    const chips = $(".outreach-chip").clone();
+    chips.find(".sr-only").remove();
+    expect(chips.map((_, el) => $(el).text()).get()).toEqual(["Contacted · Email", "Replied · Form", "Quoted"]);
+    expect($(".priority-chip")).toHaveLength(list.length);
+  }
+  expect(rows(".row-outreach")).toHaveLength(0);
+  const { rows: withColumn } = layouts(sort, ["outreach"], list);
+  expect(withColumn(".col-outreach").attr("aria-sort")).toBe("ascending");
+  expect(withColumn(".row-outreach .outreach-chip")).toHaveLength(3);
+  expect(withColumn(".row-markers .outreach-chip")).toHaveLength(0);
+});
+
+it("labels the event outreach section, editor, research links and prices independently of pipeline", () => {
+  const outreach = mergeOutreach(null, {
+    contact_type: "form", contact: "https://example.com/apply",
+    published_booth_price: "$200", price_source_url: "https://example.com/prices",
+  });
+  const $ = load(renderToStaticMarkup(
+    <Detail e={{ ...event, outreach }} knownOutreach={outreach} entry={emptyEntry}
+      score={scores[event.id]} saved setGoing={shared.setGoing}
+      onStage={vi.fn()} onNote={vi.fn()} onOutreach={vi.fn()} setOverride={vi.fn()} openClash={vi.fn()} toast={null} />,
+  ));
+  const section = $("section[aria-labelledby='outreach-heading']");
+  expect($("#outreach-heading").text()).toBe("Outreach");
+  expect(section.find("dt").map((_, el) => $(el).text()).get()).toEqual(["Known contact route", "Published booth price"]);
+  expect(section.find("a").map((_, el) => $(el).attr("href")).get()).toEqual(["https://example.com/apply", "https://example.com/prices"]);
+  expect(section.text()).toContain("$200");
+  expect(section.find("label").map((_, el) => $(el).contents().first().text()).get()).toEqual([
+    "Outreach status", "Outreach method", "Contact address or URL", "Contacted on",
+    "Response date", "Quoted price", "Outreach notes",
+  ]);
+  expect(section.find("button").text()).toBe("Save outreach");
+  expect($(".event-facts .outreach-chip").text()).toBe("Outreach: Not contacted");
+  expect($("label[for=detail-stage]").text()).toBe("PIPELINE STAGE");
 });
 
 it("keeps the scanner value in the event page priority breakdown", () => {
   const $ = load(renderToStaticMarkup(
     <Detail e={event} entry={emptyEntry} score={scores[event.id]} saved setGoing={shared.setGoing}
-      onStage={vi.fn()} onNote={vi.fn()} setOverride={vi.fn()} openClash={vi.fn()} toast={null} />,
+      onStage={vi.fn()} onNote={vi.fn()} onOutreach={vi.fn()} setOverride={vi.fn()} openClash={vi.fn()} toast={null} />,
   ));
   const factor = $(".priority-detail details").filter((_, el) => $(el).find("summary").text().includes("Scanner score"));
   expect(factor).toHaveLength(1);

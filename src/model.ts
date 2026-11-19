@@ -48,6 +48,8 @@ export const emptyOutreach: Outreach = {
 
 export interface Event {
   id: string;
+  /** Scanner's ID when a replacement uses an existing planner ID to keep its history. */
+  scanner_export_id?: string;
   name: string;
   games: string[];
   games_note: string | null;

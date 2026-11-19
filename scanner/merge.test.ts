@@ -119,16 +119,18 @@ it("carries only planner outreach onto replacement Scanner records with the same
   const previous = scanner({ outreach, vendor_cost: "Old cost", contact: "old@example.com" });
   const imported = scanner({ vendor_cost: "New cost", contact: "new@example.com" });
   const foreign = scanner({ id: "different", outreach });
-  const { events } = merge([previous, scanner({ id: "removed", outreach })], [], today, [imported, foreign]);
+  const missing = scanner({ id: "removed", name: "Other tracked event", outreach });
+  const { events } = merge([previous, missing], [], today, [imported, foreign]);
   expect(events).toEqual([
     { ...imported, outreach },
     scanner({ id: "different" }),
+    missing,
   ]);
   expect(merge([previous], [], today, [{ ...imported, outreach: null }]).events[0].outreach).toEqual(outreach);
   expect(imported.outreach).toBeUndefined();
 });
 
-it.each([undefined, null])("keeps outreach when a scraper update supplies %s", (incomingOutreach) => {
+it.each([undefined, null, mergeOutreach(null, { notes: "Source default" })])("keeps planner outreach when a scraper update supplies %j", (incomingOutreach) => {
   const outreach = mergeOutreach(null, { status: "replied", method: "email", notes: "Follow up" });
   const previous = find({ outreach });
   const update = find({ vendor_count: 320, outreach: incomingOutreach });
@@ -137,6 +139,31 @@ it.each([undefined, null])("keeps outreach when a scraper update supplies %s", (
     outreach,
     vendor_count: 320,
   });
+});
+it("keeps seeded finds after their dates pass, including when a Scanner row replaces a find", () => {
+  const outreach = mergeOutreach(null, { status: "quoted", method: "email", quoted_price: "$200" });
+  const saved = find({ outreach });
+  expect(merge([saved], [], "2027-12-31").events).toEqual([saved]);
+
+  const imported = scanner({ vendor_count: 320 });
+  const promoted = { ...imported, id: saved.id, scanner_export_id: imported.id, outreach };
+  expect(merge([saved], [], today, [imported]).events).toEqual([promoted]);
+  expect(merge([promoted], [], today, [imported]).events).toEqual([promoted]);
+  const rescheduled = { ...imported, start_date: "2027-02-01", end_date: "2027-02-02" };
+  expect(merge([promoted], [], today, [rescheduled]).events).toEqual([
+    { ...promoted, start_date: rescheduled.start_date, end_date: rescheduled.end_date },
+  ]);
+  expect(merge([promoted], [], today, [imported, { ...imported, id: saved.id }]).events).toEqual([
+    imported, { ...imported, id: saved.id, outreach },
+  ]);
+});
+
+it("never assigns saved outreach to an ambiguous Scanner replacement", () => {
+  const saved = find({ outreach: mergeOutreach(null, { notes: "Keep this note" }) });
+  const exportRows = [scanner(), scanner({ id: "second" })];
+  const { events } = merge([saved], [], today, exportRows);
+  expect(events).toHaveLength(3);
+  expect(events.filter((event) => event.outreach)).toEqual([saved]);
 });
 it("retains unlisted finds through day 30 after the end, including confirmed multi-day shows", () => {
   expect(merge([base], [], "2027-01-12").events).toEqual([base]);

@@ -23,10 +23,12 @@ import { merge } from "./merge.ts";
 import { sources } from "./sources/index.ts";
 
 const json = (v: unknown) => JSON.stringify(v, null, 2) + "\n";
-async function write(path: string, content: string | Buffer) {
+async function write(path: string, content: string | Buffer, original?: string) {
   const tmp = path + "." + randomUUID() + ".tmp";
   try {
     await writeFile(tmp, content);
+    if (original !== undefined && await readFile(path, "utf8") !== original)
+      throw Error("Event data changed during refresh. Rerun the scanner to keep those edits.");
     await rename(tmp, path);
   } finally {
     await rm(tmp, { force: true });
@@ -160,19 +162,23 @@ async function main() {
   });
   const dry = values["dry-run"],
     path = values["import-scanner"];
-  const original = await readFile("data/events.json", "utf8");
-  const existing: unknown = JSON.parse(original);
-  validate(existing);
   let imported: Event[] | undefined;
   if (path) {
     const input: unknown = JSON.parse(await readFile(path, "utf8"));
     validate(input);
     if (input.some((e) => e.source))
       throw Error("Scanner export contains scraper-owned events");
-    if (!input.length && existing.some((e) => !e.source))
-      throw Error("Empty Scanner export would replace a nonempty Scanner snapshot");
     imported = input;
   }
+  async function readSnapshot() {
+    const original = await readFile("data/events.json", "utf8");
+    const events: unknown = JSON.parse(original);
+    validate(events);
+    if (imported?.length === 0 && events.some((e) => !e.source))
+      throw Error("Empty Scanner export would replace a nonempty Scanner snapshot");
+    return { original, events };
+  }
+  await readSnapshot();
   const logos = path && imported ? await logoChanges(path, imported) : [];
   const now = new Date(),
     today = localDay(now),
@@ -182,6 +188,8 @@ async function main() {
     const signal = AbortSignal.timeout(120_000);
     return scanSource(source, (url) => get(url, signal), now);
   }));
+  // Source requests can take minutes. Pick up planner edits saved while they were in flight.
+  const { original, events: existing } = await readSnapshot();
   const allFailed = results.every((r) => r.stats.status === "FAILED");
   const merged = merge(
     existing,
@@ -229,8 +237,8 @@ async function main() {
   if (logos.length) await mkdir("public/logos", { recursive: true });
   for (const logo of logos) await write(logo.dest, logo.bytes);
   if (changed) {
+    await write("data/events.json", json(merged.events), original);
     await write("data/meta.json", json({ ...meta, updatedAt: today }));
-    await write("data/events.json", json(merged.events));
   }
   await write("scanner/last-run.json", json(summary));
 }

@@ -87,8 +87,8 @@ outreach in order. The first seven entries are emails sent on 2026-11-19 from
 After sending a form, append an object to `outreach-log.json` with the existing
 event ID, `"status": "contacted"`, `"method": "form"`, the actual
 `contacted_at` date, and `message_ref` if available. Omit `contact` to use the
-researched route already on the event. Use `mtg-sea-r2`, `bkk-card-show`, or
-`comifuro24` for the three researched forms. Append further entries for replies
+researched route already on the event. The seeded forms use `mtg-sea-r2` and
+`comifuro24`. Append further entries for replies
 or quotes with the relevant `status`, `response_at`, `quoted_price`, and `notes`.
 Later entries update only the fields they supply. Run `node scripts/outreach-seed.ts`
 with Node 24. The seed rejects unknown IDs before writing and can be rerun
@@ -98,8 +98,10 @@ The app loads shared outreach from `events.json`, then applies this browser's
 saved edits field by field. JSON backups include the browser's outreach
 patches. Merge restores prefer imported values for overlapping fields. Older
 backups that omit outreach preserve the browser's existing patches.
-Scanner imports retain the planner's outreach for matching IDs, and scraper
-updates without outreach retain the saved record.
+Scanner imports and scraper updates retain the planner's outreach. Rows with
+shared outreach remain addressable if the export omits them or they pass the
+scraper's grace period. An unambiguous Scanner replacement keeps the planner
+ID and records the export's ID in `scanner_export_id` for later refreshes.
 
 ## App metadata and publishing
 
@@ -125,4 +127,7 @@ The 97-event breakdown above describes the 16 November 2026 Scanner export. The 
 
 Dated discoveries enter the timeline. Estimated months are recorded separately from confirmed travel dates. Undated finds enter the watchlist. For a published forecast range, the numeric field holds its lower bound and `expected_size` retains the range and forecast wording. `previous_editions_count` can count documented past listings. A year on the earliest available listing alone does not establish `first_year`. Scraper `vendor_score` and `logo` are null. A vendor link can be an enquiry or expression of interest; a blank application field means the source did not supply one.
 
-Scanner records retain export key order and IDs during import. Existing scraper IDs and their first discovery timestamps survive parser corrections. Schedule and deploy commands are in the [scanner instructions](../README.md#scanners).
+Scanner records retain export key order during import and use the export ID
+for new events. Existing scraper IDs and their first discovery timestamps
+survive parser corrections. Schedule and deploy commands are in the
+[scanner instructions](../README.md#scanners).

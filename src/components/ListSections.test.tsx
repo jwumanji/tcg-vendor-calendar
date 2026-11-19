@@ -106,7 +106,7 @@ it("shows outreach wording in Grid and Rows with an opt-in sortable column and n
   for (const $ of [grid, rows]) {
     const chips = $(".outreach-chip").clone();
     chips.find(".sr-only").remove();
-    expect(chips.map((_, el) => $(el).text()).get()).toEqual(["Contacted · Email", "Replied · Form", "Quoted"]);
+    expect(chips.map((_, el) => $(el).text()).get()).toEqual(["Contacted · Email", "Replied · Form", "Quoted · Email"]);
     expect($(".priority-chip")).toHaveLength(list.length);
   }
   expect(rows(".row-outreach")).toHaveLength(0);
@@ -114,6 +114,19 @@ it("shows outreach wording in Grid and Rows with an opt-in sortable column and n
   expect(withColumn(".col-outreach").attr("aria-sort")).toBe("ascending");
   expect(withColumn(".row-outreach .outreach-chip")).toHaveLength(3);
   expect(withColumn(".row-markers .outreach-chip")).toHaveLength(0);
+});
+
+it.each([
+  ["sales@example.com", null, "mailto:sales@example.com", "Email · sales@example.com"],
+  ["Use the official form", "https://example.com/contact", "https://example.com/contact", "https://example.com/contact"],
+])("uses a direct event route for %s when no outreach route is seeded", (contact, vendor_application, href, label) => {
+  const $ = load(renderToStaticMarkup(
+    <Detail e={{ ...event, contact, vendor_application }} entry={emptyEntry}
+      score={scores[event.id]} saved setGoing={shared.setGoing}
+      onStage={vi.fn()} onNote={vi.fn()} onOutreach={vi.fn()} setOverride={vi.fn()} openClash={vi.fn()} toast={null} />,
+  ));
+  expect($(".outreach-section a").attr("href")).toBe(href);
+  expect($(".outreach-section a").text()).toBe(label);
 });
 
 it("labels the event outreach section, editor, research links and prices independently of pipeline", () => {

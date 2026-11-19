@@ -300,13 +300,6 @@ export default function App() {
       clear: () => set("tba", true),
     });
   const quick = [
-    {
-      id: "status",
-      label: "Confirmed",
-      active: filters.status === "confirmed",
-      toggle: () =>
-        set("status", filters.status === "confirmed" ? "" : "confirmed"),
-    },
     ...([
       ["contacted", "Contacted"],
       ["not_contacted", "Not contacted"],
@@ -317,6 +310,13 @@ export default function App() {
       active: filters.outreach === status,
       toggle: () => set("outreach", filters.outreach === status ? "" : status),
     })),
+    {
+      id: "status",
+      label: "Confirmed",
+      active: filters.status === "confirmed",
+      toggle: () =>
+        set("status", filters.status === "confirmed" ? "" : "confirmed"),
+    },
     ...quickCountries.map(({ country, code }) => ({
       code,
       id: "country:" + country,

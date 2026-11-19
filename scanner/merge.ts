@@ -94,6 +94,46 @@ export function matches(a: Event, b: Event) {
       .trim();
   return similar(mainTitle(a), mainTitle(b));
 }
+
+function reconcileScanner(existing: Event[], imported: Event[]) {
+  const byId = new Map(existing.map((event) => [event.id, event]));
+  const byExportId = new Map(
+    existing.flatMap((event) => event.scanner_export_id
+      ? [[event.scanner_export_id, event] as const]
+      : []),
+  );
+  const importedIds = new Set(imported.map((event) => event.id));
+  const matched = imported.map((event) => {
+    const alias = byExportId.get(event.id);
+    return byId.get(event.id) ?? (alias && !importedIds.has(alias.id) ? alias : undefined);
+  });
+  const used = new Set(matched.filter(Boolean));
+  const unmatched = existing.filter((event) => event.outreach && !used.has(event));
+  const candidates = imported.map((event, index) =>
+    matched[index] ? [] : unmatched.filter((old) => matches(event, old)),
+  );
+  const scanner = imported.map<Event>(({ outreach: _outreach, scanner_export_id: _exportId, ...event }, index) => {
+    const [candidate] = candidates[index];
+    // Keep the planner ID so event links, seed log entries and local patches still resolve.
+    const previous = matched[index] ?? (
+      candidates[index].length === 1 &&
+      !candidates.some((rows, other) => other !== index && rows.includes(candidate))
+        ? candidate : undefined
+    );
+    if (!previous) return event;
+    used.add(previous);
+    return {
+      ...event,
+      ...(previous.id !== event.id && { id: previous.id, scanner_export_id: event.id }),
+      ...(previous.outreach !== undefined && { outreach: previous.outreach }),
+    };
+  });
+  return {
+    scanner: [...scanner, ...unmatched.filter((event) => !event.source && !used.has(event))],
+    old: existing.filter((event) => event.source && !used.has(event)),
+  };
+}
+
 export function merge(
   existing: Event[],
   incoming: Event[],
@@ -106,14 +146,12 @@ export function merge(
     const index = sourceOrder.indexOf(id);
     return index === -1 ? Infinity : index;
   };
-  const existingById = new Map(existing.map((event) => [event.id, event]));
-  const scanner: Event[] = imported?.map(({ outreach: _importedOutreach, ...event }) => {
-    const outreach = existingById.get(event.id)?.outreach;
-    return outreach === undefined ? event : { ...event, outreach };
-  }) ?? existing.filter((e) => !e.source);
-  const old = existing.filter((e) => e.source);
+  const { scanner, old } = imported ? reconcileScanner(existing, imported) : {
+    scanner: existing.filter((e) => !e.source),
+    old: existing.filter((e) => e.source),
+  };
   const retained = old.filter(
-    (e) => !scanner.some((s) => s.id === e.id || matches(s, e)),
+    (e) => e.outreach || !scanner.some((s) => s.id === e.id || matches(s, e)),
   );
   const keys = new Map<string, number>();
   for (const e of [...incoming, ...notices]) {
@@ -158,11 +196,10 @@ export function merge(
       const earlier = retained[i];
       const oldOwner = earlier.source!.id;
       if (oldOwner === owner || rank(owner) < rank(oldOwner)) {
-        const { outreach, ...update } = event;
+        const { outreach: _outreach, ...update } = event;
         retained[i] = {
           ...earlier,
           ...update,
-          ...(outreach != null && { outreach }),
           id: earlier.id,
           source: {
             ...event.source!,
@@ -205,9 +242,10 @@ export function merge(
     delete retained[i].occurrences;
     known[notice.source!.id] = (known[notice.source!.id] ?? 0) + 1;
   }
-  // Apply the grace period after reconciliation: a newly rescheduled show
-  // may have been discovered more than thirty days after its original date.
-  const active = retained.filter((e) => !e.end_date || stamp(today) - stamp(e.end_date) <= 30 * day);
+  // Reconcile rescheduled shows before pruning. Shared outreach keeps past events addressable.
+  const active = retained.filter((e) =>
+    e.outreach || !e.end_date || stamp(today) - stamp(e.end_date) <= 30 * day,
+  );
   // Insert finds chronologically within the export sections; preserve the original
   // order of all Scanner records, including its manually positioned TBA entries.
   const section = { timeline: 0, recurring_sg: 1, watchlist: 2 };
@@ -230,6 +268,6 @@ export function merge(
     events: ordered,
     added: ordered.filter((e) => newIds.has(e.id)),
     known,
-    removed: old.length - active.filter((e) => !newIds.has(e.id)).length,
+    removed: existing.filter((e) => e.source).length - active.filter((e) => !newIds.has(e.id)).length,
   };
 }

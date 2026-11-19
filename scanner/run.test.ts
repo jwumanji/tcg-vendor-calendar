@@ -33,7 +33,7 @@ it("imports raw Scanner records, refreshes logos, fails soft, and performs read-
       id,
       logo: "logos/change.webp",
     };
-    put("data/events.json", JSON.stringify([{ ...original, id, outreach }]));
+    put("data/events.json", JSON.stringify([{ ...original, id, outreach: { ...outreach, notes: "" } }]));
     put("data/meta.json", '{"updatedAt":"2020-01-01"}');
     put("export/events.json", JSON.stringify([imported]));
     const webp = readFileSync("public/logos/mtg.webp");
@@ -47,23 +47,29 @@ it("imports raw Scanner records, refreshes logos, fails soft, and performs read-
     const markup = `<article class="eventlist-event--upcoming"><h1 class="eventlist-title"><a class="eventlist-title-link" href="/show">Test Card Show</a></h1><time class="event-date" datetime="${date}"></time></article>`;
     put(
       "network.mjs",
-      `globalThis.fetch = async url => {
+      `import { readFileSync, writeFileSync } from "node:fs";
+    globalThis.fetch = async url => {
       if (new URL(url).hostname !== "www.suntecsingapore.com" || process.env.ALL_FAIL) return new Response("",{status:403});
+      if (process.env.SAVE_NOTE && new URL(url).pathname === "/robots.txt") {
+        const events = JSON.parse(readFileSync("data/events.json", "utf8"));
+        events[0].outreach.notes = process.env.SAVE_NOTE;
+        writeFileSync("data/events.json", JSON.stringify(events));
+      }
       return new Response(new URL(url).pathname === "/robots.txt" ? "" : ${JSON.stringify(markup)});
     };`,
     );
-    const run = (args: string[], fail = false) =>
+    const run = (args: string[], fail = false, note = "") =>
       spawnSync(
         process.execPath,
         ["--import", join(dir, "network.mjs"), entry, ...args],
         {
           cwd: dir,
           encoding: "utf8",
-          env: { ...process.env, ALL_FAIL: fail ? "1" : "" },
+          env: { ...process.env, ALL_FAIL: fail ? "1" : "", SAVE_NOTE: note },
         },
       );
     const args = ["--import-scanner", join(dir, "export/events.json")];
-    const first = run(args);
+    const first = run(args, false, outreach.notes);
     expect(first.status, first.stderr).toBe(0);
     const report = JSON.parse(read("scanner/last-run.json"));
     expect(

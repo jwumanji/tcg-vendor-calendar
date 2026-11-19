@@ -24,10 +24,9 @@ export function OutreachChip({
 }) {
   const status = outreach?.status ?? "not_contacted";
   if (status === "not_contacted" && !showUncontacted) return null;
-  const method =
-    (status === "contacted" || status === "replied") && outreach?.method
-      ? outreachMethodLabels[outreach.method]
-      : null;
+  const method = status !== "not_contacted" && outreach?.method
+    ? outreachMethodLabels[outreach.method]
+    : null;
   return (
     <span className="outreach-chip" data-status={status}>
       <span className="sr-only">Outreach: </span>

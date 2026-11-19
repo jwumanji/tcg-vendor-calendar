@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { mergeOutreach, outreachContactHref } from "../data";
+import { outreachContactHref } from "../data";
 import {
   emptyOutreach,
   outreachMethods,
@@ -24,39 +24,45 @@ const editableFields = [
 export function OutreachSection({
   outreach = emptyOutreach,
   knownOutreach,
+  eventContacts,
   onSave,
   saved,
 }: {
   outreach?: Outreach;
   knownOutreach?: Outreach | null;
+  eventContacts: (string | null)[];
   onSave: (patch: OutreachPatch) => void;
   saved: boolean;
 }) {
-  const [draft, setDraft] = useState(outreach);
+  const [edits, setEdits] = useState<OutreachPatch>({});
   const [submitted, setSubmitted] = useState(false);
-  const knownContact = knownOutreach?.contact ?? null;
-  const knownMethod = knownMethods[knownOutreach?.contact_type ?? "none"];
-  const href = outreachContactHref(knownContact);
+  const knownContact = knownOutreach?.contact ?? eventContacts
+    .map((contact) => contact?.trim())
+    .find(outreachContactHref);
+  const contactHref = outreachContactHref(knownContact);
+  const knownType = knownOutreach?.contact ? knownOutreach.contact_type : null;
+  const knownMethod = knownMethods[knownType ?? "none"] ?? (
+    contactHref?.startsWith("mailto:") ? "email" : null
+  );
+  const status = edits.status ?? outreach.status;
+  const recording = status !== "not_contacted";
+  const draft = {
+    ...outreach,
+    ...(recording && status !== outreach.status && {
+      method: outreach.method ?? knownMethod,
+      contact: outreach.contact ?? (contactHref ? knownContact ?? null : null),
+      ...(status === "contacted" && !outreach.contacted_at && { contacted_at: localDate() }),
+      ...(status !== "contacted" && !outreach.response_at && { response_at: localDate() }),
+    }),
+    ...edits,
+  };
   const contact = draft.contact?.trim() || null;
   const contactIsInvalid = contact !== null && !outreachContactHref(contact);
-  const changes = editableFields.filter((field) =>
-    (field === "contact" ? contact : draft[field]) !== outreach[field],
-  );
+  const values = { ...draft, contact, method: recording ? draft.method : null };
+  const changes = editableFields.filter((field) => values[field] !== outreach[field]);
   function update(patch: OutreachPatch) {
-    setDraft((current) => mergeOutreach(current, patch));
+    setEdits((current) => ({ ...current, ...patch }));
     setSubmitted(false);
-  }
-  function changeStatus(status: OutreachStatus) {
-    const firstOutreach = draft.status === "not_contacted" && status !== "not_contacted";
-    update({
-      status,
-      ...(firstOutreach && {
-        method: knownMethod,
-        contact: contact ?? knownContact,
-      }),
-      ...(status === "contacted" && !draft.contacted_at && { contacted_at: localDate() }),
-      ...(["replied", "quoted", "declined"].includes(status) && { response_at: localDate() }),
-    });
   }
   return (
     <section className="outreach-section" aria-labelledby="outreach-heading">
@@ -65,8 +71,8 @@ export function OutreachSection({
         <div className="detail-row">
           <dt>Known contact route</dt>
           <dd>
-            {href ? (
-              <a href={href} target={href.startsWith("mailto:") ? undefined : "_blank"} rel="noreferrer">
+            {contactHref ? (
+              <a href={contactHref} target={contactHref.startsWith("mailto:") ? undefined : "_blank"} rel="noreferrer">
                 {knownMethod && outreachMethodLabels[knownMethod] + " · "}{knownContact}
               </a>
             ) : "No known contact route"}
@@ -78,9 +84,12 @@ export function OutreachSection({
             <dd>
               {outreach.published_booth_price || "No published price found"}
               {outreach.price_source_url && (
-                <a className="outreach-price-source" href={outreach.price_source_url} target="_blank" rel="noreferrer">
-                  Price source
-                </a>
+                <>
+                  {" "}
+                  <a className="outreach-price-source" href={outreach.price_source_url} target="_blank" rel="noreferrer">
+                    Price source
+                  </a>
+                </>
               )}
             </dd>
           </div>
@@ -95,14 +104,13 @@ export function OutreachSection({
       <form className="outreach-form" onSubmit={(event) => {
         event.preventDefault();
         if (contactIsInvalid || !changes.length) return;
-        onSave(Object.fromEntries(changes.map((field) => [
-          field, field === "contact" ? contact : draft[field],
-        ])));
+        onSave(Object.fromEntries(changes.map((field) => [field, values[field]])));
+        setEdits({});
         setSubmitted(true);
       }}>
         <label>
           Outreach status
-          <select value={draft.status} onChange={(event) => changeStatus(event.target.value as OutreachStatus)}>
+          <select value={status} onChange={(event) => update({ status: event.target.value as OutreachStatus })}>
             {outreachStatuses.map((status) =>
               <option key={status} value={status}>{outreachStatusLabels[status]}</option>,
             )}
@@ -110,7 +118,7 @@ export function OutreachSection({
         </label>
         <label>
           Outreach method
-          <select value={draft.method ?? ""} disabled={draft.status === "not_contacted"}
+          <select value={values.method ?? ""} disabled={!recording}
             onChange={(event) => update({ method: (event.target.value || null) as Outreach["method"] })}>
             <option value="">Choose method</option>
             {outreachMethods.map((method) =>

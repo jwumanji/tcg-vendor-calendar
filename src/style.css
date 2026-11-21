@@ -3440,3 +3440,110 @@ input[type="checkbox"]:indeterminate::after { content: ""; width: 10px; height: 
   min-height: 0;
 }
 .place .flag-img { flex-shrink: 0; }
+
+.vendor-price-cue,
+.money-tag {
+  display: inline-block;
+  width: fit-content;
+  padding: 2px 7px;
+  border: 1px solid var(--line-2);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  font: 700 11px/1.4 var(--font-text);
+}
+.row-markers .vendor-price-cue { padding: 1px 5px; }
+.vendor-money { container-type: inline-size; }
+.detail-body .vendor-money > h2::before { background: var(--accent); }
+.money-summary {
+  display: grid;
+  gap: 3px;
+  padding: 14px;
+  border: 1px solid rgb(var(--tbc) / .5);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.money-summary > strong {
+  color: var(--accent);
+  font-size: clamp(17px, 3vw, 23px);
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+.money-summary-label { font-size: 13px; font-weight: 750; }
+.money-summary p, .money-reference, .money-sources, .money-document-meta, .money-documents p {
+  color: var(--muted);
+  font-size: 13px;
+}
+.money-reference { margin: 10px 0; }
+.money-table-scroll { overflow-x: auto; }
+.money-table {
+  width: 100%;
+  margin-block: 14px 8px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.money-table th, .money-table td {
+  padding: 9px 6px;
+  border-bottom: 1px solid var(--line);
+  text-align: start;
+  vertical-align: top;
+}
+.money-table thead th { color: var(--muted); }
+.money-table tbody th { min-width: 93px; }
+.money-table tr[data-applicable="true"] { background: rgb(var(--tbc) / .08); }
+.money-table tr[data-inactive="true"],
+.money-table tr[data-inactive="true"] .money-tag { color: var(--muted); }
+.money-amount { font-variant-numeric: tabular-nums; }
+.money-amount > span:not(.money-cell-label) { white-space: nowrap; }
+.money-amount small, .money-cutoff { display: block; color: var(--muted); }
+.money-cutoff { margin-top: 4px; }
+.money-cell-label { display: none; }
+.money-tags, .money-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+}
+.money-tags:not(:empty), .money-item-actions { margin-top: 5px; }
+.money-tag[data-applicable="true"] { color: var(--accent); border-color: rgb(var(--tbc) / .6); }
+.money-item-actions .button { padding-inline: 8px; }
+.money-sources { margin-block: 4px 8px; }
+.money-sources summary { align-content: center; cursor: pointer; }
+.money-sources ul { list-style: none; margin-bottom: 8px; }
+.money-sources a, .money-documents a { color: var(--accent); }
+.money-sources a { margin-inline-start: 4px; }
+.money-documents { margin-top: 16px; }
+.money-documents h3 { font-size: 15px; }
+.money-documents ul { list-style: none; }
+.money-documents li { padding: 5px 0 9px; border-bottom: 1px solid var(--line); }
+.money-documents .button { margin-top: 6px; }
+.money-file, .money-document-meta { gap: 6px; }
+.money-document-meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+.money-form p { color: var(--muted); font-size: 13px; }
+.money-editor { margin: auto; }
+.money-form label.money-check { display: flex; align-items: center; gap: 8px; }
+.money-check input[type="checkbox"] { width: 18px; min-height: 0; }
+.detail-body #vendor-editor-title { margin: 0; }
+.detail-body #vendor-editor-title::before { display: none; }
+@container (max-width: 630px) {
+  .money-table, .money-table tbody { display: block; }
+  .money-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .money-table tbody tr {
+    display: grid;
+    margin-bottom: 8px;
+    padding: 10px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+  }
+  .money-table tr[data-applicable="true"] { border-color: rgb(var(--tbc) / .48); }
+  .money-table tbody th { font-size: 15px; padding: 0 0 7px; }
+  .money-table td {
+    display: grid;
+    grid-template-columns: minmax(82px, 25%) minmax(0, 1fr);
+    gap: 2px 8px;
+    padding: 5px 0;
+  }
+  .money-table td:last-child { border: 0; padding-bottom: 0; }
+  .money-cell-label { display: inline; color: var(--muted); font-weight: 700; }
+  .money-amount small, .money-cutoff { grid-column: 2; }
+}

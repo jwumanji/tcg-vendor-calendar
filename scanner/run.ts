@@ -13,7 +13,7 @@ import type { Source } from "./types.ts";
 import { dirname, join, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { parseArgs } from "node:util";
-import { normalizeEvents, validDate } from "../src/data.ts";
+import { normalizeEvents, normalizeVendorPricing, validDate } from "../src/data.ts";
 import type { Event } from "../src/model.ts";
 import { localDay, horizon } from "./dates.ts";
 import { createClient } from "./http.ts";
@@ -38,6 +38,7 @@ export function validate(value: unknown): asserts value is Event[] {
   const rows = normalizeEvents(value);
   for (const [i, row] of rows.entries()) {
     const raw = (value as Event[])[i];
+    normalizeVendorPricing(raw, true);
     if (
       !row.name.trim() ||
       !["timeline", "watchlist", "recurring_sg"].includes(raw.section) ||

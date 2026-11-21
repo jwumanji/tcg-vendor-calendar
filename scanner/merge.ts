@@ -1,5 +1,5 @@
 import type { Event } from "../src/model.ts";
-import { mergeMilestones } from "../src/data.ts";
+import { mergeMilestones, mergeVendorPricing } from "../src/data.ts";
 import { listingKey, type Notice } from "./listing.ts";
 import { slug } from "./normalize.ts";
 import { fold } from "./relevance.ts";
@@ -157,7 +157,8 @@ function calendarIdentity(old: Event, next: Event): Partial<Event> {
 }
 
 function hasSharedPlanning(event: Event) {
-  return Boolean(event.outreach || event.vendor_milestones?.length);
+  return Boolean(event.outreach || event.vendor_milestones?.length ||
+    event.vendor_options?.length || event.vendor_documents?.length);
 }
 
 function preserveMilestones(previous: Event, next: Event): Partial<Event> {
@@ -201,6 +202,7 @@ function reconcileScanner(existing: Event[], imported: Event[]) {
       ...event,
       ...calendarIdentity(previous, event),
       ...preserveMilestones(previous, event),
+      ...mergeVendorPricing(event, previous),
       ...(previous.id !== event.id && { id: previous.id, scanner_export_id: event.id }),
       ...(previous.outreach !== undefined && { outreach: previous.outreach }),
     };
@@ -352,6 +354,7 @@ export function merge(
           ...earlier,
           ...update,
           ...preserveMilestones(earlier, event),
+          ...mergeVendorPricing(event, earlier),
           id: earlier.id,
           logo: event.logo ?? earlier.logo,
           logo_kind: event.logo ? event.logo_kind : earlier.logo_kind,

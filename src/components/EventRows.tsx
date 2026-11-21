@@ -21,6 +21,7 @@ import { GoingButton, type SetGoing } from "./GoingButton";
 import { StageBadge } from "./Pipeline";
 import { PriorityChip } from "./PriorityChip";
 import { OutreachChip } from "./OutreachChip";
+import { VendorPriceCue } from "./VendorPriceCue";
 import { SectionHeading } from "./ListSections";
 import { SourceChip } from "./FindSource";
 
@@ -32,6 +33,7 @@ export function EventRows({
   entries,
   scores,
   today,
+  now = Date.now(),
   selectMode,
   setGoing,
   open,
@@ -43,6 +45,7 @@ export function EventRows({
   entries: Entries;
   scores: Record<string, ScoreResult>;
   today: string;
+  now?: number;
   selectMode: boolean;
   setGoing: SetGoing;
   open: (e: Event) => void;
@@ -308,6 +311,7 @@ export function EventRows({
                             {past && <span>Past</span>}
                             <ClashCue score={scores[e.id]} entries={entries} />
                             {!showOutreachColumn && <OutreachChip outreach={e.outreach} />}
+                            <VendorPriceCue event={e} now={now} />
                           </div>
                         </div>
                       </div>

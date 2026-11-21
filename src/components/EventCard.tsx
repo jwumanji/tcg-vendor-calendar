@@ -17,6 +17,7 @@ import {
   NoteTag,
 } from "./EventIdentity";
 import { StageBadge } from "./Pipeline";
+import { VendorPriceCue } from "./VendorPriceCue";
 export const EventCard = memo(function EventCard({
   e,
   entry,
@@ -24,6 +25,7 @@ export const EventCard = memo(function EventCard({
   score,
   setGoing,
   today,
+  now = Date.now(),
   occurrence,
   titleLevel = 3,
   open,
@@ -34,6 +36,7 @@ export const EventCard = memo(function EventCard({
   score: ScoreResult;
   setGoing: SetGoing;
   today: string;
+  now?: number;
   occurrence?: string;
   titleLevel?: 3 | 4;
   open: (e: Event, occurrence?: string) => void;
@@ -77,6 +80,7 @@ export const EventCard = memo(function EventCard({
           <ClashCue score={score} entries={entries} />
           <Status e={e} />
           <OutreachChip outreach={e.outreach} />
+          <VendorPriceCue event={e} now={now} />
           <FindBadges e={e} />
           {games(e)
             .slice(0, 3)

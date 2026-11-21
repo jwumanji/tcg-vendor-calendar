@@ -1,7 +1,7 @@
 """Run after npm run build with Python Playwright and Chromium installed."""
 
 from datetime import datetime
-from json import dumps
+from json import dumps, loads
 from os import environ
 from pathlib import Path
 import re
@@ -235,6 +235,116 @@ class PlannerBrowser(TestCase):
         expect(preview).to_have_count(0)
         expect(tools.get_by_text("Imported 0 entries (merge).")).to_be_visible()
         expect(base).to_have_value("au-sydney")
+
+    def test_vendor_money_fits_mobile_and_desktop_and_links_public_documents(self):
+        page = self.page
+        page.clock.set_fixed_time(datetime.fromisoformat("2026-11-21T00:00:00+00:00"))
+        money = page.get_by_role("region", name="Money")
+        page.goto(f"{ORIGIN}/event/mefcc-2027")
+        expect(money.locator(".money-summary")).to_contain_text("AED 7,686 · USD 2,092.85")
+        applicable = money.locator('tr[data-applicable="true"]')
+        expect(applicable).to_contain_text("AED 7,320")
+        expect(applicable).to_contain_text("AED 920 listing fee")
+        expect(applicable).to_contain_text("5%")
+        expect(applicable).to_have_css("display", "grid")
+        self.assertLessEqual(page.evaluate("document.documentElement.scrollWidth"), 390)
+
+        scroll = money.locator(".money-table-scroll")
+        page.set_viewport_size({"width": 700, "height": 844})
+        expect(applicable).to_have_css("display", "table-row")
+        expect(scroll).to_have_css("overflow-x", "auto")
+        self.assertLessEqual(page.evaluate("document.documentElement.scrollWidth"), 700)
+        page.set_viewport_size({"width": 1440, "height": 900})
+        expect(applicable).to_have_css("display", "table-row")
+        self.assertEqual(scroll.evaluate("(el) => el.scrollWidth"), scroll.evaluate("(el) => el.clientWidth"))
+        page.set_viewport_size({"width": 390, "height": 844})
+
+        for event_id, label, filename, date in [
+            ("mefcc-2027", "MEFCC 2027 floorplan", "mefcc-2027-floorplan.pdf", "19 Nov 2026"),
+            ("color18", "Commercial Booth Info and Price", "color-fiesta-commercial-booth-info-and-price.jpg", "20 Nov 2026"),
+            ("jet-2027", "Japan Expo Thailand 2027 proposal excerpt", "japan-expo-thailand-2027-proposal-excerpt.pdf", "19 Nov 2026"),
+        ]:
+            page.goto(f"{ORIGIN}/event/{event_id}")
+            path = f"/vendor-docs/{filename}"
+            expect(money.get_by_role("link", name=label)).to_have_attribute("href", path)
+            expect(money.get_by_text(f"Received {date}")).to_be_visible()
+            self.assertTrue((DIST / path.lstrip("/")).is_file())
+        expect(money.get_by_text("Quote pending")).to_be_visible()
+        expect(money.get_by_role("table")).to_have_count(0)
+        expect(money.get_by_role("link", name="Full proposal source")).to_have_attribute(
+            "href", "https://drive.google.com/file/d/1oEur5IwMEvYggiV5lHWpbMK13eTPgtaT/view",
+        )
+
+    def test_vendor_price_cue_switches_at_cutoff_across_grid_and_rows(self):
+        page = self.page
+        page.clock.set_fixed_time(datetime.fromisoformat("2026-11-21T00:00:00+00:00"))
+        page.goto(ORIGIN)
+        page.get_by_label("Search events").fill("Gold Coast")
+        page.get_by_role("button", name="Grid", exact=True).click()
+        cue = page.locator(".vendor-price-cue")
+        expect(cue).to_have_text("Booth published · USD 1,071.59")
+        page.get_by_role("button", name="Rows", exact=True).click()
+        expect(cue).to_have_text("Booth published · USD 1,071.59")
+
+        page.clock.set_fixed_time(datetime.fromisoformat("2026-11-22T14:00:00+00:00"))
+        page.evaluate("window.dispatchEvent(new Event('focus'))")
+        expect(cue).to_have_text("Booth published · USD 1,610.71")
+        page.get_by_role("button", name="Grid", exact=True).click()
+        expect(cue).to_have_text("Booth published · USD 1,610.71")
+
+        page.goto(f"{ORIGIN}/event/scan-suntec-asia-comic-expo-005-202701")
+        money = page.get_by_role("region", name="Money")
+        expect(money.locator(".money-summary")).to_contain_text("TCG singles eligibility unclear")
+        expect(money.get_by_text("Expired early bird", exact=True)).to_have_count(2)
+        expect(money.locator('tr[data-applicable="true"]')).to_have_count(0)
+
+    def test_vendor_option_and_document_edits_reload_export_and_restore(self):
+        page = self.page
+        page.goto(f"{ORIGIN}/event/color18")
+        money = page.get_by_role("region", name="Money")
+        money.get_by_role("button", name="Edit Commercial Booth 9m²", exact=True).click()
+        editor = page.get_by_role("dialog", name="Edit booth option")
+        editor.get_by_label("Original amount").fill("16000000")
+        editor.get_by_role("button", name="Save booth option").click()
+        expect(money.locator(".money-summary")).to_contain_text("VND 16,000,000 · USD 621.85")
+        money.get_by_role("button", name="Edit Commercial Booth Info and Price", exact=True).click()
+        editor = page.get_by_role("dialog", name="Edit document link")
+        editor.get_by_label("Label", exact=True).fill("Local rate card")
+        editor.get_by_role("button", name="Save document link").click()
+        expect(money.get_by_role("link", name="Local rate card")).to_be_visible()
+        page.reload()
+        expect(money.locator(".money-summary")).to_contain_text("USD 621.85")
+        expect(money.get_by_role("link", name="Local rate card")).to_be_visible()
+
+        page.get_by_role("button", name="Back to events", exact=False).click()
+        page.get_by_role("button", name="Tools", exact=True).click()
+        tools = page.get_by_role("dialog", name="Tools")
+        with page.expect_download() as download:
+            tools.get_by_role("button", name="Export backup").click()
+        exported = download.value.path().read_text()
+        backup = loads(exported)
+        pricing = backup["vendorPricing"]["color18"]
+        self.assertEqual(pricing["vendor_options"][0]["amount"], 16000000)
+        self.assertEqual(pricing["vendor_options"][0]["usd_amount"], 621.85)
+        self.assertEqual(pricing["vendor_documents"][0]["label"], "Local rate card")
+        pricing["vendor_options"][0]["usd_amount"] = 1
+
+        page.goto(f"{ORIGIN}/event/color18")
+        money.get_by_role("button", name="Reset to shared Commercial Booth 9m²", exact=True).click()
+        money.get_by_role("button", name="Reset to shared Local rate card", exact=True).click()
+        expect(money.locator(".money-summary")).to_contain_text("USD 582.98")
+        page.get_by_role("button", name="Back to events", exact=False).click()
+        page.get_by_role("button", name="Tools", exact=True).click()
+        tools.get_by_label("Import JSON").set_input_files({
+            "name": "backup.json", "mimeType": "application/json", "buffer": dumps(backup).encode(),
+        })
+        preview = tools.get_by_role("region", name="Import preview")
+        expect(preview).to_contain_text("2 booth option and document edits")
+        preview.get_by_role("button", name="Confirm import").click()
+        expect(preview).to_have_count(0)
+        page.goto(f"{ORIGIN}/event/color18")
+        expect(money.locator(".money-summary")).to_contain_text("USD 621.85")
+        expect(money.get_by_role("link", name="Local rate card")).to_be_visible()
 
     def test_expired_cards_hand_off_focus_and_collapse_the_empty_strip(self):
         page = self.page

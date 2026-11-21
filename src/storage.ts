@@ -1,7 +1,7 @@
 import { normalizeWeights, type Weights } from "./scoring";
-import { mergeMilestones, normalizeMilestones, normalizeOutreachPatch } from "./data";
+import { mergeMilestones, mergeVendorPricing, normalizeMilestones, normalizeOutreachPatch, normalizeVendorPricing } from "./data";
 import { findHomeBase } from "./homeBase";
-import type { OutreachPatch, VendorMilestone } from "./model";
+import type { OutreachPatch, VendorMilestone, VendorPricingPatch } from "./model";
 
 export const stages = [
   "New",
@@ -24,6 +24,7 @@ export interface Entry {
 export type Entries = Record<string, Entry>;
 export type OutreachPatches = Record<string, OutreachPatch>;
 export type MilestoneEdits = Record<string, VendorMilestone[]>;
+export type VendorPricingEdits = Record<string, VendorPricingPatch>;
 export const emptyEntry: Entry = {
   going: false,
   goingUpdatedAt: null,
@@ -124,6 +125,7 @@ export interface Backup {
   priority?: PriorityPreferences;
   outreach?: OutreachPatches;
   milestones?: MilestoneEdits;
+  vendorPricing?: VendorPricingEdits;
   version: 1;
   exportedAt: string;
   entries: Entries;
@@ -206,6 +208,17 @@ export function validateBackup(value: unknown): Backup {
       Object.entries(value.milestones).map(([id, records]) => [id, validateMilestoneEntry(id, records)]),
     );
   }
+  if (value.vendorPricing !== undefined) {
+    if (!object(value.vendorPricing)) throw new Error("Invalid vendor pricing in backup.");
+    result.vendorPricing = Object.fromEntries(Object.entries(value.vendorPricing).map(([id, patch]) => {
+      if (!id.trim()) throw new Error("Vendor pricing event ID must not be empty.");
+      try {
+        return [id, normalizeVendorPricing(patch, true)];
+      } catch (error) {
+        throw new Error(`Invalid vendor pricing for ${id}. ${(error as Error).message}`);
+      }
+    }));
+  }
   if (value.priority !== undefined) {
     if (
       !object(value.priority) ||
@@ -229,6 +242,7 @@ export function backup(
   priority?: PriorityPreferences,
   outreach?: OutreachPatches,
   milestones?: MilestoneEdits,
+  vendorPricing?: VendorPricingEdits,
 ): Backup {
   return {
     version: 1,
@@ -237,6 +251,7 @@ export function backup(
     ...(priority && { priority }),
     ...(outreach && { outreach }),
     ...(milestones && { milestones }),
+    ...(vendorPricing && { vendorPricing }),
   };
 }
 export function importPriority(
@@ -320,16 +335,45 @@ export function removeMilestoneEdit(edits: MilestoneEdits, eventId: string, mile
   return next;
 }
 
+export function importVendorPricing(
+  current: VendorPricingEdits,
+  incoming: VendorPricingEdits | undefined,
+  mode: "merge" | "replace",
+): VendorPricingEdits {
+  if (!incoming) return current;
+  if (mode === "replace") return incoming;
+  const merged: VendorPricingEdits = Object.assign(Object.create(null), current);
+  for (const [id, patch] of Object.entries(incoming)) merged[id] = mergeVendorPricing(merged[id], patch);
+  return merged;
+}
+
+export function removeVendorPricingEdit(
+  edits: VendorPricingEdits, eventId: string, field: keyof VendorPricingPatch, itemId: string,
+): VendorPricingEdits {
+  if (!Object.hasOwn(edits, eventId)) return edits;
+  const patch = { ...edits[eventId] };
+  const records = patch[field];
+  const remaining = records?.filter(({ id }) => id !== itemId);
+  if (!remaining || remaining.length === records?.length) return edits;
+  delete patch[field];
+  const next = { ...edits };
+  if (remaining.length) next[eventId] = { ...patch, [field]: remaining };
+  else if (Object.keys(patch).length) next[eventId] = patch;
+  else delete next[eventId];
+  return next;
+}
+
 export function unknownIds(
   entries: Entries,
   ids: string[],
   overrides: Record<string, number> = {},
   outreach: OutreachPatches = {},
   milestones: MilestoneEdits = {},
+  vendorPricing: VendorPricingEdits = {},
 ) {
   const known = new Set(ids);
   return [
-    ...new Set([...Object.keys(entries), ...Object.keys(overrides), ...Object.keys(outreach), ...Object.keys(milestones)]),
+    ...new Set([...Object.keys(entries), ...Object.keys(overrides), ...Object.keys(outreach), ...Object.keys(milestones), ...Object.keys(vendorPricing)]),
   ].filter((id) => !known.has(id));
 }
 export function migrateLegacy(value: unknown): Entries {
@@ -351,6 +395,7 @@ export interface LoadedEntries {
   entries: Entries;
   outreach: OutreachPatches;
   milestones: MilestoneEdits;
+  vendorPricing: VendorPricingEdits;
   error: string;
   raw: string | null;
   recoveryKey: string | null;
@@ -364,6 +409,7 @@ export function loadEntries(
     entries: Object.create(null),
     outreach: Object.create(null),
     milestones: Object.create(null),
+    vendorPricing: Object.create(null),
     error: "",
     raw: null,
     recoveryKey: null,
@@ -380,8 +426,9 @@ export function loadEntries(
       };
     const value: unknown = JSON.parse(raw);
     try {
-      const { entries, outreach = result.outreach, milestones = result.milestones } = validateBackup(value);
-      return { ...result, entries, outreach, milestones };
+      const { entries, outreach = result.outreach, milestones = result.milestones,
+        vendorPricing = result.vendorPricing } = validateBackup(value);
+      return { ...result, entries, outreach, milestones, vendorPricing };
     } catch {
       if (object(value) && object(value.entries)) {
         for (const [id, entry] of Object.entries(value.entries)) {
@@ -416,6 +463,21 @@ export function loadEntries(
           result.dropped += records.length - recovered.length;
         }
       }
+      if (object(value) && object(value.vendorPricing)) {
+        for (const [id, patch] of Object.entries(value.vendorPricing)) {
+          if (!id.trim() || !object(patch)) {
+            result.dropped++;
+            continue;
+          }
+          const recovered = normalizeVendorPricing(patch);
+          for (const field of ["vendor_options", "vendor_documents"] as const) {
+            const records = patch[field];
+            if (records !== undefined)
+              result.dropped += Array.isArray(records) ? records.length - (recovered[field]?.length ?? 0) : 1;
+          }
+          if (Object.keys(recovered).length) result.vendorPricing[id] = recovered;
+        }
+      }
     }
   } catch {
     /* Preserve the original even if JSON parsing fails. */
@@ -430,7 +492,8 @@ export function loadEntries(
       /* Saving stays locked until the original can be preserved. */
     }
   }
-  const recovered = Object.keys(result.entries).length + Object.keys(result.outreach).length + Object.keys(result.milestones).length;
+  const recovered = Object.keys(result.entries).length + Object.keys(result.outreach).length +
+    Object.keys(result.milestones).length + Object.keys(result.vendorPricing).length;
   result.error = `Saved planner data needs recovery. Recovered ${recovered} saved records. Dropped ${result.dropped} invalid records. Automatic saving is paused. ${result.recoveryKey ? "The original is preserved on this device." : "Export the original before continuing."}`;
   return result;
 }
@@ -439,9 +502,10 @@ export function stashBeforeReplace(
   priority?: PriorityPreferences,
   outreach?: OutreachPatches,
   milestones?: MilestoneEdits,
+  vendorPricing?: VendorPricingEdits,
 ): string {
   const key = `${STORAGE_KEY}-before-replace-${Date.now()}`;
-  localStorage.setItem(key, JSON.stringify(backup(entries, priority, outreach, milestones)));
+  localStorage.setItem(key, JSON.stringify(backup(entries, priority, outreach, milestones, vendorPricing)));
   return key;
 }
 export function saveValue(key: string, value: unknown): string {

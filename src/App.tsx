@@ -11,7 +11,7 @@ import { BrandLockup, BrandMark } from "./components/Brand";
 import { EmptyState } from "./components/EmptyState";
 import { EventExports } from "./components/EventExports";
 import { TopPicks } from "./components/TopPicks";
-import { UpcomingMilestones } from "./components/UpcomingMilestones";
+import { UpcomingMilestones, useMilestoneClock } from "./components/UpcomingMilestones";
 import { OutreachFollowUps } from "./components/OutreachFollowUps";
 import { Pipeline } from "./components/Pipeline";
 import { BackupControls } from "./components/BackupControls";
@@ -52,7 +52,7 @@ import { useFilters, stored } from "./hooks/useFilters";
 import { CountryFilter } from "./components/CountryFilter";
 import { CountryFlag } from "./components/EventIdentity";
 import { useToday } from "./hooks/useToday";
-import { mergeMilestones, mergeOutreach, normalizeEvents, reconcileOutreachOverlay } from "./data";
+import { mergeMilestones, mergeOutreach, mergeVendorPricing, normalizeEvents, reconcileOutreachOverlay } from "./data";
 import meta from "../data/meta.json";
 import type { Event } from "./model";
 import { emptyFilters } from "./model";
@@ -93,10 +93,13 @@ export default function App() {
     entries,
     outreach,
     milestones,
+    vendorPricing,
     update,
     updateOutreach,
     updateMilestone,
     resetMilestone,
+    updateVendorPricing,
+    resetVendorPricing,
     applyEntries,
     setGoing,
     undo,
@@ -116,8 +119,9 @@ export default function App() {
       ...(Object.hasOwn(milestones, event.id) && {
         vendor_milestones: mergeMilestones(event.vendor_milestones, milestones[event.id]),
       }),
+      ...(Object.hasOwn(vendorPricing, event.id) && mergeVendorPricing(event, vendorPricing[event.id])),
     })),
-    [shippedEvents, outreach, milestones],
+    [shippedEvents, outreach, milestones, vendorPricing],
   );
   const [show2026, setShow2026] = useState(
     () => stored("tcg-show-2026-v1") === true,
@@ -127,6 +131,7 @@ export default function App() {
     [allEvents, show2026],
   );
   const today = useToday();
+  const now = useMilestoneClock();
   // The calendar opens on the first month of the season (January 2027).
   const firstMonth = nextMonth(events, today);
   const initialMonth =
@@ -135,7 +140,7 @@ export default function App() {
       : SEASON_START.slice(0, 7);
   const { route, openEvent, back, listContext } = useEventRoute();
   const { filters, setFilters, set } = useFilters(setStorageError, listContext?.sessionFilters);
-  const priority = usePriority(shippedEvents, today, setStorageError);
+  const priority = usePriority(allEvents, today, now, setStorageError);
   const { scores } = priority;
   const [toolsOpen, setToolsOpen] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
@@ -418,6 +423,7 @@ export default function App() {
         entries={entries}
         setGoing={setGoing}
         today={today}
+        now={now}
         occurrence={occurrence}
         titleLevel={titleLevel}
         open={open}
@@ -989,6 +995,7 @@ export default function App() {
                     entries={entries}
                     scores={scores}
                     today={today}
+                    now={now}
                     open={open}
                   />
                 )
@@ -1117,6 +1124,7 @@ export default function App() {
             entries={entries}
             outreach={outreach}
             milestones={milestones}
+            vendorPricing={vendorPricing}
             ids={allEvents.map((e) => e.id)}
             apply={applyEntries}
             priority={{
@@ -1156,6 +1164,7 @@ export default function App() {
             <Suspense fallback={<p role="status">Loading event…</p>}>
               <Detail
                 today={today}
+                now={now}
                 toast={toast}
                 e={selected}
                 score={scores[selected.id]}
@@ -1174,6 +1183,10 @@ export default function App() {
                 localMilestones={Object.hasOwn(milestones, selected.id) ? milestones[selected.id] : undefined}
                 onMilestone={(milestone) => updateMilestone(selected.id, milestone)}
                 onRemoveMilestone={(id) => resetMilestone(selected.id, id)}
+                sharedVendorPricing={sharedSelection ?? undefined}
+                localVendorPricing={Object.hasOwn(vendorPricing, selected.id) ? vendorPricing[selected.id] : undefined}
+                onVendorPricing={(patch) => updateVendorPricing(selected.id, patch)}
+                onRemoveVendorPricing={(field, id) => resetVendorPricing(selected.id, field, id)}
               />
             </Suspense>
           ) : (

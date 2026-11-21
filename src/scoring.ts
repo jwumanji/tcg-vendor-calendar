@@ -1,5 +1,8 @@
 import type { Event } from "./model";
 import { estimateTravel, resolveHomeBase, type HomeBase } from "./homeBase";
+import { applicableVendorPrice, formatVendorAmount, formatVendorUsd, legacyVendorPrice } from "./vendorPricing";
+
+export { parseBoothCost } from "./vendorPricing";
 
 export const DEFAULT_WEIGHTS = Object.freeze({
   scale: 20,
@@ -134,6 +137,7 @@ export interface ScoreOptions {
   weights?: unknown;
   overrides?: Readonly<Record<string, number>>;
   today?: string | Date;
+  now?: number;
   homeBase?: string;
 }
 const missing = (note: string): Evidence => ({
@@ -386,64 +390,9 @@ function market(e: Event): Evidence {
   );
 }
 
-// Fixed approximate USD equivalents for comparative scoring, not live exchange quotes.
-const fx: Record<string, number> = {
-  SGD: 0.75,
-  HKD: 0.128,
-  MYR: 0.23,
-  THB: 0.029,
-  IDR: 0.000063,
-  USD: 1,
-  AED: 0.272,
-  CNY: 0.14,
-  SAR: 0.267,
-  PHP: 0.017,
-  VND: 0.000039,
-  QAR: 0.275,
-  KWD: 3.25,
-  BHD: 2.65,
-};
-const aliases: Record<string, string> = {
-  HK$: "HKD",
-  S$: "SGD",
-  US$: "USD",
-  RM: "MYR",
-  RP: "IDR",
-};
-export function parseBoothCost(text?: string | null) {
-  if (!text || /sponsorship packages/i.test(text)) return null;
-  // Take the first quoted eligible booth rate. Retain the original terms (area,
-  // historical year, unverified quote, VAT, etc.) instead of implying a current price.
-  const price =
-    /\b(HK\$|US\$|S\$|SGD|HKD|MYR|THB|IDR|USD|AED|CNY|SAR|PHP|VND|QAR|KWD|BHD|RM|Rp\.?)\s*(\d[\d,]*(?:\.\d+)?)/gi;
-  for (const match of text.matchAll(price)) {
-    const before = text.slice(0, match.index).split(/[;:]/).pop() ?? "";
-    const after = text.slice(match.index + match[0].length);
-    if (
-      /\+\s*$|(?:extra (?:staff pass|badges?)|artist alley|deposit|selection fee)\s*$/i.test(
-        before,
-      ) ||
-      /^\s*(?:deposit|service fee|\/sqm)\b/i.test(after)
-    )
-      continue;
-    const code = match[1].toUpperCase().replace(".", "");
-    const currency = aliases[code] ?? code;
-    const amount = Number(match[2].replaceAll(",", ""));
-    if (finite(amount)) {
-      // Scope years to the selected price, excluding separate alternatives
-      // and statements about an edition whose rates have yet to be published.
-      const prefix = text.slice(0, match.index).split(/[;.]/).at(-1) ?? "";
-      const suffix = after.split(/[;.]/)[0];
-      const year = suffix.match(/^\s*\((20\d\d)\)|^.{0,40}?\b(?:was (?:the )?|for )(20\d\d)\b/i)
-        ?? prefix.match(/\b(20\d\d)\b(?!.*\b20\d\d\b)(?![^:]*not published)/i);
-      const quoteYear = year ? Number(year[1] ?? year[2]) : null;
-      return { amount, currency, approxUsd: amount * fx[currency], note: text, quoteYear };
-    }
-  }
-  return null;
-}
-function commercial(e: Event): Evidence {
-  const cost = parseBoothCost(e.vendor_cost);
+function commercial(e: Event, now: number): Evidence {
+  const cost = applicableVendorPrice(e, now);
+  const historical = !cost ? legacyVendorPrice(e) : null;
   const booth = boothStatus(e);
   const app =
     e.vendor_application &&
@@ -453,9 +402,11 @@ function commercial(e: Event): Evidence {
   const signals: string[] = [];
   let value = 0.5;
   const priced = cost && count(e.visitors) && e.visitors > 0;
-  if (cost) signals.push(cost.note);
+  if (cost) signals.push(cost.basis === "listed" ? cost.note :
+    `${cost.option.name} · ${formatVendorAmount(cost.amount, cost.currency)} · ${formatVendorUsd(cost.usd)}`);
+  if (historical?.status === "past_year") signals.push("Prior-edition rate on file");
   if (priced) {
-    const perK = (cost.approxUsd * 1000) / e.visitors!;
+    const perK = (cost.usd * 1000) / e.visitors!;
     value = 1 / (1 + perK / 45);
     signals.push(
       `Approx. USD ${perK.toFixed(2)} per 1,000 reported attendees / places`,
@@ -481,24 +432,18 @@ function commercial(e: Event): Evidence {
   if (booth && e.vendor_booths) signals.push(e.vendor_booths);
   if (app && booth >= 0) signals.push(e.vendor_application!);
   value += booth < 0 ? -0.35 : booth * 0.06 + (app ? 0.04 : 0);
-  const editionYear = Number((e.start_date ?? e.estimated_month)?.slice(0, 4)
-    ?? e.name.match(/\b(20\d\d)\b/)?.[1]);
-  const historical = cost && ((cost.quoteYear !== null && cost.quoteYear < editionYear) ||
-    /\b(?:prior|past|previous|last)[ -](?:edition|year)|historical rate/i.test(cost.note));
-  if (priced && !historical && !/unverified|not verified|unconfirmed|not (?:a )?confirmed|agent price/i.test(cost.note))
+  if (priced)
     return real(
       value,
       signals,
-      "Quoted price relative to reported attendance, adjusted for vendor access.",
+      "Applicable booth price relative to reported attendance, adjusted for vendor access.",
     );
   if (signals.length)
     return estimated(
       value,
       signals,
-      historical
-        ? `Estimated from a prior-edition price${cost.quoteYear ? " quoted for " + cost.quoteYear : ""}.`
-        : priced
-        ? "Price relies on an unverified quote."
+      historical?.status === "past_year"
+        ? `Cost per attendee unavailable. Recorded price is from a prior edition${historical.quoteYear ? " (" + historical.quoteYear + ")" : ""}.`
         : "Cost per attendee unavailable. Estimated from a 0.5 baseline.",
     );
   return missing("No comparable pricing, market, size or booth information.");
@@ -623,6 +568,7 @@ function baseScore(
   weights: Weights,
   today: number | null,
   homeBase: HomeBase,
+  now: number,
 ): ScoreResult {
   if (e.event_status === "cancelled") return {
     id: e.id, name: e.name, startDate: e.start_date ?? e.estimated_month,
@@ -637,7 +583,7 @@ function baseScore(
     track: track(e, year),
     tcg_fit: tcgFit(e),
     market: market(e),
-    commercial: commercial(e),
+    commercial: commercial(e, now),
     logistics: logistics(e, today, homeBase),
     scanner_score: scanner(e),
   };
@@ -689,13 +635,20 @@ function referenceDay(today: ScoreOptions["today"]) {
   if (typeof today === "string") return day(today);
   return finite(today.getTime()) ? day(today.toISOString().slice(0, 10)) : null;
 }
+function pricingTime(options: ScoreOptions, today: number | null) {
+  if (options.now !== undefined) return options.now;
+  if (today === null) return Infinity;
+  return options.today instanceof Date ? options.today.getTime() : today * dayMs;
+}
 export function scoreEvent(e: Event, options: ScoreOptions = {}): ScoreResult {
+  const today = referenceDay(options.today);
   return finish(
     baseScore(
       e,
       normalizeWeights(options.weights),
-      referenceDay(options.today),
+      today,
       resolveHomeBase(options.homeBase),
+      pricingTime(options, today),
     ),
     options.overrides,
   );
@@ -740,7 +693,8 @@ export function scoreEvents(
   const weights = normalizeWeights(options.weights),
     today = referenceDay(options.today);
   const homeBase = resolveHomeBase(options.homeBase);
-  const base = events.map((e) => baseScore(e, weights, today, homeBase));
+  const now = pricingTime(options, today);
+  const base = events.map((e) => baseScore(e, weights, today, homeBase, now));
   const ranges = events.map(confirmedRanges);
   return base.map((r, i) => {
     const clashes: ClashInfo[] = [];

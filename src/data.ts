@@ -5,12 +5,17 @@ import {
   outreachMethods,
   outreachNextActions,
   outreachStatuses,
+  vendorEligibilities,
+  vendorRateStatuses,
   type Event,
   type Outreach,
   type OutreachPatch,
   type OutreachStatus,
   type MilestoneType,
   type VendorMilestone,
+  type VendorDocument,
+  type VendorOption,
+  type VendorPricingPatch,
 } from "./model.ts";
 import { milestoneInstantInRange } from "./milestones.ts";
 const nullableStrings = [
@@ -65,6 +70,107 @@ const record = (value: unknown): value is Record<string, unknown> =>
 const isText = (value: unknown): value is string => typeof value === "string";
 const httpUrl = (value: unknown): value is string =>
   isText(value) && /^https?:\/\//i.test(value) && URL.canParse(value);
+
+const recordId = /^[a-z0-9][a-z0-9-]*$/;
+const offsetDateTime = /^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,3})?)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/;
+const amount = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value) && value >= 0;
+
+export function normalizeVendorOption(value: unknown): VendorOption {
+  if (!record(value) || !isText(value.id) || !recordId.test(value.id))
+    throw new Error("Booth option needs a stable ID.");
+  const { id, name, size, includes, notes, source, currency, fx_rate, fx_as_of, fx_source,
+    vat_rate, amount_incl_vat, kind, basis, early_bird, valid_until } = value;
+  const eligibility = value.eligibility as VendorOption["eligibility"];
+  const rate_status = value.rate_status as VendorOption["rate_status"];
+  if (!isText(name) || !name.trim() || !isText(size) || !isText(includes) || !isText(notes) ||
+      !isText(source) || !source.trim() || !isText(fx_source) || !fx_source.trim())
+    throw new Error("Enter an option name, price source and FX source.");
+  if (!amount(value.amount) || !isText(currency) || !/^[A-Z]{3}$/.test(currency) ||
+      !amount(fx_rate) || fx_rate === 0 || !validDate(fx_as_of))
+    throw new Error("Enter a valid local amount, a currency code, and a positive dated FX rate.");
+  if (vat_rate !== undefined && (!amount(vat_rate) || vat_rate > 1 || !amount(amount_incl_vat) ||
+      amount_incl_vat !== Math.round(value.amount * (1 + vat_rate) * 100) / 100))
+    throw new Error("Enter a VAT rate and matching tax-inclusive amount.");
+  if (vat_rate === undefined && amount_incl_vat !== undefined)
+    throw new Error("A tax-inclusive amount requires a VAT rate.");
+  const payable = amount(amount_incl_vat) ? amount_incl_vat : value.amount;
+  const usd_amount = Math.round(payable / fx_rate * 100) / 100;
+  if (!amount(usd_amount))
+    throw new Error("The local amount and FX rate must yield a finite USD amount.");
+  if (!vendorEligibilities.includes(eligibility) || !vendorRateStatuses.includes(rate_status) ||
+      (kind !== "package" && kind !== "add_on") || (basis !== "quote" && basis !== "published"))
+    throw new Error("Choose an eligibility, kind, price source type and rate status.");
+  if (early_bird !== undefined && typeof early_bird !== "boolean")
+    throw new Error("Early-bird status must be true or false.");
+  if (valid_until !== undefined && (!isText(valid_until) || !offsetDateTime.test(valid_until) ||
+      !validDate(valid_until.slice(0, 10)) || !Number.isFinite(Date.parse(valid_until))))
+    throw new Error("Enter a cutoff as an ISO datetime with a UTC offset.");
+  return {
+    id, name: name.trim(), size: size.trim(), includes: includes.trim(), amount: value.amount, currency,
+    fx_rate, fx_as_of, fx_source: fx_source.trim(), usd_amount,
+    ...(vat_rate !== undefined && { vat_rate, amount_incl_vat: payable }),
+    notes: notes.trim(), eligibility, kind, basis, source: source.trim(), rate_status,
+    ...(early_bird !== undefined && { early_bird }),
+    ...(valid_until !== undefined && { valid_until }),
+  };
+}
+
+export function normalizeVendorDocument(value: unknown): VendorDocument {
+  if (!record(value) || !isText(value.id) || !recordId.test(value.id))
+    throw new Error("Vendor document needs a stable ID.");
+  const { id, label, path, source, received_at, notes } = value;
+  if (!isText(label) || !label.trim() || !isText(source) || !source.trim() || !validDate(received_at))
+    throw new Error("Enter a document label, source and received date.");
+  if (!isText(path) || !/^vendor-docs\/[a-z0-9][a-z0-9._-]*\.(?:pdf|jpe?g|png|webp)$/i.test(path))
+    throw new Error("Enter a PDF or image path under vendor-docs/.");
+  return { id, label: label.trim(), path, source: source.trim(), received_at,
+    ...(isText(notes) && notes.trim() && { notes: notes.trim() }) };
+}
+
+function normalizeVendorRecords<T extends { id: string }>(
+  value: unknown, normalize: (row: unknown) => T, strict: boolean,
+): T[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) {
+    if (strict) throw new Error("Expected a list of booth options or vendor documents.");
+    return undefined;
+  }
+  const rows = new Map<string, T>();
+  for (const entry of value) {
+    try {
+      const row = normalize(entry);
+      if (rows.has(row.id)) throw new Error(`Duplicate vendor item ID ${row.id}.`);
+      rows.set(row.id, row);
+    } catch (error) {
+      if (strict) throw error;
+    }
+  }
+  return [...rows.values()];
+}
+
+export function normalizeVendorPricing(value: unknown, strict = false): VendorPricingPatch {
+  if (!record(value)) {
+    if (strict) throw new Error("Expected an object with booth options or vendor documents.");
+    return {};
+  }
+  const vendor_options = normalizeVendorRecords(value.vendor_options, normalizeVendorOption, strict);
+  const vendor_documents = normalizeVendorRecords(value.vendor_documents, normalizeVendorDocument, strict);
+  return { ...(vendor_options && { vendor_options }), ...(vendor_documents && { vendor_documents }) };
+}
+
+export function mergeVendorPricing(base: VendorPricingPatch = {}, incoming: VendorPricingPatch = {}): VendorPricingPatch {
+  function merge<T extends { id: string }>(previous: T[] = [], next: T[]) {
+    return [...new Map([...previous, ...next].map((row) => [row.id, row])).values()];
+  }
+  return {
+    ...(base.vendor_options && { vendor_options: base.vendor_options }),
+    ...(base.vendor_documents && { vendor_documents: base.vendor_documents }),
+    ...(incoming.vendor_options && { vendor_options: merge(base.vendor_options, incoming.vendor_options) }),
+    ...(incoming.vendor_documents && { vendor_documents: merge(base.vendor_documents, incoming.vendor_documents) }),
+  };
+}
+
 export function milestoneSourceHref(source: string): string | undefined {
   return httpUrl(source) ? source : undefined;
 }
@@ -82,12 +188,12 @@ function validTimeZone(zone: string) {
 }
 
 export function normalizeMilestone(value: unknown): VendorMilestone {
-  if (!record(value) || !isText(value.id) || !/^[a-z0-9][a-z0-9-]*$/.test(value.id))
+  if (!record(value) || !isText(value.id) || !recordId.test(value.id))
     throw new Error("Booking milestone needs a stable ID.");
   if (!milestoneTypes.includes(value.type as MilestoneType))
     throw new Error("Choose a booking milestone type.");
   const at = isText(value.at) ? value.at.trim() : "";
-  const timed = /^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,3})?)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/.test(at);
+  const timed = offsetDateTime.test(at);
   if (!(timed && validDate(at.slice(0, 10)) && Number.isFinite(Date.parse(at))) && !validDate(at))
     throw new Error("Enter a valid date or an ISO datetime with a UTC offset.");
   const timeZone = isText(value.timeZone) ? value.timeZone.trim() : "";
@@ -258,6 +364,7 @@ export function normalizeEvents(value: unknown): Event[] {
     else if (v.outreach === null) e.outreach = null;
     const milestones = normalizeMilestones(v.vendor_milestones);
     if (milestones.length) e.vendor_milestones = milestones;
+    Object.assign(e, normalizeVendorPricing(v));
     for (const key of nullableNumbers)
       e[key] =
         typeof v[key] === "number" && Number.isFinite(v[key]) ? v[key] : null;

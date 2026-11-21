@@ -14,6 +14,7 @@ import { stored } from "./useFilters";
 export function usePriority(
   events: Event[],
   today: string,
+  now: number,
   reportError: (message: string) => void,
 ) {
   const [weights, setWeights] = useState(() =>
@@ -57,12 +58,12 @@ export function usePriority(
   const scores = useMemo(
     () =>
       Object.fromEntries(
-        scoreEvents(events, { weights, overrides, today, homeBase }).map((result) => [
+        scoreEvents(events, { weights, overrides, today, now, homeBase }).map((result) => [
           result.id,
           result,
         ]),
       ),
-    [events, weights, overrides, today, homeBase],
+    [events, weights, overrides, today, now, homeBase],
   );
   function setOverride(id: string, value: number | null) {
     setOverrides((current) => {

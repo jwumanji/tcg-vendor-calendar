@@ -7,15 +7,17 @@ import {
   emptyEntry,
   loadEntries,
   removeMilestoneEdit,
+  removeVendorPricingEdit,
   saveValue,
   STORAGE_KEY,
   type Entries,
   type LoadedEntries,
   type MilestoneEdits,
   type OutreachPatches,
+  type VendorPricingEdits,
 } from "../storage";
-import type { Outreach, OutreachPatch, VendorMilestone } from "../model";
-import { mergeMilestones, reconcileOutreachOverlay } from "../data";
+import type { Outreach, OutreachPatch, VendorMilestone, VendorPricingPatch } from "../model";
+import { mergeMilestones, mergeVendorPricing, reconcileOutreachOverlay } from "../data";
 import { download } from "../utils";
 
 export function useEntries() {
@@ -27,6 +29,7 @@ export function useEntries() {
         entries: {},
         outreach: {},
         milestones: {},
+        vendorPricing: {},
         error: "Storage is unavailable. Export a backup to keep changes.",
         raw: null,
         recoveryKey: null,
@@ -39,15 +42,17 @@ export function useEntries() {
     patch: ReturnType<typeof inverseGoingPatch>;
     changedAt: string;
   };
-  const [{ entries, outreach, milestones, undo }, setState] = useState<{
+  const [{ entries, outreach, milestones, vendorPricing, undo }, setState] = useState<{
     entries: Entries;
     outreach: OutreachPatches;
     milestones: MilestoneEdits;
+    vendorPricing: VendorPricingEdits;
     undo: Undo | null;
   }>({
     entries: loaded.entries,
     outreach: loaded.outreach,
     milestones: loaded.milestones,
+    vendorPricing: loaded.vendorPricing,
     undo: null,
   });
   const [storageError, setStorageError] = useState(loaded.error);
@@ -101,12 +106,29 @@ export function useEntries() {
       milestones: removeMilestoneEdit(current.milestones, id, milestoneId),
     }));
   }, []);
+  const updateVendorPricing = useCallback((id: string, patch: VendorPricingPatch) => {
+    setSaved(false);
+    setState((current) => ({
+      ...current,
+      vendorPricing: {
+        ...current.vendorPricing,
+        [id]: mergeVendorPricing(Object.hasOwn(current.vendorPricing, id) ? current.vendorPricing[id] : undefined, patch),
+      },
+    }));
+  }, []);
+  const resetVendorPricing = useCallback((id: string, field: keyof VendorPricingPatch, itemId: string) => {
+    setSaved(false);
+    setState((current) => ({
+      ...current,
+      vendorPricing: removeVendorPricingEdit(current.vendorPricing, id, field, itemId),
+    }));
+  }, []);
   useEffect(() => {
     if (!canSave) return;
-    const error = saveValue(STORAGE_KEY, backup(entries, undefined, outreach, milestones));
+    const error = saveValue(STORAGE_KEY, backup(entries, undefined, outreach, milestones, vendorPricing));
     setSaved(!error);
     setStorageError(error);
-  }, [entries, outreach, milestones, canSave]);
+  }, [entries, outreach, milestones, vendorPricing, canSave]);
   const setGoing = useCallback((ids: readonly string[], going: boolean) => {
     const now = new Date().toISOString();
     setState((current) => {
@@ -150,14 +172,17 @@ export function useEntries() {
     setStorageError("");
     setCanSave(true);
   }
-  function applyEntries(entries: Entries, outreach: OutreachPatches, milestones: MilestoneEdits) {
+  function applyEntries(entries: Entries, outreach: OutreachPatches, milestones: MilestoneEdits, vendorPricing: VendorPricingEdits) {
     setSaved(false);
-    setState({ entries, outreach, milestones, undo: null });
+    setState({ entries, outreach, milestones, vendorPricing, undo: null });
   }
   return {
     entries,
     outreach,
     milestones,
+    vendorPricing,
+    updateVendorPricing,
+    resetVendorPricing,
     update,
     updateOutreach,
     updateMilestone,

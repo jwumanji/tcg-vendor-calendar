@@ -223,6 +223,31 @@ it("carries only planner outreach onto replacement Scanner records with the same
   expect(imported.outreach).toBeUndefined();
 });
 
+it("preserves options and documents during scraper refresh, pruning and Scanner promotion", () => {
+  const color = normalizeEvents(JSON.parse(readFileSync(new URL("../data/events.json", import.meta.url), "utf8")))
+    .find((event) => event.id === "color18")!;
+  const pricing = { vendor_options: color.vendor_options, vendor_documents: color.vendor_documents };
+  const previous = find(pricing);
+  const refreshed = find({ vendor_count: 320, vendor_options: [], vendor_documents: [] });
+  const [updated] = merge([previous], [refreshed], today).events;
+  expect(updated).toMatchObject({ ...pricing, vendor_count: 320 });
+  expect(merge([updated], [], "2027-12-31").events).toEqual([updated]);
+
+  const imported = scanner({ vendor_cost: "SGD 200" });
+  const [promoted] = merge([updated], [], today, [imported]).events;
+  expect(promoted).toMatchObject({ ...pricing, id: previous.id, scanner_export_id: imported.id, vendor_cost: "SGD 200" });
+  expect(merge([promoted], [], today, [imported]).events).toEqual([promoted]);
+  expect(() => validate([promoted])).not.toThrow();
+});
+
+it("preserves an explicitly empty option list and proposal when Scanner replaces a document-only event", () => {
+  const japan = normalizeEvents(JSON.parse(readFileSync(new URL("../data/events.json", import.meta.url), "utf8")))
+    .find((event) => event.id === "jet-2027")!;
+  const previous = scanner({ vendor_options: [], vendor_documents: japan.vendor_documents });
+  const [updated] = merge([previous], [], today, [scanner({ vendor_count: 80 })]).events;
+  expect(updated).toMatchObject({ vendor_options: [], vendor_documents: japan.vendor_documents, vendor_count: 80 });
+});
+
 it.each([undefined, null, mergeOutreach(null, { notes: "Source default" })])("keeps planner outreach when a scraper update supplies %j", (incomingOutreach) => {
   const outreach = mergeOutreach(null, { status: "replied", method: "email", notes: "Follow up" });
   const previous = find({ outreach });

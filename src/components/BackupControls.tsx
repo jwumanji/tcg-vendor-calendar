@@ -16,10 +16,12 @@ import {
   importEntries,
   importOutreach,
   importMilestoneEdits,
+  importVendorPricing,
   unknownIds,
   type Entries,
   type OutreachPatches,
   type MilestoneEdits,
+  type VendorPricingEdits,
 } from "../storage";
 import { download } from "../utils";
 import { findHomeBase, homeBaseLabel, resolveHomeBase } from "../homeBase";
@@ -27,6 +29,7 @@ export function BackupControls({
   entries,
   outreach,
   milestones,
+  vendorPricing,
   ids,
   apply,
   priority,
@@ -35,22 +38,26 @@ export function BackupControls({
   entries: Entries;
   outreach: OutreachPatches;
   milestones: MilestoneEdits;
+  vendorPricing: VendorPricingEdits;
   ids: string[];
   priority: PriorityPreferences;
   applyPriority: (value: PriorityPreferences) => void;
-  apply: (entries: Entries, outreach: OutreachPatches, milestones: MilestoneEdits) => void;
+  apply: (entries: Entries, outreach: OutreachPatches, milestones: MilestoneEdits, vendorPricing: VendorPricingEdits) => void;
 }) {
   const [preview, setPreview] = useState<Backup | null>(null);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
   const [mode, setMode] = useState<"merge" | "replace">("merge");
   const absent = preview
-    ? unknownIds(preview.entries, ids, preview.priority?.overrides, preview.outreach, preview.milestones)
+    ? unknownIds(preview.entries, ids, preview.priority?.overrides, preview.outreach, preview.milestones, preview.vendorPricing)
     : [];
   const outreachCount = Object.keys(preview?.outreach ?? {}).length;
   const outreachSummary = `${outreachCount} outreach ${outreachCount === 1 ? "patch" : "patches"}`;
   const milestoneCount = Object.values(preview?.milestones ?? {}).reduce((count, records) => count + records.length, 0);
   const milestoneSummary = `${milestoneCount} booking milestone ${milestoneCount === 1 ? "edit" : "edits"}`;
+  const pricingCount = Object.values(preview?.vendorPricing ?? {}).reduce(
+    (count, patch) => count + (patch.vendor_options?.length ?? 0) + (patch.vendor_documents?.length ?? 0), 0);
+  const pricingSummary = `${pricingCount} booth option and document ${pricingCount === 1 ? "edit" : "edits"}`;
   const currentHomeBase = resolveHomeBase(priority.homeBase);
   const importedHomeBaseId = preview?.priority?.homeBase;
   const importedHomeBase = findHomeBase(importedHomeBaseId);
@@ -61,7 +68,7 @@ export function BackupControls({
           <HardDrive size={16} aria-hidden="true" /> Backup &amp; restore
         </span>
         <span>
-          Going choices, stages, notes, outreach edits, booking milestone edits and score settings are kept in this
+          Going choices, stages, notes, outreach edits, booking milestones, booth option and document edits, and score settings are kept in this
           browser only. Export a backup before switching devices.
         </span>
       </div>
@@ -70,7 +77,7 @@ export function BackupControls({
           className="button"
           onClick={() =>
             download(
-              JSON.stringify(backup(entries, priority, outreach, milestones), null, 2),
+              JSON.stringify(backup(entries, priority, outreach, milestones, vendorPricing), null, 2),
               "tcg-pipeline-backup.json",
               "application/json",
             )
@@ -121,6 +128,7 @@ export function BackupControls({
             <p>{outreachSummary}</p>
           )}
           {preview.milestones && <p>{milestoneSummary}</p>}
+          {preview.vendorPricing && <p>{pricingSummary}</p>}
           <p>
             {absent.length} IDs absent from current data (kept):{" "}
             {absent.slice(0, 20).join(", ") || "none"}
@@ -157,6 +165,11 @@ export function BackupControls({
               ? "Imported booking edits take precedence for matching milestones."
               : "Imported booking edits replace your current device edits. Shared milestones still apply."}</p>
           )}
+          {preview.vendorPricing && (
+            <p>{mode === "merge"
+              ? "Imported booth options and documents take precedence for matching records."
+              : "Imported booth options and documents replace your device edits. Shared rates and documents still apply."}</p>
+          )}
           {preview.priority && (
             <p>
               Imported score weights will apply to all events.{" "}
@@ -176,11 +189,12 @@ export function BackupControls({
               className="button primary"
               onClick={() => {
                 try {
-                  if (mode === "replace") stashBeforeReplace(entries, priority, outreach, milestones);
+                  if (mode === "replace") stashBeforeReplace(entries, priority, outreach, milestones, vendorPricing);
                   apply(
                     importEntries(entries, preview.entries, mode),
                     importOutreach(outreach, preview.outreach, mode),
                     importMilestoneEdits(milestones, preview.milestones, mode),
+                    importVendorPricing(vendorPricing, preview.vendorPricing, mode),
                   );
                   applyPriority(
                     importPriority(priority, preview.priority, mode),
@@ -189,6 +203,7 @@ export function BackupControls({
                     `${Object.keys(preview.entries).length} entries`,
                     preview.outreach && outreachSummary,
                     preview.milestones && milestoneSummary,
+                    preview.vendorPricing && pricingSummary,
                   ].filter(Boolean).join(" · ");
                   setStatus(`Imported ${summary} (${mode}).`);
                   setError("");

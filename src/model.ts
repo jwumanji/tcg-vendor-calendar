@@ -71,6 +71,44 @@ export interface VendorMilestone {
   notes?: string;
 }
 
+export const vendorEligibilities = ["eligible", "ineligible", "unclear"] as const;
+export const vendorRateStatuses = ["current", "past_year", "expired", "unavailable"] as const;
+
+export interface VendorOption {
+  id: string;
+  name: string;
+  size: string;
+  includes: string;
+  /** Listed amount including mandatory fees, before VAT when vat_rate is set. */
+  amount: number;
+  currency: string;
+  fx_rate: number;
+  fx_as_of: string;
+  fx_source: string;
+  /** USD equivalent of the payable amount, including VAT where specified. */
+  usd_amount: number;
+  vat_rate?: number;
+  amount_incl_vat?: number;
+  notes: string;
+  eligibility: (typeof vendorEligibilities)[number];
+  kind: "package" | "add_on";
+  basis: "quote" | "published";
+  source: string;
+  rate_status: (typeof vendorRateStatuses)[number];
+  early_bird?: boolean;
+  /** Exclusive ISO datetime with UTC offset, as published by the organizer. */
+  valid_until?: string;
+}
+
+export interface VendorDocument {
+  id: string;
+  label: string;
+  path: string;
+  source: string;
+  received_at: string;
+  notes?: string;
+}
+
 export interface Event {
   id: string;
   /** Scanner's ID when a replacement uses an existing planner ID to keep its history. */
@@ -110,6 +148,8 @@ export interface Event {
   vendor_deadline: string | null;
   vendor_milestones?: VendorMilestone[];
   vendor_cost: string | null;
+  vendor_options?: VendorOption[];
+  vendor_documents?: VendorDocument[];
   booth_detail: string | null;
   contact: string | null;
   outreach?: Outreach | null;
@@ -133,6 +173,7 @@ export interface Event {
   is_new_find?: boolean;
   verification?: "scanner" | "unverified" | "verified";
 }
+export type VendorPricingPatch = Pick<Event, "vendor_options" | "vendor_documents">;
 export interface Filters {
   search: string;
   countries: string[];

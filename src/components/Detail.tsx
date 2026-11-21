@@ -13,7 +13,7 @@ import {
   LoaderCircle,
   Download,
 } from "lucide-react";
-import type { Event, VendorMilestone } from "../model";
+import type { Event, VendorMilestone, VendorPricingPatch } from "../model";
 import {
   displayDateLabel,
   safeUrl,
@@ -31,9 +31,11 @@ import type { Outreach, OutreachPatch } from "../model";
 import { OutreachChip } from "./OutreachChip";
 import { OutreachSection } from "./OutreachSection";
 import { BookingMilestones } from "./BookingMilestones";
+import { VendorMoney } from "./VendorMoney";
 export function Detail({
   e,
   today,
+  now = Date.now(),
   occurrence,
   entry,
   setGoing,
@@ -45,6 +47,10 @@ export function Detail({
   sharedMilestones,
   localMilestones,
   onRemoveMilestone,
+  sharedVendorPricing,
+  localVendorPricing,
+  onVendorPricing,
+  onRemoveVendorPricing,
   saved,
   score,
   setOverride,
@@ -53,6 +59,7 @@ export function Detail({
 }: {
   e: Event;
   today: string;
+  now?: number;
   occurrence?: string;
   entry: Entry;
   setGoing: SetGoing;
@@ -64,6 +71,10 @@ export function Detail({
   sharedMilestones?: readonly VendorMilestone[];
   localMilestones?: readonly VendorMilestone[];
   onRemoveMilestone: (id: string) => void;
+  sharedVendorPricing?: VendorPricingPatch;
+  localVendorPricing?: VendorPricingPatch;
+  onVendorPricing?: (patch: VendorPricingPatch) => void;
+  onRemoveVendorPricing?: (field: keyof VendorPricingPatch, id: string) => void;
   saved: boolean;
   score: ScoreResult;
   setOverride: (value: number | null) => void;
@@ -171,6 +182,8 @@ export function Detail({
           onSave={onOutreach}
           saved={saved}
         />
+        <VendorMoney event={e} now={now} shared={sharedVendorPricing} local={localVendorPricing}
+          onSave={onVendorPricing} onRemove={onRemoveVendorPricing} />
         <div className="planning">
           <label htmlFor="detail-stage">PIPELINE STAGE</label>
           <StageBadge stage={entry.stage} />
@@ -285,7 +298,6 @@ export function Detail({
               : e.vendor_application,
           )}
           {!e.event_status && row(e.vendor_milestones?.length ? "Vendor notice" : "Deadline / notice", e.vendor_deadline)}
-          {row("Cost", e.vendor_cost)}
           {row("Booth details", e.booth_detail)}
           {row(
             "Contact",

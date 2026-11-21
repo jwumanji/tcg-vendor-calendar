@@ -640,7 +640,7 @@
     "previous_editions_count": null,
     "first_year": null,
     "vendor_booths": "Yes, tables",
-    "vendor_application": "Google Form on urbanops.hk; Cardlover WhatsApp +852 5926 9384, cardloverhk1111@gmail.com",
+    "vendor_application": "https://docs.google.com/forms/d/e/1FAIpQLSeulGNKHBEi5UgHtx-IBqt6NyjihmQAyrXSBOYCKF953o62Jg/viewform",
     "vendor_deadline": "20 Dec 2026 (general registration)",
     "vendor_milestones": [
       {
@@ -3329,11 +3329,11 @@
     "previous_editions_count": 5,
     "first_year": "2022",
     "vendor_booths": "Yes, at festival/GameExpo level. Whether a 2026-style TCG zone returns is not confirmed.",
-    "vendor_application": "DFRE said on 28 Sep 2026 that sponsor and exhibitor interest registration was already open. 2026 Narrows tables: uprizing.ae/the-narrows",
+    "vendor_application": "DFRE said on 28 Sep 2026 that sponsor and exhibitor interest registration was already open. No 2027 registration link was verified.",
     "vendor_deadline": null,
     "vendor_cost": "AED 1,750 + VAT was the 2026 The Narrows table price for a 1.8×1.5 m space (2 tables, 2 chairs, mesh grid, one plug), plus a refundable AED 300 deposit. This is a 2026 rate, not a confirmed 2027 price.",
     "booth_detail": "Use AED 1,750 + VAT only as a 2026 The Narrows reference. 2026 terms: no table sharing, UAE trade licence or government ID, no bootlegs. 2027 rates and category list not found.",
-    "contact": "DFRE / Dubai DET; 2026 Narrows via Uprizing (uprizing.ae/the-narrows)",
+    "contact": "DFRE / Dubai DET",
     "vendor_score": 69,
     "shortlist_priority": 2,
     "priority_market": false,
@@ -3345,7 +3345,8 @@
     "audience": "Esports fans and a general gaming festival crowd, not a dedicated card-show audience.",
     "fit": "Confirmed Dubai dates just after MEFCC. Audience is primarily esports. TCG fit depends on whether The Narrows Collectibles & TCGs category returns. 2026 rules required a UAE trade licence or government ID and banned unlicensed goods.",
     "source_urls": [
-      "https://www.dubaiesportsfestival.com/en/home"
+      "https://www.dubaiesportsfestival.com/en/home",
+      "https://uprizing.ae/the-narrows"
     ],
     "logo": "logos/def.webp",
     "logo_kind": "logo",
@@ -4889,7 +4890,7 @@
     "previous_editions_count": null,
     "first_year": "Not established",
     "vendor_booths": "Yes, as a B2B exhibitor (paper/stationery/toys trade), not as a consumer TCG table",
-    "vendor_application": "https://paperworld-middle-east.ae.messefrankfurt.com/dubai/en/exhibitors/faq.html",
+    "vendor_application": null,
     "vendor_deadline": "Not captured",
     "vendor_cost": "Not published on the pages fetched",
     "booth_detail": "B2B stand booking via Messe Frankfurt. Not a consumer card table.",
@@ -4905,7 +4906,8 @@
     "audience": "Trade buyers for paper, stationery and possibly toys.",
     "fit": "LOW TCG FIT. Confirmed Dubai dates only. Do not plan this as a card-show weekend unless you also sell into toy or stationery trade buyers.",
     "source_urls": [
-      "https://paperworld-middle-east.ae.messefrankfurt.com/dubai/en.html"
+      "https://paperworld-middle-east.ae.messefrankfurt.com/dubai/en.html",
+      "https://paperworld-middle-east.ae.messefrankfurt.com/dubai/en/exhibitors/faq.html"
     ],
     "logo": "logos/paperworld.webp",
     "logo_kind": "logo",
@@ -4963,7 +4965,7 @@
     "shortlist_priority": 3,
     "priority_market": false,
     "priority_market_level": null,
-    "website": "https://playvault.ae/pages/tcg-event-calendar-2026-gcc",
+    "website": null,
     "instagram": null,
     "instagram_followers": null,
     "description": "Kuwait pop-culture con with a collectibles and TCG vendor scene in recent years. Official website was not independently confirmed. 2027 dates are not announced.",
@@ -6784,7 +6786,7 @@
     "shortlist_priority": 3,
     "priority_market": false,
     "priority_market_level": null,
-    "website": "https://playvault.ae/pages/tcg-event-calendar-2026-gcc",
+    "website": null,
     "instagram": null,
     "instagram_followers": null,
     "description": "First Bahrain dedicated card show, 2026. Official website was not independently confirmed. 2027 is undated.",

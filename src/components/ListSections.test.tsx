@@ -70,14 +70,14 @@ it("renders an event empty state and only shows a calendar action for verified b
 });
 
 it.each([
-  ["cardcon3", "General booking opens 30 Nov 2026 at 23:00 Saigon time"],
-  ["bkk-card-show", "Table reservations open 1 Dec 2026 at 12:00 Bangkok / Saigon time"],
+  ["cardcon3", "30 Nov 2026, 23:00 Saigon"],
+  ["bkk-card-show", "1 Dec 2026, 12:00 Bangkok / Saigon"],
 ])("shows the corrected vendor notice on the %s event page", (id, notice) => {
   const e = normalizeEvents(shipped).find((row) => row.id === id)!;
   const $ = load(renderToStaticMarkup(<Detail today={today} e={e} entry={emptyEntry} score={scoreEvents([e])[0]}
     saved setGoing={shared.setGoing} onStage={vi.fn()} onNote={vi.fn()} onOutreach={vi.fn()} onMilestone={vi.fn()}
     onRemoveMilestone={vi.fn()} setOverride={vi.fn()} openClash={vi.fn()} toast={null} />));
-  expect($("dt").filter((_, field) => $(field).text() === "Vendor notice").next().text()).toContain(notice);
+  expect($(".decision-facts time").text()).toContain(notice);
   expect($("body").text()).not.toMatch(/Card Con 2 exhibitors first|Not published \(zone-based, book early\)/);
 });
 
@@ -189,7 +189,7 @@ it("shows outreach wording in Grid and Rows with an opt-in sortable column and n
 });
 
 it.each([
-  ["sales@example.com", null, "mailto:sales@example.com", "Email · sales@example.com"],
+  ["sales@example.com", null, "mailto:sales@example.com", "sales@example.com"],
   ["Use the official form", "https://example.com/contact", "https://example.com/contact", "https://example.com/contact"],
 ])("uses a direct event route for %s when no outreach route is seeded", (contact, vendor_application, href, label) => {
   const $ = load(renderToStaticMarkup(
@@ -213,15 +213,16 @@ it("labels the event outreach section, editor, research links and prices indepen
   ));
   const section = $("section[aria-labelledby='outreach-heading']");
   expect($("#outreach-heading").text()).toBe("Outreach");
-  expect(section.find("dt").map((_, el) => $(el).text()).get()).toEqual(["Known contact route", "Published booth price"]);
-  expect(section.find("a").map((_, el) => $(el).attr("href")).get()).toEqual(["https://example.com/apply", "https://example.com/prices"]);
-  expect(section.text()).toContain("$200");
+  expect(section.find(".outreach-summary").text()).toBe("Not contacted");
+  expect(section.find(".outreach-research a").attr("href")).toBe("https://example.com/apply");
+  expect($(".vendor-money a").filter((_, el) => $(el).text() === "Outreach price source").attr("href")).toBe("https://example.com/prices");
+  expect($(".vendor-money").text()).toContain("$200");
   expect(section.find("label").map((_, el) => $(el).contents().first().text()).get()).toEqual([
     "Outreach status", "Outreach method", "Contact address or URL", "Contacted on",
     "Response date", "Next action", "Follow-up due date", "Message reference", "Quoted price", "Outreach notes",
   ]);
   expect(section.find("button").text()).toBe("Save outreach");
-  expect($(".event-facts .outreach-chip").text()).toBe("Outreach: Not contacted");
+  expect($(".decision-stage").text()).toBe("Pipeline · New");
   expect($("label[for=detail-stage]").text()).toBe("PIPELINE STAGE");
 });
 
@@ -251,7 +252,7 @@ it("shows the same home-base Priority in Grid, Rows, Top picks and event details
   expect(label).toContain(`Score ${result.score} of 100`);
   expect(rows(".priority-chip").attr("aria-label")).toBe(label);
   expect(picks(".priority-chip").attr("aria-label")).toBe(label);
-  expect(detail(".priority-detail .priority-chip").attr("aria-label")).toBe(label);
+  expect(detail(".decision-score .priority-chip").attr("aria-label")).toBe(label);
   expect(detail(".priority-detail").text()).toContain("Travel from Sydney, Australia to Singapore (estimated: Other international)");
 });
 
@@ -302,7 +303,7 @@ it("labels cancelled calendar dates, undated postponements, pipeline cards and e
     saved setGoing={shared.setGoing} onStage={vi.fn()} onNote={vi.fn()} onOutreach={vi.fn()} onMilestone={vi.fn()} onRemoveMilestone={vi.fn()}
     setOverride={vi.fn()} openClash={vi.fn()} toast={null} />));
   expect(detail(".badge.cancelled").text()).toBe("Cancelled");
-  expect(detail(".note").text()).toContain(cancelled.date_note);
+  expect(detail(".event-information dl").text()).toContain(cancelled.date_note);
   expect(detail(".override-form, .clash-note")).toHaveLength(0);
 });
 

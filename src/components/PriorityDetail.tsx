@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { ChevronDown, Copy } from "lucide-react";
 import { explainScore, type ScoreResult } from "../scoring";
 import { eventPath } from "../route";
-import { PriorityChip } from "./PriorityChip";
 
 export function PriorityDetail({
   result,
@@ -25,21 +24,10 @@ export function PriorityDetail({
     Number.isInteger(Number(draft)) &&
     Number(draft) >= 0 &&
     Number(draft) <= 100;
-  if (result.tier === "cancelled") return (
-    <section className="priority-detail"><h2>Priority score</h2><PriorityChip result={result} /></section>
-  );
+  if (result.tier === "cancelled") return null;
   return (
     <section className="priority-detail" aria-labelledby="priority-title">
-      <h2 id="priority-title">Priority score</h2>
-      <div className="score-summary">
-        <PriorityChip result={result} />
-        <div>
-          <strong>{result.confidence} confidence</strong>
-          <small>
-            {result.confidencePct}% {result.postponed ? "after halving confidence for postponement" : "of weight backed by real factors"}
-          </small>
-        </div>
-      </div>
+      <h2 id="priority-title" className="sr-only">Score breakdown</h2>
       <p>
         Based on {count("real")} real signals, {count("estimated")} estimated
         and {count("missing")} missing across {contributing.length} weighted
@@ -107,7 +95,7 @@ export function PriorityDetail({
         <label htmlFor="my-score">Your score</label>
         <span>
           Calculated <b>{result.computedScore}</b> · Yours{" "}
-          <b>{result.overridden ? result.score : "—"}</b>
+          <b>{result.overridden ? result.score : "Not set"}</b>
         </span>
         <div>
           <input

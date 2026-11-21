@@ -2,13 +2,18 @@ import { GoingButton, type SetGoing } from "./GoingButton";
 import { PriorityDetail } from "./PriorityDetail";
 import { FindBadges, FindDetails } from "./FindSource";
 import type { ScoreResult } from "../scoring";
+import { decisionReason, nextVendorAction, routeAction, saigonDay, vendorRoutes, vendorTiming, type goingConflicts } from "../eventDecision";
+import { homeBaseLabel, resolveHomeBase } from "../homeBase";
+import { applicableVendorPrice, formatVendorAmount, legacyVendorPrice } from "../vendorPricing";
+import { eventPath } from "../route";
 import { flushSync } from "react-dom";
-import React, { useRef, useEffect, useState, useCallback } from "react";
+import React, { useRef, useEffect, useState, useCallback, useSyncExternalStore } from "react";
 import {
   AlertTriangle,
   ArrowUpRight,
   CalendarDays,
   CheckCircle2,
+  ChevronDown,
   Instagram,
   LoaderCircle,
   Download,
@@ -23,16 +28,63 @@ import {
   download,
   gameKeyOf,
   primaryGameKey,
+  hasConfirmedDates,
 } from "../utils";
 import { Logo, Status, Place } from "./EventIdentity";
-import { StageBadge, StagePicker } from "./Pipeline";
+import { StagePicker } from "./Pipeline";
 import type { Entry, Stage } from "../storage";
 import type { Outreach, OutreachPatch } from "../model";
-import { OutreachChip } from "./OutreachChip";
+import { PriorityChip } from "./PriorityChip";
 import { OutreachSection } from "./OutreachSection";
 import { BookingMilestones } from "./BookingMilestones";
-import { VendorMoney } from "./VendorMoney";
+import { Cutoff, VendorEditor, VendorMoney } from "./VendorMoney";
 import { TripBudget } from "./TripBudget";
+import { calculateTripBudget } from "../tripBudget";
+import { outreachStatusLabels } from "./OutreachChip";
+import { MilestoneTimes } from "./UpcomingMilestones";
+
+function meaningful(value?: string | number | null) {
+  const text = value == null ? "" : String(value).trim();
+  return text && !/^(?:unknown|tba|tbd|other|unspecified|[-—–])$/i.test(text) ? text : undefined;
+}
+
+const desktopQuery = "(min-width: 900px)";
+function subscribeDesktop(callback: () => void) {
+  const query = window.matchMedia(desktopQuery);
+  query.addEventListener("change", callback);
+  return () => query.removeEventListener("change", callback);
+}
+function DetailDisclosure({ label, hint, defaultOpen, children, disclosureRef }: {
+  label: string;
+  hint: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+  disclosureRef?: React.Ref<HTMLDetailsElement>;
+}) {
+  // Freeze the initial attribute so native toggles and focus reveals survive edits.
+  const [initialOpen] = useState(defaultOpen);
+  return (
+    <details className="detail-disclosure" open={initialOpen} ref={disclosureRef}>
+      <summary>
+        <span className="detail-summary-text">
+          <span className="detail-summary-label">{label}</span>
+          <small className="detail-summary-hint">{hint}</small>
+        </span>
+        <ChevronDown aria-hidden="true" size={17} />
+      </summary>
+      <div className="detail-disclosure-body">{children}</div>
+    </details>
+  );
+}
+
+function ActionLink({ href, children, primary = false }: {
+  href: string;
+  children: React.ReactNode;
+  primary?: boolean;
+}) {
+  return <a className={primary ? "button primary" : "text-button"} href={href}
+    target={safeUrl(href) ? "_blank" : undefined} rel="noreferrer">{children}</a>;
+}
 export function Detail({
   e,
   today,
@@ -60,6 +112,7 @@ export function Detail({
   score,
   setOverride,
   openClash,
+  conflicts = [],
   toast,
 }: {
   e: Event;
@@ -88,6 +141,7 @@ export function Detail({
   score: ScoreResult;
   setOverride: (value: number | null) => void;
   openClash: (id: string) => void;
+  conflicts?: ReturnType<typeof goingConflicts>;
   toast: React.ReactNode;
 }) {
   const title = useRef<HTMLHeadingElement>(null);
@@ -134,83 +188,220 @@ export function Detail({
         <ArrowUpRight size={14} />
       </a>
     ) : null;
+  const desktop = useSyncExternalStore(subscribeDesktop, () => window.matchMedia(desktopQuery).matches, () => false);
+  const [loggingQuote, setLoggingQuote] = useState(false);
+  const priceFact = useRef<HTMLDivElement>(null);
+  const outreachPanel = useRef<HTMLDetailsElement>(null);
+  const outreachEditor = useRef<HTMLDetailsElement>(null);
+  const planningPanel = useRef<HTMLDetailsElement>(null);
+  const schedulePanel = useRef<HTMLDetailsElement>(null);
+  function revealPanel(panel: HTMLDetailsElement | null) {
+    if (!panel) return;
+    panel.open = true;
+    const summary = panel.querySelector("summary");
+    summary?.focus({ preventScroll: true });
+    summary?.scrollIntoView({ block: "start" });
+  }
+  function revealOutreach(edit?: "contact" | "exchange") {
+    revealPanel(outreachPanel.current);
+    if (!edit || !outreachEditor.current) return;
+    outreachEditor.current.open = true;
+    const field = outreachEditor.current.querySelector<HTMLElement>(edit === "contact" ? "input" : "select");
+    field?.focus({ preventScroll: true });
+    field?.scrollIntoView({ block: "nearest" });
+  }
+
+  const outreach = e.outreach;
+  const outreachDay = saigonDay(now);
+  const routes = vendorRoutes(e, knownOutreach);
+  const timing = vendorTiming(e, now);
+  const price = applicableVendorPrice(e, now);
+  const priceOption = price && price.basis !== "listed" ? price.option : undefined;
+  const priceUnit = priceOption?.includes.match(/\b(?:both days|per (?:day|table|booth)|for all \d+ days)\b/i)?.[0];
+  const action = nextVendorAction(e, entry.stage, outreachDay, timing, routes, !!price);
+  const contactAction = routes.contact && routeAction(routes.contact);
+  const priceAmount = price && formatVendorAmount(price.amount, price.currency);
+  const date = occurrence || displayDateLabel(e, today);
+  const fit = meaningful(e.fit) || meaningful(e.expected_size) ||
+    (meaningful(e.size_tier) && `Size tier ${e.size_tier}${e.size_tier_estimated ? " (estimated)" : ""}`);
+  const access = meaningful(e.vendor_booths) || (routes.application ? "Vendor route published" : "Vendor access not published");
+  const normalize = (text?: string | null) => text?.trim().toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+  const terms = meaningful(e.booth_detail) && e.booth_detail &&
+    ![e.vendor_booths, e.vendor_cost, price && price.basis !== "listed" ? price.option.notes : null]
+      .some((value) => normalize(value)?.includes(normalize(e.booth_detail?.replace(/ only\.?$/i, ""))!)) &&
+    !/^(?:vendor booths yes|vendor tables yes|exhibitor applications open)[;,. ]+(?:20\d\d )?rates not published\b|^(?:ask .+|no public vendor program|not announced)\.$/i.test(e.booth_detail)
+    ? e.booth_detail : null;
+  const moneyHasPricesOrDocs = Boolean(price || e.vendor_options?.length || e.vendor_documents?.length ||
+    outreach?.published_booth_price || legacyVendorPrice(e));
+  const hasMoney = moneyHasPricesOrDocs || Boolean(e.vendor_cost || terms || outreach?.price_source_url);
+  const budget = localBudget ?? e.trip_budget;
+  const budgetResult = calculateTripBudget(e, now, today, homeBase, occurrence, budget, budgetDefaults);
+  const budgetHasCosts = Boolean(budgetResult.tableFee || budgetResult.extraCosts.some(({ cost }) => cost) ||
+    budget?.custom?.length);
+  const hasBudget = budgetHasCosts || Boolean(budget && Object.keys(budget).length);
+  const budgetHint = budgetResult.total ? `Trip total · ${formatVendorAmount(budgetResult.total.vnd, "VND")}`
+    : budgetResult.subtotal ? `Known costs · ${formatVendorAmount(budgetResult.subtotal.vnd, "VND")}` : "Trip costs and walk-away fee";
+  const hasOutreach = Boolean(outreach && (outreach.status !== "not_contacted" || outreach.contacted_at ||
+    outreach.response_at || outreach.acknowledgement_at || outreach.quoted_price || outreach.notes));
+  const hasSchedule = Boolean(ranges(e).length || e.estimated_month || e.date_note || e.venue || e.city || e.country ||
+    e.vendor_milestones?.length || timing.referenceNotice);
+  const sources = [...new Set([e.website, e.tickets ?? null, e.instagram, ...e.source_urls])]
+    .filter((url): url is string => !!url && safeUrl(url));
+  const about: [string, string | number | null | undefined][] = [
+    ["Organizer", e.organizer],
+    ["Audience", e.audience],
+    ["Event type", e.event_type],
+    ["Region", e.region_group],
+    ["Expected size", e.expected_size === fit ? null : e.expected_size],
+    ["Size notes", e.size_note],
+    ["Visitors", e.visitors?.toLocaleString()],
+    ["Vendors", e.vendor_count?.toLocaleString()],
+    ["Previous editions", e.previous_editions],
+    ["Edition count", e.previous_editions_count],
+    ["First year", e.first_year],
+    ["Priority market", e.priority_market ? e.priority_market_level || "Yes" : null],
+  ];
+  const aboutRows = about.filter(([, value]) => meaningful(value));
+  const money = <VendorMoney event={e} now={now} shared={sharedVendorPricing} local={localVendorPricing}
+    onSave={onVendorPricing} onRemove={onRemoveVendorPricing} terms={terms} />;
+  const trip = <TripBudget event={e} now={now} today={today} occurrence={occurrence} homeBase={homeBase}
+    local={localBudget} defaults={budgetDefaults} onSave={onTripBudget} />;
+  const milestones = <BookingMilestones event={e} sharedMilestones={sharedMilestones} localMilestones={localMilestones}
+    onSave={onMilestone} onRemove={onRemoveMilestone} featuredId={timing.milestone?.id} hideEmptyNotice />;
+
   return (
     <article className="event-layout" data-game={primaryGameKey(e)}>
-      <div className="detail-body event-facts">
-        <Logo e={e} size="detail" />
-        <h1 ref={title} tabIndex={-1}>{e.name}</h1>
-        <div className="detail-badges">
-          <Status e={e} />
-          <FindBadges e={e} />
-          <OutreachChip outreach={e.outreach} showUncontacted />
-          {e.priority_market && (
-            <span className="badge priority">
-              ✦ {e.priority_market_level ? `${e.priority_market_level} ` : ""}
-              priority market
-            </span>
-          )}
+      <header className="event-facts">
+        <div className="event-identity">
+          <h1 ref={title} tabIndex={-1}>{e.name}</h1>
+          <div className="detail-badges">
+            <Status e={e} />
+            <FindBadges e={e} />
+          </div>
+          <p className="detail-date"><CalendarDays size={16} aria-hidden="true" />{date}</p>
+          <p><Place e={e} /></p>
+          <GoingButton e={e} going={entry.going} setGoing={setGoing} />
         </div>
-        <GoingButton e={e} going={entry.going} setGoing={setGoing} />
-        <p className="detail-date">
-          <CalendarDays size={18} />
-          {occurrence || displayDateLabel(e, today)}
-        </p>
-        {e.date_note && <p className="note">{e.date_note}</p>}
-        {e.date_status === "estimated" && (
-          <p className="note">
-            Estimated timing only. Confirm with the organizer before booking
-            travel.
-          </p>
+        <div className="event-artwork"><Logo e={e} size="detail" /></div>
+      </header>
+      <section className="detail-body event-decision decision-card" aria-labelledby="decide-title">
+        <h2 id="decide-title" className="sr-only">Decide</h2>
+        <div className="decision-score">
+          <PriorityChip result={score} />
+          <div>
+            <strong>{score.confidence} confidence</strong>
+            {score.overridden && <small>Manual score · calculated {score.computedScore}</small>}
+          </div>
+        </div>
+        <p className="decision-reason">{decisionReason(e, score)}</p>
+        {conflicts.length > 0 && (
+          <div className="decision-conflicts">
+            <strong>Overlaps with events marked Going</strong>
+            <ul>{conflicts.map((other) => <li key={`${other.id}:${other.date}`}>
+              <a href={eventPath(other.id)} onClick={(ev) => {
+                if (ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
+                ev.preventDefault();
+                openClash(other.id);
+              }}>{other.name}</a> · {other.date}
+            </li>)}</ul>
+          </div>
         )}
-        <p>
-          <Place e={e} />
-        </p>
-        {e.venue && <p>{e.venue}</p>}
-        <div className="game-pills">
-          {e.games.map((g) => (
-            <span key={g} className="game-tag" data-game={gameKeyOf(g)}>
-              {g}
-            </span>
-          ))}
-        </div>
-      </div>
+        <section className="next-step" aria-labelledby="next-step-title">
+          <h2 id="next-step-title">Next step</h2>
+          <p>{action.sentence}</p>
+          {!routes.contact && !routes.application && !action.panel && <small>No contact route found</small>}
+          <div className="next-step-actions">
+            {action.label && (action.href ? <ActionLink href={action.href} primary>{action.label}</ActionLink>
+              : <button className="button primary" onClick={() => {
+                if (action.panel === "planning") revealPanel(planningPanel.current);
+                else if (action.panel === "schedule") revealPanel(schedulePanel.current ?? planningPanel.current);
+                else if (action.panel === "outreach") revealOutreach();
+                else revealOutreach(action.panel === "outreach-edit" ? "exchange" : "contact");
+              }}>{action.label}</button>)}
+            <button type="button" className="text-button decision-stage" onClick={() => revealPanel(planningPanel.current)}>
+              <span>Pipeline · <strong>{entry.stage}</strong></span>
+            </button>
+          </div>
+        </section>
+        <dl className="decision-facts">
+          <div><dt>Vendor access</dt><dd>{access}</dd></div>
+          <div><dt>{meaningful(e.fit) ? "Vendor fit" : "Event size"}</dt><dd>{fit || "Vendor fit and size not documented"}</dd></div>
+          <div className="decision-price" tabIndex={-1} ref={priceFact}>
+            <dt>Booth price</dt>
+            {price ? (
+              <dd>
+                {price.basis === "listed" ? <>Listed · {priceAmount}{price.conditions && ` ${price.conditions}`}</> : <>
+                  <strong>{formatVendorAmount(price.amount, price.currency)}</strong>
+                  {price.option.amount_incl_vat !== undefined && " incl. VAT"} · {price.option.name}
+                  {price.option.size && !price.option.name.includes(price.option.size) && ` · ${price.option.size}`}
+                  {priceUnit && !price.option.name.toLowerCase().includes(priceUnit.toLowerCase()) && ` · ${priceUnit}`}
+                  {price.basis === "quote" ? " · This-edition quote" : " · Published"}
+                  {price.option.notes && ` · ${price.option.notes}`}
+                  {price.option.valid_until && <> · Rate until <Cutoff until={price.option.valid_until} /></>}
+                </>}
+              </dd>
+            ) : (
+              <dd>
+                <strong>Current booth price unknown</strong>
+                <div className="decision-links">
+                  {contactAction && action.panel !== "outreach-edit" &&
+                    <ActionLink href={contactAction.href}>{contactAction.label}</ActionLink>}
+                  {onVendorPricing && <button type="button" className="text-button" aria-haspopup="dialog"
+                    onClick={() => setLoggingQuote(true)}>Log a quote</button>}
+                </div>
+              </dd>
+            )}
+          </div>
+          <div className={timing.milestone ? "decision-timing-milestone" : undefined}>
+            <dt>{timing.label}</dt>
+            <dd>
+              {timing.milestone ? <>
+                <strong>{timing.milestone.label}{timing.passed && " · Passed"}</strong>
+                {" "}<MilestoneTimes milestone={timing.milestone} />
+                {timing.countdown && <span className="decision-countdown">{timing.countdown}</span>}
+                {timing.notes && <small>{timing.notes}</small>}
+              </> : timing.notice || "No vendor deadline published"}
+            </dd>
+          </div>
+          <div className="decision-origin"><dt>Travel origin</dt><dd>{homeBaseLabel(resolveHomeBase(homeBase))}</dd></div>
+        </dl>
+      </section>
       <div className="detail-body event-information">
-        <BookingMilestones event={e} sharedMilestones={sharedMilestones} localMilestones={localMilestones}
-          onSave={onMilestone} onRemove={onRemoveMilestone} />
-        <FindDetails e={e} />
-        <PriorityDetail
-          result={score}
-          setOverride={setOverride}
-          openClash={openClash}
-        />
-        <OutreachSection
-          today={today}
-          outreach={e.outreach ?? undefined}
-          knownOutreach={knownOutreach}
-          eventContacts={[e.contact, e.vendor_application]}
-          onSave={onOutreach}
-          saved={saved}
-        />
-        <VendorMoney event={e} now={now} shared={sharedVendorPricing} local={localVendorPricing}
-          onSave={onVendorPricing} onRemove={onRemoveVendorPricing} />
-        <TripBudget event={e} now={now} today={today} occurrence={occurrence} homeBase={homeBase}
-          local={localBudget} defaults={budgetDefaults} onSave={onTripBudget} />
-        <div className="planning">
+        <DetailDisclosure label="Outreach" hint={outreachStatusLabels[outreach?.status ?? "not_contacted"]} defaultOpen={desktop || hasOutreach} disclosureRef={outreachPanel}>
+          <OutreachSection today={outreachDay} outreach={outreach ?? undefined} knownOutreach={knownOutreach}
+            routes={routes} editor={outreachEditor} eventContacts={[e.contact, e.vendor_application]}
+            onSave={onOutreach} saved={saved} />
+        </DetailDisclosure>
+        {hasMoney && <DetailDisclosure label="Money" hint={priceAmount || "Rates and booth documents"} defaultOpen={desktop || moneyHasPricesOrDocs}>{money}</DetailDisclosure>}
+        {hasBudget && <DetailDisclosure label="Budget / break-even" hint={budgetHint} defaultOpen={desktop || budgetHasCosts}>{trip}</DetailDisclosure>}
+        {hasSchedule && (
+          <DetailDisclosure label="When and where" hint={date} disclosureRef={schedulePanel} defaultOpen={desktop || Boolean(e.vendor_milestones?.length)}>
+            <dl>
+              {row("Dates", date)}
+              {row("Venue", e.venue)}
+              {row("Place", e.city || e.country ? <Place e={e} /> : null)}
+              {row("Date note", e.date_note)}
+              {row("Vendor notice", timing.referenceNotice)}
+            </dl>
+            {e.occurrences?.length ? (
+              <div className="detail-occurrences">
+                <h3>Published occurrences</h3>
+                <div className="occurrences">{ranges(e).map((r) => (
+                  <span key={r.start_date}>{prettyDate(r.start_date)}{r.end_date !== r.start_date && ` – ${prettyDate(r.end_date)}`}</span>
+                ))}</div>
+              </div>
+            ) : null}
+            {hasConfirmedDates(e) && (
+              <button className="button" onClick={() => download(ics([e]), e.id + ".ics", "text/calendar;charset=utf-8")}>
+                <Download size={16} /> Add {e.occurrences ? "all occurrences" : "event"} to calendar
+              </button>
+            )}
+            {milestones}
+          </DetailDisclosure>
+        )}
+        <DetailDisclosure label="Your planning" hint={entry.stage} disclosureRef={planningPanel} defaultOpen={desktop || !!entry.note.trim() || entry.stage !== "New"}>
+          <div className="planning">
           <label htmlFor="detail-stage">PIPELINE STAGE</label>
-          <StageBadge stage={entry.stage} />
-          <p className="stage-help">
-            {
-              {
-                New: "Choose a stage when you review this event.",
-                Pass: "Keep for later; hidden by default.",
-                "Too expensive": "Record the quoted booth price below.",
-                Interested: "Next step: find out the booth price.",
-                Contacted: "Waiting for information from the organizer.",
-                "Need to pay": "Arrange payment for the booth.",
-                "Paid / attending": "Booth paid — ready to attend.",
-              }[entry.stage]
-            }
-          </p>
           <StagePicker
             name={e.name}
             id="detail-stage"
@@ -260,92 +451,46 @@ export function Detail({
               ? "Notes saved on this device"
               : ""}
           </span>
-        </div>
-        {e.description && <p className="description">{e.description}</p>}
-        <h2>The essentials</h2>
-        <dl>
-          {row("Organizer", e.organizer)}
-          {row("Event type", e.event_type)}
-          {row("Region", e.region_group)}
-          {row(
-            "Size tier",
-            e.size_tier
-              ? e.size_tier + (e.size_tier_estimated ? " · estimated" : "")
-              : null,
-          )}
-          {row("Expected size", e.expected_size)}
-          {row("Size notes", e.size_note)}
-          {row("Visitors", e.visitors?.toLocaleString())}
-          {row("Vendors", e.vendor_count?.toLocaleString())}
-          {row("Previous editions", e.previous_editions)}
-          {row("Edition count", e.previous_editions_count)}
-          {row("First year", e.first_year)}
-          {row("Audience", e.audience)}
-          {row("Vendor fit", e.fit)}
-          {row("Shortlist priority", e.shortlist_priority)}
-        </dl>
-        {e.occurrences && (
-          <>
-            <h2>All published occurrences</h2>
-            <div className="occurrences">
-              {ranges(e).map((r) => (
-                <span key={r.start_date}>
-                  {prettyDate(r.start_date)}
-                  {r.end_date !== r.start_date
-                    ? " – " + prettyDate(r.end_date)
-                    : ""}
-                </span>
-              ))}
-            </div>
-          </>
+          </div>
+          {!hasMoney && onVendorPricing && <DetailDisclosure label="Add booth options or documents" hint="Booth rates and documents">{money}</DetailDisclosure>}
+          {!hasBudget && onTripBudget && <DetailDisclosure label="Set up trip budget" hint={budgetHint}>{trip}</DetailDisclosure>}
+          {!hasSchedule && milestones}
+        </DetailDisclosure>
+        {(e.description || e.games.length > 0 || aboutRows.length > 0) && (
+          <DetailDisclosure label="About" hint={meaningful(e.organizer) || e.event_type} defaultOpen={desktop}>
+            {e.description && <p className="description">{e.description}</p>}
+            {e.games.length > 0 && <div className="game-pills">{e.games.map((g) => (
+              <span key={g} className="game-tag" data-game={gameKeyOf(g)}>{g}</span>
+            ))}</div>}
+            {aboutRows.length > 0 && <dl>{aboutRows.map(([label, value]) => <React.Fragment key={label}>{row(label, value)}</React.Fragment>)}</dl>}
+          </DetailDisclosure>
         )}
-        <h2>Vendor information</h2>
-        <dl>
-          {row("Booths offered", e.vendor_booths || "Unknown")}
-          {row(
-            "How to apply",
-            safeUrl(e.vendor_application)
-              ? link(e.vendor_application, "Application information")
-              : e.vendor_application,
-          )}
-          {!e.event_status && row(e.vendor_milestones?.length ? "Vendor notice" : "Deadline / notice", e.vendor_deadline)}
-          {row("Booth details", e.booth_detail)}
-          {row(
-            "Contact",
-            safeUrl(e.contact)
-              ? link(e.contact, "Contact organizer")
-              : e.contact,
-          )}
-        </dl>
-        <h2>Follow the source</h2>
-        <div className="source-links">
-          {link(e.website, "Official website")}
-          {link(e.tickets ?? null, "Tickets")}
-          {link(e.instagram, "Instagram")}
-          {[...new Set(e.source_urls)].filter(safeUrl).map((s, i) => (
-            <React.Fragment key={s}>
-              {link(s, `Source ${i + 1}`)}
-            </React.Fragment>
-          ))}
-        </div>
-        {e.instagram_followers !== null && (
-          <p className="detail-stat">
-            <Instagram size={16} aria-hidden="true" />
-            Instagram followers: {e.instagram_followers.toLocaleString()}
-          </p>
+        {score.tier !== "cancelled" && (
+          <DetailDisclosure label="Score breakdown" hint={`Calculated score · ${score.computedScore}`}>
+            <PriorityDetail result={score} setOverride={setOverride} openClash={openClash} />
+          </DetailDisclosure>
         )}
-        {e.date_status === "confirmed" && ranges(e).length > 0 && (
-          <button
-            className="button primary full"
-            onClick={() =>
-              download(ics([e]), e.id + ".ics", "text/calendar;charset=utf-8")
-            }
-          >
-            <Download size={16} /> Add{" "}
-            {e.occurrences ? "all occurrences" : "event"} to calendar
-          </button>
+        {(sources.length > 0 || e.source || e.instagram_followers != null) && (
+          <DetailDisclosure label="Sources" hint={routes.official ? "Official site and research" : "Research links"} defaultOpen={desktop}>
+            {sources.length > 0 && <div className="source-links">
+              {sources.map((url, i) => <React.Fragment key={url}>{link(url, url === e.website ? "Official website"
+                : url === e.tickets ? "Tickets" : url === e.instagram ? "Instagram" : `Source ${i + 1}`)}</React.Fragment>)}
+            </div>}
+            {e.instagram_followers != null && (
+              <p className="detail-stat"><Instagram size={16} aria-hidden="true" /> Instagram followers: {e.instagram_followers.toLocaleString()}</p>
+            )}
+            {e.source && <FindDetails e={e} />}
+          </DetailDisclosure>
         )}
       </div>
+      {loggingQuote && onVendorPricing && <VendorEditor editing={{ type: "option" }}
+        close={() => setLoggingQuote(false)} save={(patch) => {
+          onVendorPricing(patch);
+          setLoggingQuote(false);
+          requestAnimationFrame(() => {
+            if (document.activeElement === document.body) priceFact.current?.focus({ preventScroll: true });
+          });
+        }} />}
       {toast}
     </article>
   );

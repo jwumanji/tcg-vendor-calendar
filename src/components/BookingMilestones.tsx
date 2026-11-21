@@ -13,12 +13,16 @@ export function BookingMilestones({
   sharedMilestones,
   localMilestones,
   onRemove,
+  featuredId,
+  hideEmptyNotice,
 }: {
   event: Event;
   onSave: (milestone: VendorMilestone) => void;
   sharedMilestones?: readonly VendorMilestone[];
   localMilestones?: readonly VendorMilestone[];
   onRemove: (id: string) => void;
+  featuredId?: string;
+  hideEmptyNotice?: boolean;
 }) {
   const [editing, setEditing] = useState<VendorMilestone | "new" | null>(null);
   const addButton = useRef<HTMLButtonElement>(null);
@@ -31,7 +35,8 @@ export function BookingMilestones({
         <ul>
           {milestones.map((milestone) => {
             const href = milestoneSourceHref(milestone.source);
-            const countdown = milestoneCountdown(event, milestone, now);
+            const countdown = (milestone.type === "booking_opens" || milestone.type === "application_closes") &&
+              milestoneCountdown(event, milestone, now);
             const local = localMilestones?.some(({ id }) => id === milestone.id);
             const shared = sharedMilestones?.some(({ id }) => id === milestone.id);
             const removeLabel = shared ? "Reset to shared" : "Delete local milestone";
@@ -42,9 +47,11 @@ export function BookingMilestones({
                   {event.event_status ? <span className="milestone-badge">Booking date on hold</span>
                     : !milestone.verified && <span className="milestone-badge">Unverified date</span>}
                 </div>
-                <MilestoneTimes milestone={milestone} />
-                {countdown && <p className="milestone-countdown">{countdown}</p>}
-                {milestone.notes && <p className="milestone-notes">{milestone.notes}</p>}
+                {milestone.id !== featuredId && <>
+                  <MilestoneTimes milestone={milestone} />
+                  {countdown && <p className="milestone-countdown">{countdown}</p>}
+                  {milestone.notes && <p className="milestone-notes">{milestone.notes}</p>}
+                </>}
                 <div className="milestone-actions">
                   {href ? (
                     <a href={href} target="_blank" rel="noreferrer" aria-label={`Source for ${milestone.label}`}>
@@ -69,7 +76,7 @@ export function BookingMilestones({
             );
           })}
         </ul>
-      ) : <p>No booking milestones recorded yet.</p>}
+      ) : !hideEmptyNotice && <p>No booking milestones recorded yet.</p>}
       <button className="button" ref={addButton} onClick={() => setEditing("new")} aria-haspopup="dialog">
         <Plus size={15} aria-hidden="true" /> Add milestone
       </button>

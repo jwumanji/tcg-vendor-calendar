@@ -25,7 +25,7 @@ function Source({ source, label }: { source: string; label?: string }) {
   return safeUrl(source) ? <a href={source} target="_blank" rel="noreferrer">{label ?? source}</a> : <span>{source}</span>;
 }
 
-function Cutoff({ until }: { until: string }) {
+export function Cutoff({ until }: { until: string }) {
   const zone = until.endsWith("Z") ? "UTC" : "UTC" + until.slice(-6);
   return <time dateTime={until}>{prettyDate(until.slice(0, 10))}, {until.slice(11, 16)} {zone}</time>;
 }
@@ -34,10 +34,11 @@ function Cell({ label, children, className }: { label: string; children: ReactNo
   return <td role="cell" className={className}><span className="money-cell-label" aria-hidden="true">{label}</span>{children}</td>;
 }
 
-export function VendorMoney({ event, now, shared, local, onSave, onRemove }: {
+export function VendorMoney({ event, now, shared, local, onSave, onRemove, terms }: {
   event: Event;
   now: number;
   shared?: VendorPricingPatch;
+  terms?: string | null;
   local?: VendorPricingPatch;
   onSave?: (patch: VendorPricingPatch) => void;
   onRemove?: (field: keyof VendorPricingPatch, id: string) => void;
@@ -49,7 +50,7 @@ export function VendorMoney({ event, now, shared, local, onSave, onRemove }: {
   const docs = event.vendor_documents ?? [];
   const price = applicableVendorPrice(event, now);
   const selected = price && price.basis !== "listed" ? price.option.id : null;
-  const legacy = !price ? legacyVendorPrice(event) : null;
+  const legacy = legacyVendorPrice(event);
   const sources = [...new Map(options.map((option) => [option.source, option.basis]))];
   const conversions = [...new Map(options.map((option) => [
     JSON.stringify([option.currency, option.fx_as_of, option.fx_rate, option.fx_source]), option,
@@ -90,11 +91,18 @@ export function VendorMoney({ event, now, shared, local, onSave, onRemove }: {
           </>
         ) : <p>{missingPriceMessage(event, now)}</p>}
       </div>
-      {event.vendor_cost && (!options.length || price?.basis === "listed") && (
+      {event.vendor_cost && (!options.length || price?.basis === "listed" || legacy && legacy.status !== "current") && (
         <p className="money-reference">
           <strong>{legacy && legacy.status !== "current" ? rateLabels[legacy.status] : "Listed vendor information"}</strong>
           {" · "}{event.vendor_cost}
         </p>
+      )}
+      {terms && <p className="money-reference"><strong>Booth terms</strong> · {terms}</p>}
+      {event.outreach?.published_booth_price && event.outreach.published_booth_price !== event.vendor_cost && (
+        <p className="money-reference"><strong>Outreach research reference</strong> · {event.outreach.published_booth_price}</p>
+      )}
+      {event.outreach?.price_source_url && (
+        <p className="money-reference"><Source source={event.outreach.price_source_url} label="Outreach price source" /></p>
       )}
       {options.length > 0 && (
         <>
@@ -120,8 +128,8 @@ export function VendorMoney({ event, now, shared, local, onSave, onRemove }: {
                         </div>
                         {actions({ type: "option", item: option }, option.name, addOption)}
                       </th>
-                      <Cell label="Size">{option.size || "—"}</Cell>
-                      <Cell label="Includes">{option.includes || "—"}</Cell>
+                      <Cell label="Size">{option.size || "Size not listed"}</Cell>
+                      <Cell label="Includes">{option.includes || "Inclusions not listed"}</Cell>
                       <Cell label="Original price" className="money-amount">
                         <span>{formatVendorAmount(option.amount, option.currency)}</span>
                         {option.amount_incl_vat !== undefined && <small>{formatVendorAmount(option.amount_incl_vat, option.currency)} incl. VAT</small>}
@@ -133,7 +141,7 @@ export function VendorMoney({ event, now, shared, local, onSave, onRemove }: {
                       <Cell label="Notes">
                         {option.notes}
                         {option.valid_until && <small className="money-cutoff">{status === "expired" ? "Cutoff was " : "Rate until "}<Cutoff until={option.valid_until} /></small>}
-                        {!option.notes && !option.valid_until && "—"}
+                        {!option.notes && !option.valid_until && "No additional terms"}
                       </Cell>
                     </tr>
                   );
@@ -159,21 +167,23 @@ export function VendorMoney({ event, now, shared, local, onSave, onRemove }: {
       )}
       {(docs.length > 0 || onSave) && (
         <div className="money-documents">
-          <h3>Vendor documents</h3>
           {docs.length > 0 && (
-            <ul>{docs.map((doc) => (
-              <li key={doc.id}>
-                <a className="money-file" href={import.meta.env.BASE_URL + doc.path} target="_blank" rel="noreferrer">
-                  {doc.label} <ArrowUpRight size={15} aria-hidden="true" />
-                </a>
-                <div className="money-document-meta">
-                  <time dateTime={doc.received_at}>Received {prettyDate(doc.received_at)}</time>
-                  <Source source={doc.source} label={doc.source.includes("drive.google.com") ? "Full proposal source" : "Source"} />
-                </div>
-                {doc.notes && <p>{doc.notes}</p>}
-                {actions({ type: "document", item: doc }, doc.label, addDocument)}
-              </li>
-            ))}</ul>
+            <>
+              <h3>Vendor documents</h3>
+              <ul>{docs.map((doc) => (
+                <li key={doc.id}>
+                  <a className="money-file" href={import.meta.env.BASE_URL + doc.path} target="_blank" rel="noreferrer">
+                    {doc.label} <ArrowUpRight size={15} aria-hidden="true" />
+                  </a>
+                  <div className="money-document-meta">
+                    <time dateTime={doc.received_at}>Received {prettyDate(doc.received_at)}</time>
+                    <Source source={doc.source} label={doc.source.includes("drive.google.com") ? "Full proposal source" : "Source"} />
+                  </div>
+                  {doc.notes && <p>{doc.notes}</p>}
+                  {actions({ type: "document", item: doc }, doc.label, addDocument)}
+                </li>
+              ))}</ul>
+            </>
           )}
           {onSave && (
             <button className="button" ref={addDocument} onClick={() => setEditing({ type: "document" })} aria-haspopup="dialog">
@@ -190,7 +200,7 @@ export function VendorMoney({ event, now, shared, local, onSave, onRemove }: {
   );
 }
 
-function VendorEditor({ editing, close, save }: { editing: Editing; close: () => void; save: (patch: VendorPricingPatch) => void }) {
+export function VendorEditor({ editing, close, save }: { editing: Editing; close: () => void; save: (patch: VendorPricingPatch) => void }) {
   const [error, setError] = useState<{ message: string }>();
   const saveError = useRef<HTMLParagraphElement>(null);
   useEffect(() => {

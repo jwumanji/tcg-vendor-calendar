@@ -18,6 +18,7 @@ import { BackupControls } from "./components/BackupControls";
 import { BudgetDefaultsForm } from "./components/TripBudget";
 import { stages, emptyEntry, hasLocalPlanning, saveValue } from "./storage";
 import { scoreEvent } from "./scoring";
+import { goingConflicts } from "./eventDecision";
 import {
   lazy,
   Suspense,
@@ -1180,6 +1181,10 @@ export default function App() {
                 })}
                 setOverride={(value) => priority.setOverride(selected.id, value)}
                 openClash={openEvent}
+                conflicts={goingConflicts(
+                  allEvents.find((event) => event.id === selected.id) ?? selected,
+                  activeEvents, entries, today, route.occurrence,
+                )}
                 occurrence={route.occurrence}
                 key={selected.id}
                 entry={entries[selected.id] || emptyEntry}

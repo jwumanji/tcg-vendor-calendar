@@ -57,7 +57,9 @@ export function parseBoothCost(text?: string | null) {
       const year = suffix.match(/^\s*\((20\d\d)\)|^.{0,40}?\b(?:was (?:the )?|for )(20\d\d)\b/i)
         ?? prefix.match(/\b(20\d\d)\b(?!.*\b20\d\d\b)(?![^:]*not published)/i);
       const quoteYear = year ? Number(year[1] ?? year[2]) : null;
-      return { amount, currency, approxUsd: amount / fx[currency], note: text, quoteYear };
+      const conditions = after.split(/;|\.\s|\s*[–—-]\s*(?=\d)|\s+to\s+(?=\d)/i)[0]
+        .split(price)[0].replace(/(?:\s+(?:or|and|vs\.?|plus)|[,+/])\s*$/i, "").trim();
+      return { amount, currency, approxUsd: amount / fx[currency], note: text, quoteYear, conditions };
     }
   }
   return null;
@@ -85,7 +87,7 @@ export function legacyVendorPrice(event: Event) {
 
 export type ApplicableVendorPrice =
   | { basis: VendorOption["basis"]; amount: number; currency: string; usd: number; option: VendorOption }
-  | { basis: "listed"; amount: number; currency: string; usd: number; note: string };
+  | { basis: "listed"; amount: number; currency: string; usd: number; note: string; conditions: string };
 
 const payable = (option: VendorOption) => option.amount_incl_vat ?? option.amount;
 
@@ -130,7 +132,8 @@ export function applicableVendorPrice(
     !(option.basis === "quote" && eligiblePackage(option, now)) &&
     option.currency === listed.currency && (option.amount === listed.amount || option.amount_incl_vat === listed.amount));
   if (listed?.status === "current" && !duplicatesItemizedRate)
-    return { basis: "listed", amount: listed.amount, currency: listed.currency, usd: listed.approxUsd, note: listed.note };
+    return { basis: "listed", amount: listed.amount, currency: listed.currency, usd: listed.approxUsd,
+      note: listed.note, conditions: listed.conditions };
   return null;
 }
 

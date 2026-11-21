@@ -10,12 +10,14 @@ export const parse = venueParser({
   cards: ".eventlist-event--upcoming",
   title: (c) => c.find(".eventlist-title").text(),
   website: ".eventlist-title-link",
-  date: (c) =>
-    c
-      .find("time.event-date")
-      .toArray()
-      .map((t) => t.attribs.datetime)
-      .join(" / "),
+  date: (c) => {
+    const dates = c.find("time.event-date").toArray().map((t) => t.attribs.datetime).filter(Boolean);
+    const fields = c.find(".eventlist-datetag-status, .event-date");
+    const annotation = fields.toArray()
+      .map((_, i) => clean(fields.eq(i).text()))
+      .filter((field) => /\b(?:postponed|cancell?ed)\b/i.test(field));
+    return [dates.join(" / "), ...new Set(annotation)].filter(Boolean).join(" ");
+  },
   details: (c) => {
     const paragraphs = c.find(".eventlist-description p");
     const venue = clean(

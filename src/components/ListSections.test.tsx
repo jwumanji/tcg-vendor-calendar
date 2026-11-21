@@ -3,13 +3,16 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import fixtures from "../../tests/fixtures/new-finds.json";
 import { mergeOutreach, normalizeEvents } from "../data";
-import { defaultRowSort, groupSortedRows, listCardDate, sortRows, type OptionalColumn, type RowSort } from "../rows";
+import { defaultRowSort, groupSortedRows, orderTimelineGroups, sortRows, type OptionalColumn, type RowSort } from "../rows";
 import { scoreEvents } from "../scoring";
+import { emptyFilters } from "../model";
+import { ics, matches, matchingEvent, timelineGroups } from "../utils";
 import { emptyEntry } from "../storage";
 import { Detail } from "./Detail";
 import { EventCard } from "./EventCard";
 import { EventRows } from "./EventRows";
 import { CardSections } from "./ListSections";
+import { CalendarView } from "./CalendarView";
 import { Pipeline } from "./Pipeline";
 import { TopPicks } from "./TopPicks";
 
@@ -20,20 +23,20 @@ const events = [event, kowloon, pasar, { ...pasar, id: "estimate", estimated_mon
 const scores = Object.fromEntries(scoreEvents(events, { today }).map((score) => [score.id, score]));
 const shared = { entries: {}, open: vi.fn(), setGoing: vi.fn() };
 
-function layouts(sort: RowSort, columns: OptionalColumn[] = [], list = events) {
-  const sorted = sortRows(list, sort, {}, scores, today);
+function layouts(sort: RowSort, columns: OptionalColumn[] = [], list = events, results = scores) {
+  const sorted = sortRows(list, sort, {}, results, today);
   const groups = groupSortedRows(sorted, sort.key, today);
   const grid = (
     <CardSections groups={groups} sortKey={sort.key}>
       {(e, titleLevel) => (
-        <EventCard key={e.id} e={e} entry={emptyEntry} score={scores[e.id]}
-          occurrence={listCardDate(e, today)} titleLevel={titleLevel} {...shared} />
+        <EventCard key={e.id} e={e} entry={emptyEntry} score={results[e.id]}
+          today={today} titleLevel={titleLevel} {...shared} />
       )}
     </CardSections>
   );
   const rows = (
     <EventRows groups={groups} sort={sort} setSort={vi.fn()} columns={columns}
-      today={today} scores={scores} selectMode={false} {...shared} />
+      today={today} scores={results} selectMode={false} {...shared} />
   );
   return { grid: load(renderToStaticMarkup(grid)), rows: load(renderToStaticMarkup(rows)) };
 }
@@ -82,8 +85,8 @@ describe("Grid and Rows sections", () => {
 
 it("shows only priority chips on list cards, rows, pipeline cards and top picks", () => {
   const { grid, rows } = layouts(defaultRowSort);
-  const pipeline = <Pipeline events={[event]} scores={scores} change={vi.fn()} {...shared} />;
-  const picks = <TopPicks events={[event]} scores={scores} today={today} visible={() => true} {...shared} />;
+  const pipeline = <Pipeline today={today} sort={defaultRowSort} events={[event]} scores={scores} change={vi.fn()} {...shared} />;
+  const picks = <TopPicks events={[event]} scores={scores} today={today} {...shared} />;
   for (const $ of [grid, rows, load(renderToStaticMarkup(pipeline)), load(renderToStaticMarkup(picks))]) {
     expect($(".priority-chip").length).toBeGreaterThan(0);
     expect($(".gem, .gem-tier, [data-tier], [title^='Scanner score']")).toHaveLength(0);
@@ -121,7 +124,7 @@ it.each([
   ["Use the official form", "https://example.com/contact", "https://example.com/contact", "https://example.com/contact"],
 ])("uses a direct event route for %s when no outreach route is seeded", (contact, vendor_application, href, label) => {
   const $ = load(renderToStaticMarkup(
-    <Detail e={{ ...event, contact, vendor_application }} entry={emptyEntry}
+    <Detail today={today} e={{ ...event, contact, vendor_application }} entry={emptyEntry}
       score={scores[event.id]} saved setGoing={shared.setGoing}
       onStage={vi.fn()} onNote={vi.fn()} onOutreach={vi.fn()} setOverride={vi.fn()} openClash={vi.fn()} toast={null} />,
   ));
@@ -135,7 +138,7 @@ it("labels the event outreach section, editor, research links and prices indepen
     published_booth_price: "$200", price_source_url: "https://example.com/prices",
   });
   const $ = load(renderToStaticMarkup(
-    <Detail e={{ ...event, outreach }} knownOutreach={outreach} entry={emptyEntry}
+    <Detail today={today} e={{ ...event, outreach }} knownOutreach={outreach} entry={emptyEntry}
       score={scores[event.id]} saved setGoing={shared.setGoing}
       onStage={vi.fn()} onNote={vi.fn()} onOutreach={vi.fn()} setOverride={vi.fn()} openClash={vi.fn()} toast={null} />,
   ));
@@ -155,11 +158,145 @@ it("labels the event outreach section, editor, research links and prices indepen
 
 it("keeps the scanner value in the event page priority breakdown", () => {
   const $ = load(renderToStaticMarkup(
-    <Detail e={event} entry={emptyEntry} score={scores[event.id]} saved setGoing={shared.setGoing}
+    <Detail today={today} e={event} entry={emptyEntry} score={scores[event.id]} saved setGoing={shared.setGoing}
       onStage={vi.fn()} onNote={vi.fn()} onOutreach={vi.fn()} setOverride={vi.fn()} openClash={vi.fn()} toast={null} />,
   ));
   const factor = $(".priority-detail details").filter((_, el) => $(el).find("summary").text().includes("Scanner score"));
   expect(factor).toHaveLength(1);
   expect(factor.text()).toContain("Scanner vendor score 51/100");
   expect($("meter, .vendor-meter, .gem")).toHaveLength(0);
+});
+
+it("shows the same schedule status and zero priority in Rows and Grid and excludes cancellations from picks and deadlines", () => {
+  const cancelled = { ...event, event_status: "cancelled" as const, vendor_deadline: "1 Dec 2026" };
+  const postponed = { ...kowloon, event_status: "postponed" as const };
+  const list = [cancelled, postponed];
+  const results = Object.fromEntries(scoreEvents(list, { overrides: { [event.id]: 100 } }).map((r) => [r.id, r]));
+  const { grid, rows } = layouts({ key: "priority", direction: "desc" }, [], list, results);
+  for (const $ of [grid, rows]) {
+    expect($(".badge.cancelled").text()).toBe("Cancelled");
+    expect($(".badge.postponed").text()).toBe("Postponed");
+    expect($(".priority-chip").last().attr("aria-label")).toContain("Score 0 of 100, Cancelled");
+  }
+  const picks = load(renderToStaticMarkup(<TopPicks events={list} scores={results} today={today} {...shared} />));
+  expect(picks(".overview").text()).not.toContain(cancelled.name);
+  expect(picks(".pick .badge.postponed").text()).toBe("Postponed");
+  expect(rows(".row-name").first().text()).toBe(postponed.name);
+  const cell = rows(".row-dates").last();
+  expect(cell.attr("title")).toMatch(/^cancelled · /);
+  expect(cell.text()).toMatch(/^Cancelled /);
+  expect(cell.text()).not.toContain("Confirmed");
+  expect(matches(cancelled, { ...emptyFilters, status: "cancelled" }, {})).toBe(true);
+  expect(matches(cancelled, { ...emptyFilters, status: "confirmed" }, {})).toBe(false);
+});
+
+it("identifies a hidden sort column and direction in Rows", () => {
+  const { rows } = layouts({ key: "scanner", direction: "desc" });
+  expect(rows(".rows-sort-note").text()).toBe("Sorted by Scanner score (descending)");
+  expect(layouts({ key: "scanner", direction: "desc" }, ["scanner"]).rows(".rows-sort-note")).toHaveLength(0);
+});
+
+it("labels cancelled calendar dates, undated postponements, pipeline cards and event details", () => {
+  const cancelled = { ...event, event_status: "cancelled" as const, date_note: "Event has been cancelled" };
+  const postponed = { ...pasar, event_status: "postponed" as const };
+  const list = [cancelled, postponed];
+  const results = Object.fromEntries(scoreEvents(list).map((r) => [r.id, r]));
+  const month = cancelled.start_date!.slice(0, 7);
+  const calendar = load(renderToStaticMarkup(<CalendarView filtered={list} month={month} initialMonth={month}
+    today={today} scores={results} setMonth={vi.fn()} {...shared} />));
+  expect(calendar(".month-header span").first().text()).toBe("1 dated show · 0 estimated");
+  expect(calendar(".calendar-event .badge.cancelled").first().text()).toBe("Cancelled");
+  expect(calendar(".tba-links .badge.postponed").text()).toBe("Postponed");
+  const pipeline = load(renderToStaticMarkup(<Pipeline today={today} sort={defaultRowSort} events={list} scores={results} change={vi.fn()} {...shared} />));
+  expect(pipeline(".pcard-tags .badge.cancelled")).toHaveLength(1);
+  expect(pipeline(".pcard-tags .badge.postponed")).toHaveLength(1);
+  const detail = load(renderToStaticMarkup(<Detail today={today} e={cancelled} score={results[cancelled.id]} entry={emptyEntry}
+    saved setGoing={shared.setGoing} onStage={vi.fn()} onNote={vi.fn()} onOutreach={vi.fn()}
+    setOverride={vi.fn()} openClash={vi.fn()} toast={null} />));
+  expect(detail(".badge.cancelled").text()).toBe("Cancelled");
+  expect(detail(".note").text()).toContain(cancelled.date_note);
+  expect(detail(".override-form, .clash-note")).toHaveLength(0);
+});
+
+it("orders Rows, Pipeline columns and Timeline stage groups by the same descending stage selection", () => {
+  const sort: RowSort = { key: "stage", direction: "desc" };
+  const entries = { [kowloon.id]: { ...emptyEntry, stage: "Contacted" as const } };
+  const sorted = sortRows([event, kowloon], sort, entries, scores, today);
+  const groups = groupSortedRows(sorted, sort.key, today);
+  const rows = load(renderToStaticMarkup(<EventRows groups={groups} sort={sort} setSort={vi.fn()} columns={[]}
+    today={today} scores={scores} selectMode={false} {...shared} entries={entries} />));
+  const pipeline = load(renderToStaticMarkup(<Pipeline today={today} sort={sort} events={sorted} scores={scores}
+    change={vi.fn()} {...shared} entries={entries} />));
+  expect(rows(".row-name").map((_, el) => rows(el).text()).get()).toEqual([kowloon.name, event.name]);
+  expect(pipeline(".pcard-title button").map((_, el) => pipeline(el).contents().first().text()).get())
+    .toEqual([kowloon.name, event.name]);
+  const timeline = orderTimelineGroups(timelineGroups(sorted, emptyFilters, entries, true), true, sort);
+  expect(timeline.map(([stage]) => stage)).toEqual(["Contacted", "New"]);
+});
+
+it.each([
+  { from: "2027-03-01", to: "2027-03-31" },
+  { next90: true },
+])("shows only the matching weekend in Rows, Pipeline, Timeline and Calendar with %o", (window) => {
+  const occurrences = ["2027-01-09", "2027-03-13"].map((date) => ({ start_date: date, end_date: date }));
+  const recurring = { ...event, ...occurrences[0], occurrences };
+  const match = matchingEvent(recurring, { ...emptyFilters, ...window }, {}, 0, "2027-03-01")!;
+  const { rows, grid } = layouts(defaultRowSort, [], [match]);
+  expect(rows(".row-dates").text()).toContain("13 Mar");
+  expect(grid(".card-when").text()).toContain("13 Mar");
+  const pipeline = load(renderToStaticMarkup(<Pipeline today={today} sort={defaultRowSort} events={[match]} scores={scores}
+    change={vi.fn()} {...shared} />));
+  expect(pipeline(".pcard-line").first().text()).toContain("13 Mar");
+  expect([...timelineGroups([recurring], { ...emptyFilters, ...window }, {}, false, "2027-03-01").keys()]).toEqual(["2027-03"]);
+  for (const month of ["2027-01", "2027-03"]) {
+    const calendar = load(renderToStaticMarkup(<CalendarView filtered={[match]} month={month} initialMonth={month}
+      today={today} scores={scores} setMonth={vi.fn()} {...shared} />));
+    const count = month === "2027-03" ? 1 : 0;
+    expect(calendar(".calendar-event")).toHaveLength(count);
+    expect(calendar(".mobile-agenda .event-card")).toHaveLength(count);
+  }
+});
+
+it("announces priority rank in each title when rank two precedes rank one", () => {
+  const results = { ...scores, [event.id]: { ...scores[event.id], score: 55 }, [kowloon.id]: { ...scores[kowloon.id], score: 90 } };
+  const picks = load(renderToStaticMarkup(<TopPicks events={[event, kowloon]} scores={results} today={today} {...shared} />));
+  const titles = picks(".pick h3 button");
+  expect(titles).toHaveLength(2);
+  expect(titles.eq(0).text()).toContain(event.name + " · Priority rank 2");
+  expect(titles.eq(1).text()).toContain(kowloon.name + " · Priority rank 1");
+  expect(titles.find("[aria-hidden=true]")).toHaveLength(0);
+});
+
+it("places a January–February show only on its filtered February days and exports the published range", () => {
+  const crossing = { ...event, start_date: "2027-01-30", end_date: "2027-02-02" };
+  const filter = { ...emptyFilters, from: "2027-02-01", to: "2027-02-28" };
+  const match = matchingEvent(crossing, filter, {}, 0, today)!;
+  const groups = timelineGroups([match], filter, {}, false, today);
+  expect([...groups.keys()]).toEqual(["2027-02"]);
+  expect([...groupSortedRows([match], "dates", today).keys()]).toEqual(["2027-02"]);
+  for (const month of ["2027-01", "2027-02"]) {
+    const calendar = load(renderToStaticMarkup(<CalendarView filtered={[match]} month={month} initialMonth={month}
+      today={today} scores={scores} setMonth={vi.fn()} {...shared} />));
+    const days = calendar(".day:has(.calendar-event)").map((_, el) => calendar(el).attr("aria-label")).get();
+    expect(days).toEqual(month === "2027-02" ? ["1 Feb 2027", "2 Feb 2027"] : []);
+    expect(calendar(".mobile-agenda .event-card")).toHaveLength(month === "2027-02" ? 1 : 0);
+  }
+  expect(ics([match])).toContain("DTSTART;VALUE=DATE:20270130\r\nDTEND;VALUE=DATE:20270203");
+});
+
+it("uses the upcoming Centrepoint weekend in visible dates and accessible titles between occurrences", () => {
+  const day = "2027-02-01";
+  const occurrences = [
+    { start_date: "2027-01-30", end_date: "2027-01-31" },
+    { start_date: "2027-02-13", end_date: "2027-02-14" },
+  ];
+  const series = { ...event, name: "NEXUS Centrepoint", ...occurrences[0], occurrences };
+  const pipeline = load(renderToStaticMarkup(<Pipeline today={day} sort={defaultRowSort} events={[series]} scores={scores}
+    change={vi.fn()} {...shared} />));
+  const picks = load(renderToStaticMarkup(<TopPicks events={[series]} scores={scores} today={day} {...shared} />));
+  for (const text of [pipeline(".pcard-line").first().text(), pipeline(".pcard-title button").text(),
+    picks(".pick p").text(), picks(".pick h3 button").text()]) {
+    expect(text).toContain("13 Feb 2027 – 14 Feb 2027");
+    expect(text).not.toContain("Jan");
+  }
 });

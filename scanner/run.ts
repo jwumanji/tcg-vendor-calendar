@@ -8,14 +8,14 @@ import {
 } from "node:fs/promises";
 import sharp from "sharp";
 import { constants } from "node:fs";
-import { scheduleNotice } from "./listing.ts";
+import { ScheduleConflict, scheduleField, scheduleNotice, type Notice } from "./listing.ts";
 import type { Source } from "./types.ts";
 import { dirname, join, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { parseArgs } from "node:util";
 import { normalizeEvents, validDate } from "../src/data.ts";
 import type { Event } from "../src/model.ts";
-import { localDay, horizon, parseDates } from "./dates.ts";
+import { localDay, horizon } from "./dates.ts";
 import { createClient } from "./http.ts";
 import { normalize } from "./normalize.ts";
 import { relevance } from "./relevance.ts";
@@ -42,6 +42,10 @@ export function validate(value: unknown): asserts value is Event[] {
       !row.name.trim() ||
       !["timeline", "watchlist", "recurring_sg"].includes(raw.section) ||
       !["estimated", "confirmed", "tba"].includes(raw.date_status) ||
+      raw.event_status !== row.event_status ||
+      (raw.original_start_date !== undefined && !validDate(raw.original_start_date)) ||
+      (Array.isArray(raw.occurrences) && raw.occurrences.some((r) =>
+        r?.original_start_date !== undefined && !validDate(r.original_start_date))) ||
       (raw.date_status === "confirmed" &&
         (!validDate(raw.start_date) ||
           !validDate(raw.end_date) ||
@@ -51,12 +55,16 @@ export function validate(value: unknown): asserts value is Event[] {
         (raw.start_date != null || raw.end_date != null)) ||
       (raw.source &&
         (!row.source?.id ||
+          (raw.source.original_dates !== undefined &&
+            (!Array.isArray(raw.source.original_dates) || raw.source.original_dates.length !== row.source.original_dates?.length)) ||
+          (["previous_dates", "aliases"] as const).some((key) => raw.source![key] !== undefined &&
+            (!Array.isArray(raw.source![key]) || raw.source![key]!.length !== row.source![key]?.length)) ||
           !row.source.url ||
           !row.source.discovered_at ||
           !row.source.name ||
           row.source.confidence == null ||
           row.source.relevance == null ||
-          raw.verification !== "unverified" ||
+          (raw.verification !== "unverified" && raw.verification !== "verified") ||
           raw.is_new_find !== true))
     )
       throw Error(`Invalid event output: ${row.id}`);
@@ -105,7 +113,7 @@ export async function scanSource(source: Source, get: (url: string) => Promise<s
     dropped_as_junk: 0, outside_window: 0, status: "OK", reason: "",
   };
   const warnings: string[] = [];
-  const events: Event[] = [], notices: Event[] = [];
+  const events: Event[] = [], notices: Notice[] = [];
   try {
     const raw = await source.run({ get, warn: (message) => warnings.push(message) });
     stats.fetched = raw.length;
@@ -114,21 +122,27 @@ export async function scanSource(source: Source, get: (url: string) => Promise<s
       try {
         const notice = scheduleNotice(find.name, find.date);
         if (notice) {
-          const e = normalize({ ...find, name: notice.name, date: find.date, date_status: "tba" }, source, now.toISOString());
-          // A notice that still carries its original dates can disambiguate
-          // occurrences sharing a listing. The persisted row is always undated.
-          const dates = parseDates(find.date);
-          e.start_date = dates?.start ?? null;
-          e.end_date = dates?.end ?? null;
-          e.date_note = notice.note;
-          notices.push(e);
+          const e = normalize({
+            ...find,
+            name: notice.name,
+            date: notice.dates?.start ?? null,
+            date_status: notice.dates ? "confirmed" : notice.estimated_month ? "estimated" : "tba",
+            estimated_month: notice.estimated_month,
+          }, source, now.toISOString());
+          notices.push({
+            ...e, event_status: notice.kind, date_note: notice.note,
+            end_date: notice.dates?.end ?? null,
+            originalStart: notice.originalStart,
+            originalEnd: notice.originalEnd,
+            unknownOriginal: notice.unknownOriginal,
+          });
           continue;
         }
         if (relevance(find.name, find.evidence) < 0.5) {
           stats.dropped_as_junk++;
           continue;
         }
-        const e = normalize(find, source, now.toISOString());
+        const e = normalize({ ...find, date: scheduleField(find.date).date }, source, now.toISOString());
         const month = e.estimated_month;
         if ((e.end_date && e.end_date < today) || (e.start_date && e.start_date > until) ||
             (month && (month < today.slice(0, 7) || month > until.slice(0, 7)))) {
@@ -138,7 +152,7 @@ export async function scanSource(source: Source, get: (url: string) => Promise<s
         stats.relevant++;
         events.push(e);
       } catch (error) {
-        invalid++;
+        if (!(error instanceof ScheduleConflict)) invalid++;
         warnings.push(reason(error));
       }
     }
@@ -203,6 +217,9 @@ async function main() {
   const rows = results.map(({ stats }) => ({
     ...stats,
     new: merged.added.filter((e) => e.source?.id === stats.source).length,
+    notices_applied: merged.applied.filter((notice) => notice.source!.id === stats.source).length,
+    notices_unmatched: merged.unmatched.filter((notice) => notice.source!.id === stats.source).length,
+    ambiguous_listings: merged.ambiguous.filter((listing) => listing.source!.id === stats.source).length,
     already_known: merged.known[stats.source] ?? 0,
   }));
   const added = merged.added.map((e) => ({
@@ -217,10 +234,15 @@ async function main() {
     through: until,
     sources: rows,
     new_count: added.length,
+    notices_applied: merged.applied.length,
+    notices_unmatched: merged.unmatched.length,
+    ambiguous_listings: merged.ambiguous.length,
     removed: merged.removed,
     new_events: added,
   };
   console.table(rows);
+  for (const notice of merged.unmatched)
+    console.warn(`Unmatched notice from ${notice.source!.id}: ${notice.name} (${notice.date_note})`);
   for (const e of added)
     console.log(`+ ${e.name} | ${e.date ?? "TBA"} | ${e.city} | ${e.source}`);
   console.log(

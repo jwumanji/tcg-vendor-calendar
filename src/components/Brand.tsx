@@ -14,18 +14,18 @@ export function BrandMark({ className = "" }: { className?: string }) {
     >
       <defs>
         <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#ff6bd6" />
-          <stop offset=".3" stopColor="#ffd24a" />
-          <stop offset=".55" stopColor="#6bffb8" />
-          <stop offset=".8" stopColor="#6bc8ff" />
-          <stop offset="1" stopColor="#a58bff" />
+          <stop offset="0" stopColor="#a99aee" />
+          <stop offset=".3" stopColor="#d5cdf5" />
+          <stop offset=".55" stopColor="#a99aee" />
+          <stop offset=".8" stopColor="#8f7be6" />
+          <stop offset="1" stopColor="#6a4fd6" />
         </linearGradient>
       </defs>
       <rect x="1" y="1" width="62" height="78" rx="10" fill={`url(#${id})`} />
       <rect x="5" y="5" width="54" height="70" rx="7" fill="#171431" />
       <g
         fill="none"
-        stroke="#ffd24a"
+        stroke="#d5cdf5"
         strokeWidth="4.5"
         strokeLinecap="round"
         strokeLinejoin="round"

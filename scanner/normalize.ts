@@ -105,9 +105,6 @@ export function normalize(
       previous_editions: raw.previous_editions ?? edition?.[0],
       previous_editions_count:
         raw.previous_editions_count ?? (edition ? +edition[1] - 1 : null),
-      description:
-        raw.description ??
-        `${source.name} lists ${name}${raw.venue ? " at " + raw.venue : raw.city && !fold(name).includes(fold(raw.city)) ? " in " + raw.city : ""}.`,
       size_tier: raw.size_tier ?? size,
       games: raw.games ?? [],
       website,

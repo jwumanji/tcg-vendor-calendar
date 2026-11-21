@@ -1,3 +1,4 @@
+import { titleSubject } from "../listing.ts";
 import { document, required } from "../html.ts";
 import { pageSource, type RawFind } from "../types.ts";
 const url = "https://www.jumpfesta.com/";
@@ -9,20 +10,23 @@ export function parse(html: string): RawFind[] {
       .next("td")
       .text()
       .trim();
-  const name = required(
-    field("イベント名").match(/JUMP FESTA \d{4}/i)?.[0],
+  const title = field("イベント名").replace(/ジャンプフェスタ\d*（(JUMP FESTA(?: \d{4})?)）/i, "$1");
+  const name = titleSubject(title) !== title ? title : required(
+    title.match(/JUMP FESTA(?: \d{4})?/i)?.[0],
     "event name",
   );
-  const m = field("開催日時").match(
+  const rawDate = field("開催日時");
+  const annotation = rawDate.split("\n").map((line) => line.trim()).find((line) => /\b(?:cancell?ed|postponed)\b/i.test(line));
+  const m = rawDate.match(
     /(20\d\d)年(\d+)月(\d+)日\([^)]+\)・(\d+)月(\d+)日/,
   );
-  if (!m) throw Error("Missing Jump Festa event dates");
-  const date = (month: string, day: string) =>
-    [m[1], month.padStart(2, "0"), day.padStart(2, "0")].join("-");
+  if (!m && !annotation && titleSubject(name) === name) throw Error("Missing Jump Festa event dates");
+  const date = (year: string, month: string, day: string) =>
+    [year, month.padStart(2, "0"), day.padStart(2, "0")].join("-");
   return [
     {
       name,
-      date: date(m[2], m[3]) + " / " + date(m[4], m[5]),
+      date: m ? date(m[1], m[2], m[3]) + " / " + date(m[1], m[4], m[5]) + (annotation ? " " + annotation : "") : annotation ?? rawDate,
       code: "JP",
       city: "Chiba",
       venue:

@@ -21,7 +21,8 @@ export function parse(html: string): RawFind[] {
   // Read visible schedule cards; titles and their date span share an anchor.
   const cards = $("a[href]").filter(
     (_, a) =>
-      /20\d\d/.test($(a).children("span").text()) &&
+      (/20\d\d/.test($(a).children("span").text()) ||
+        /\b(?:cancell?ed|postponed)\b/i.test($(a).text())) &&
       $(a).children("div").length > 0,
   );
   if (!cards.length) throw Error("Missing Wizards event schedule");

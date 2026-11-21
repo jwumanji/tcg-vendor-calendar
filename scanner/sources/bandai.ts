@@ -1,3 +1,5 @@
+import { scheduleField } from "../listing.ts";
+import { parseDates } from "../dates.ts";
 import { clean, document, required, urlOf } from "../html.ts";
 import { type RawFind, type Source } from "../types.ts";
 const url = "https://www.bandaicardgames-fest.com/26-27/en/";
@@ -27,11 +29,12 @@ export function parse(html: string): RawFind[] {
     const place = clean(card.find(".place").text());
     if (!locations[place]) return [];
     const city = place.replace(" S.A.R.", "");
-    return card
-      .find(".date")
-      .text()
-      .trim()
-      .split(/\n+/)
+    const dates: string[] = [];
+    for (const line of card.find(".date").text().split(/\n+/).map(clean).filter(Boolean)) {
+      if (!dates.length || parseDates(scheduleField(line).date)) dates.push(line);
+      else dates[dates.length - 1] += " " + line;
+    }
+    return dates
       .map((date) => ({
         name: series + " in " + city,
         code: locations[place],

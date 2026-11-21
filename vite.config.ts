@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 // The planner is served at the root of planner.grailfoxtcg.com. Set VITE_BASE
@@ -7,6 +8,13 @@ const base = `/${(process.env.VITE_BASE ?? "/").replace(/^\/+|\/+$/g, "")}/`.rep
 export default defineConfig({
   plugins: [
     react(),
+    {
+      name: "planner-build-id",
+      apply: "build",
+      transformIndexHtml: () => [
+        { tag: "meta", attrs: { name: "planner-build-id", content: randomUUID() }, injectTo: "head" },
+      ],
+    },
     {
       name: "development-csp",
       apply: "serve",

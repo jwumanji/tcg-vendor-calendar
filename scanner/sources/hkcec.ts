@@ -1,23 +1,25 @@
 import { clean, document } from "../html.ts";
-import { venueParser } from "../venue.ts";
+import { venueParser, type Card } from "../venue.ts";
 import type { Source, RawFind } from "../types.ts";
 const url = "https://www.hkcec.com/en/event-calendar";
+function fields(c: Card) {
+  const text = c.find(".event-title").text().trim();
+  // A range can share the title line or start after a line break. Keep any
+  // subsequent status line in the date field along with that original range.
+  const numericDate = /\d{2}\/\d{2}\/\d{4}/;
+  const lines = text.replace(numericDate, "\n$&").split(/\n/).map(clean).filter(Boolean);
+  const split = lines.findIndex((line, i) => i > 0 && (numericDate.test(line) || /^(?:event |TBC - )?(?:cancell?ed|postponed)\b/i.test(line)));
+  if (split < 0) return { name: text, date: "" };
+  return { name: lines.slice(0, split).join(" "), date: lines.slice(split).join(" ") };
+}
 export const parse = venueParser({
   url,
   venue: "Hong Kong Convention and Exhibition Centre",
   city: "Wan Chai",
   code: "HK",
   cards: ".event-table",
-  title: (c) =>
-    c
-      .find(".event-title")
-      .text()
-      .split(/\d{2}\/\d{2}\/\d{4}/)[0],
-  date: (c) =>
-    c
-      .find(".event-title")
-      .text()
-      .match(/\d{2}\/\d{2}\/\d{4}[\s\S]*$/)?.[0] ?? "",
+  title: (c) => fields(c).name,
+  date: (c) => fields(c).date,
   website: ".event_img",
   details: (c) => ({
     organizer: clean(c.find(".event-organiser").first().text()) || null,

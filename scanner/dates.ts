@@ -22,6 +22,15 @@ function range(start: string, end = start) {
     ? { start, end }
     : null;
 }
+export function parseMonth(raw: string) {
+  if (/^\d{4}-(0[1-9]|1[0-2])$/.test(raw)) return raw;
+  const m = raw.match(/^([a-z]+) (20\d\d)$/i);
+  const n = m && month(m[1]);
+  return m && n ? m[2] + "-" + String(n).padStart(2, "0") : null;
+}
+function startYear(endYear: string, startMonth: string, endMonth: string) {
+  return month(startMonth) > month(endMonth) ? String(Number(endYear) - 1) : endYear;
+}
 export function parseDates(raw: string | null) {
   if (!raw) return null;
   const t = raw
@@ -46,7 +55,7 @@ export function parseDates(raw: string | null) {
   );
   if (m)
     return range(
-      iso(m[3] ?? m[6], month(m[2] ?? m[5]), m[1]),
+      iso(m[3] ?? startYear(m[6], m[2] ?? m[5], m[5]), month(m[2] ?? m[5]), m[1]),
       iso(m[6], month(m[5]), m[4]),
     );
   m = t.match(
@@ -54,7 +63,7 @@ export function parseDates(raw: string | null) {
   );
   if (m)
     return range(
-      iso(m[3] ?? m[6], month(m[1]), m[2]),
+      iso(m[3] ?? startYear(m[6], m[1], m[4] ?? m[1]), month(m[1]), m[2]),
       iso(m[6], month(m[4] ?? m[1]), m[5]),
     );
   m = t.match(/^(\d{1,2}) ([a-z]+) (\d{4})$/i);

@@ -1,3 +1,4 @@
+import { orderedStages, type RowSort } from "../rows";
 import { GoingButton, type SetGoing } from "./GoingButton";
 import { PriorityChip } from "./PriorityChip";
 import { FindBadges } from "./FindSource";
@@ -16,7 +17,7 @@ import {
 } from "lucide-react";
 import type { Event } from "../model";
 import { stages, emptyEntry, type Stage, type Entries } from "../storage";
-import { dateLabel, games, gameKey, primaryGameKey } from "../utils";
+import { displayDateLabel, games, gameKey, primaryGameKey } from "../utils";
 import { holo } from "../holo";
 import {
   ClashCue,
@@ -83,6 +84,8 @@ export function StagePicker({
   );
 }
 export function Pipeline({
+  today,
+  sort,
   events,
   entries,
   scores,
@@ -90,6 +93,8 @@ export function Pipeline({
   setGoing,
   change,
 }: {
+  today: string;
+  sort: RowSort;
   events: Event[];
   entries: Entries;
   scores: Record<string, ScoreResult>;
@@ -105,7 +110,7 @@ export function Pipeline({
         New.
       </p>
       <div className="pipeline">
-        {stages.map((stage) => {
+        {orderedStages(sort).map((stage) => {
           const items = events.filter(
             (e) => (entries[e.id] || emptyEntry).stage === stage,
           );
@@ -122,6 +127,7 @@ export function Pipeline({
               )}
               {items.map((e) => (
                 <PipelineCard
+                  today={today}
                   key={e.id}
                   e={e}
                   entries={entries}
@@ -148,6 +154,7 @@ export function Pipeline({
  * no interactive element is nested inside another.
  */
 const PipelineCard = memo(function PipelineCard({
+  today,
   e,
   stage,
   going,
@@ -158,6 +165,7 @@ const PipelineCard = memo(function PipelineCard({
   setGoing,
   change,
 }: {
+  today: string;
   e: Event;
   stage: Stage;
   going: boolean;
@@ -184,7 +192,7 @@ const PipelineCard = memo(function PipelineCard({
             {e.name}
             <span className="sr-only">
               {" "}
-              · {dateLabel(e)}
+              · {displayDateLabel(e, today)}
               {hasNote ? " · has notes" : ""}
             </span>
           </button>
@@ -194,7 +202,7 @@ const PipelineCard = memo(function PipelineCard({
         <ClashCue score={score} entries={entries} />
         <span className="pcard-line">
           <CalendarDays size={14} aria-hidden="true" />
-          {dateLabel(e)}
+          {displayDateLabel(e, today)}
         </span>
         <span className="pcard-line">
           <Place e={e} />

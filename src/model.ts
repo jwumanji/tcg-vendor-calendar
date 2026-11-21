@@ -6,6 +6,10 @@ export interface EventSource {
   url: string;
   /** ISO timestamp of the first scan that found it. */
   discovered_at: string;
+  /** Published ranges of this edition before its first postponement. */
+  original_dates?: { start_date: string; end_date: string }[];
+  previous_dates?: { start_date: string; end_date: string }[];
+  aliases?: string[];
   /** 0-1: how sure the scraper is that the parsed fields are right. */
   confidence: number | null;
   /** 0-1: how relevant the event is to a TCG vendor. */
@@ -56,10 +60,14 @@ export interface Event {
   section: "timeline" | "recurring_sg" | "watchlist";
   start_date: string | null;
   end_date: string | null;
+  event_status?: "cancelled" | "postponed";
   date_status: "confirmed" | "estimated" | "tba";
   date_note: string | null;
   estimated_month: string | null;
-  occurrences?: { start_date: string; end_date: string }[];
+  original_start_date?: string;
+  occurrences?: { start_date: string; end_date: string; original_start_date?: string }[];
+  /** Display-only intersection with active filters. Published dates remain available for export. */
+  visible_ranges?: { start_date: string; end_date: string }[];
   city: string | null;
   country: string | null;
   country_code: string | null;
@@ -101,7 +109,7 @@ export interface Event {
   source?: EventSource | null;
   /** True for scraper finds that no Scanner entry matched. */
   is_new_find?: boolean;
-  verification?: "scanner" | "unverified";
+  verification?: "scanner" | "unverified" | "verified";
 }
 export interface Filters {
   search: string;

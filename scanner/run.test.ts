@@ -3,6 +3,8 @@ import { spawnSync } from "node:child_process";
 import {
   mkdtempSync,
   mkdirSync,
+  openSync,
+  closeSync,
   existsSync,
   readFileSync,
   writeFileSync,
@@ -45,6 +47,7 @@ it("imports raw Scanner records, refreshes logos, fails soft, and performs read-
     // Exercise the real executable without depending on public hosts or the current season.
     const date = localDay(new Date());
     const markup = `<article class="eventlist-event--upcoming"><h1 class="eventlist-title"><a class="eventlist-title-link" href="/show">Test Card Show</a></h1><time class="event-date" datetime="${date}"></time></article>`;
+    put("listing.html", markup);
     put(
       "network.mjs",
       `import { readFileSync, writeFileSync } from "node:fs";
@@ -55,19 +58,22 @@ it("imports raw Scanner records, refreshes logos, fails soft, and performs read-
         events[0].outreach.notes = process.env.SAVE_NOTE;
         writeFileSync("data/events.json", JSON.stringify(events));
       }
-      return new Response(new URL(url).pathname === "/robots.txt" ? "" : ${JSON.stringify(markup)});
+      return new Response(new URL(url).pathname === "/robots.txt" ? "" : readFileSync("listing.html", "utf8"));
     };`,
     );
-    const run = (args: string[], fail = false, note = "") =>
-      spawnSync(
-        process.execPath,
-        ["--import", join(dir, "network.mjs"), entry, ...args],
-        {
-          cwd: dir,
-          encoding: "utf8",
+    const run = (args: string[], fail = false, note = "") => {
+      const log = openSync(join(dir, "scanner.log"), "w");
+      try {
+        const result = spawnSync(process.execPath, ["--import", join(dir, "network.mjs"), entry, ...args], {
+          cwd: dir, stdio: ["ignore", "ignore", log],
           env: { ...process.env, ALL_FAIL: fail ? "1" : "", SAVE_NOTE: note },
-        },
-      );
+        });
+        if (result.error) throw result.error;
+        return { status: result.status, stderr: read("scanner.log") };
+      } finally {
+        closeSync(log);
+      }
+    };
     const args = ["--import-scanner", join(dir, "export/events.json")];
     const first = run(args, false, outreach.notes);
     expect(first.status, first.stderr).toBe(0);
@@ -89,6 +95,20 @@ it("imports raw Scanner records, refreshes logos, fails soft, and performs read-
     expect(run([...args, "--dry-run"]).status).toBe(0);
     expect(readFileSync(join(dir, "public/logos/change.webp"))).toEqual(webp);
     expect(read("scanner/last-run.json")).toBe(summary);
+    put("listing.html", markup.replace("Test Card Show", "Test Card Show has been cancelled") +
+      markup.replace("Test Card Show", "Unknown Card Show (Postponed)").replace('href="/show"', 'href="/unknown"'));
+    const changed = run([]);
+    expect(changed.status, changed.stderr).toBe(0);
+    expect(changed.stderr).toContain("Unmatched notice from suntec: Unknown Card Show");
+    const notices = JSON.parse(read("scanner/last-run.json"));
+    expect(notices).toMatchObject({ new_count: 0, notices_applied: 1, notices_unmatched: 1 });
+    expect(notices.sources.find((s: { source: string }) => s.source === "suntec")).toMatchObject({
+      notices_applied: 1, notices_unmatched: 1, dropped_as_junk: 0, status: "OK",
+    });
+    expect(JSON.parse(read("data/events.json")).find((e: Event) => e.source)).toMatchObject({
+      event_status: "cancelled", start_date: date, date_note: "Test Card Show has been cancelled",
+    });
+    put("listing.html", markup);
     expect(run([]).status).toBe(0);
     expect(read("data/events.json")).toBe(snapshot);
     expect(run(args, true).status).toBe(1);

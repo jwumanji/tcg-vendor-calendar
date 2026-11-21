@@ -1,3 +1,4 @@
+import { merge } from "../scanner/merge";
 import { emptyEntry } from "./storage";
 import { describe, it, expect } from "vitest";
 import raw from "../data/events.json";
@@ -21,6 +22,7 @@ import {
   csv,
   foldLine,
   matches,
+  matchingEvent,
   games,
   deadlineDate,
   monthEnd,
@@ -226,8 +228,8 @@ describe("audit regressions", () => {
       {},
       false,
     );
-    expect([...groups.keys()]).toEqual(["2027-01"]);
-    expect(groups.get("2027-01")?.[0].label).toContain("2 Feb 2027");
+    expect([...groups.keys()]).toEqual(["2027-02"]);
+    expect(groups.get("2027-02")?.[0].label).toContain("2 Feb 2027");
   });
   it.each(["Malaysia", "MY", "pokemon", "collectors", "stock", "special game"])(
     "searches normalized data for %s",
@@ -376,7 +378,7 @@ it("filters to Going and exports only its confirmed occurrences", () => {
   ).toEqual(going);
   const calendar = ics(going);
   for (const r of ranges(recurring))
-    expect(calendar).toContain(`UID:${recurring.id}-${r.start_date}`);
+    expect(calendar).toContain(`UID:${recurring.id}-${r.start_date}@tcg-vendor-calendar`);
   expect(calendar.match(/BEGIN:VEVENT/g)).toHaveLength(
     ranges(recurring).length,
   );
@@ -479,4 +481,47 @@ it("previews selected flags in selection order and counts overflow or missing fl
     flags: ["HK", "MY", "SG"], more: 2,
   });
   expect(selectedFlags(["JP", "HK"], options, 1)).toEqual({ flags: ["JP"], more: 1 });
+});
+
+it("exports cancellation on the original calendar UID and includes event and date status in CSV", () => {
+  const cancelled: Event = { ...event, event_status: "cancelled" };
+  const result = ics([cancelled]);
+  expect(result).toContain(`UID:${event.id}-${event.start_date}@tcg-vendor-calendar`);
+  expect(result).toContain("\r\nSTATUS:CANCELLED\r\n");
+  expect(result).not.toContain("STATUS:TENTATIVE");
+  const exported = csv([cancelled, event]);
+  expect(exported).toContain('"Date status","Event status"');
+  expect(exported).toContain('"confirmed","cancelled"');
+  expect(exported).toContain('"confirmed","scheduled"');
+});
+
+it("keeps a single appointment's UID when its December dates move to March", () => {
+  const before = { ...event, occurrences: undefined, start_date: "2026-12-12", end_date: "2026-12-13" };
+  const after = { ...before, event_status: "postponed" as const, start_date: "2027-03-13", end_date: "2027-03-14" };
+  const original = ics([before]);
+  const updated = ics(merge([before], [], "2026-11-21", [after]).events);
+  expect(original).toContain("DTSTART;VALUE=DATE:20261212");
+  expect(updated).toContain("DTSTART;VALUE=DATE:20270313");
+  expect(updated.match(/^UID:.+$/gm)).toEqual(original.match(/^UID:.+$/gm));
+});
+
+it("keeps recurring appointments distinct and stable when a weekend moves or the export is filtered", () => {
+  const before = { ...event, occurrences: ["2027-01-09", "2027-03-13"].map((date) => ({ start_date: date, end_date: date })) };
+  const after = { ...before, occurrences: [before.occurrences[0], { start_date: "2027-04-10", end_date: "2027-04-10" }] };
+  const uids = (e: Event) => ics([e]).match(/^UID:.+$/gm)!;
+  expect(new Set(uids(before)).size).toBe(2);
+  const [updated] = merge([before], [], "2026-11-21", [after]).events;
+  expect(uids(updated)).toEqual(uids(before));
+  expect(uids(matchingEvent(updated, { ...emptyFilters, from: "2027-04-01" }, {})!)).toEqual([uids(before)[1]]);
+});
+
+it("keeps the legacy UID of a recurring weekend after the first weekend disappears upstream", () => {
+  const dates = ["2027-01-30", "2027-02-13", "2027-03-06"].map((date) => ({ start_date: date, end_date: date }));
+  const before = { ...event, ...dates[0], occurrences: dates };
+  const revised = { ...before, ...dates[1], occurrences: dates.slice(1) };
+  const [stored] = merge([before], [], "2026-11-21", [revised]).events;
+  expect(stored.occurrences?.map((r) => r.original_start_date)).toEqual(["2027-02-13", "2027-03-06"]);
+  const calendar = ics([stored]);
+  expect(calendar).not.toContain(`UID:${event.id}-2027-01-30@`);
+  for (const date of dates.slice(1)) expect(calendar).toContain(`UID:${event.id}-${date.start_date}@tcg-vendor-calendar`);
 });

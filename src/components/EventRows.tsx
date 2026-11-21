@@ -1,3 +1,4 @@
+import { scheduleStatus } from "../utils";
 import { Fragment, useMemo, useState, useRef, type KeyboardEvent } from "react";
 import { ArrowDown, ArrowUp, ChevronsUpDown, X, Columns3 } from "lucide-react";
 import type { Event } from "../model";
@@ -15,7 +16,7 @@ import {
   type RowKey,
   type RowSort,
 } from "../rows";
-import { Logo, Place, NoteTag, ClashCue } from "./EventIdentity";
+import { Logo, Place, NoteTag, ClashCue, ScheduleBadge } from "./EventIdentity";
 import { GoingButton, type SetGoing } from "./GoingButton";
 import { StageBadge } from "./Pipeline";
 import { PriorityChip } from "./PriorityChip";
@@ -48,6 +49,8 @@ export function EventRows({
 }) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const showOutreachColumn = columns.includes("outreach");
+  const sortedColumnVisible = ["name", "dates", "country", "priority", "stage", ...columns].includes(sort.key) ||
+    (sort.key === "going" && !selectMode);
   const anchor = useRef<string | null>(null);
   const ids = useMemo(
     () => Array.from(groups.values()).flatMap((items) => items.map((e) => e.id)),
@@ -122,7 +125,7 @@ export function EventRows({
     )
       return;
     const name = ev.target.classList.contains("row-name");
-    if ((name && ev.key === " ") || ev.key.toLowerCase() === "g") {
+    if (!selectMode && ev.key.toLowerCase() === "g") {
       ev.preventDefault();
       if (!ev.repeat) setGoing([e.id], !entries[e.id]?.going);
       return;
@@ -179,14 +182,17 @@ export function EventRows({
       {selectMode && (
         <div className="mobile-select-all">{selectAllCheckbox()}</div>
       )}
+      {!sortedColumnVisible && (
+        <p className="rows-sort-note">Sorted by {ROW_SORT_LABELS[sort.key]} ({sort.direction === "asc" ? "ascending" : "descending"})</p>
+      )}
       <div className="rows-wrap">
         {/* Mobile rows use CSS grid and block cells. Explicit native roles retain
             the table structure in WebKit. Each heading exposes one label per layout. */}
         <table className="event-rows" data-selecting={selectMode} role="table">
           <caption className="sr-only">
             Event opportunities. Sort by column. Use the arrow keys, Home or End
-            on event names to move between rows. Enter opens or selects. Space
-            or G toggles Going.
+            on event names to move between rows. Enter or Space activates the focused control.
+            Outside bulk selection, G toggles Going.
           </caption>
           <thead role="rowgroup">
             <tr role="row">
@@ -223,12 +229,14 @@ export function EventRows({
                 const titles = games(e);
                 const past = !upcoming(e, today);
                 const dates = rowDateLabel(e, today);
+                const status = scheduleStatus(e);
                 return (
                   <tr
                     key={e.id}
                     role="row"
                     data-going={entry.going}
                     data-selected={selectMode && selected.has(e.id)}
+                    data-event-status={e.event_status}
                     data-past={past}
                     onKeyDown={(ev) => navigate(ev, e)}
                     onClick={(ev) => {
@@ -287,6 +295,7 @@ export function EventRows({
                             {e.name}
                           </button>
                           <div className="row-markers">
+                            <ScheduleBadge e={e} />
                             {selectMode && entry.going && (
                               <span className="going-marker">Going</span>
                             )}
@@ -307,11 +316,11 @@ export function EventRows({
                       role="cell"
                       className="row-dates"
                       data-status={dates === "TBA" ? "tba" : e.date_status}
-                      title={e.date_status + " · " + dates}
+                      title={status + " · " + dates}
                     >
                       <i aria-hidden="true" />
-                      {e.date_status === "confirmed" && (
-                        <span className="sr-only">Confirmed </span>
+                      {(e.event_status || status === "confirmed") && (
+                        <span className="sr-only">{status[0].toUpperCase() + status.slice(1)} </span>
                       )}
                       {dates}
                     </td>

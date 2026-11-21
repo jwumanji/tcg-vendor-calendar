@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import type { Event } from "../model";
 import {
-  dateLabel,
+  displayDateLabel,
   safeUrl,
   ranges,
   prettyDate,
@@ -32,6 +32,7 @@ import { OutreachChip } from "./OutreachChip";
 import { OutreachSection } from "./OutreachSection";
 export function Detail({
   e,
+  today,
   occurrence,
   entry,
   setGoing,
@@ -46,6 +47,7 @@ export function Detail({
   toast,
 }: {
   e: Event;
+  today: string;
   occurrence?: string;
   entry: Entry;
   setGoing: SetGoing;
@@ -122,7 +124,7 @@ export function Detail({
         <GoingButton e={e} going={entry.going} setGoing={setGoing} />
         <p className="detail-date">
           <CalendarDays size={18} />
-          {occurrence || dateLabel(e)}
+          {occurrence || displayDateLabel(e, today)}
         </p>
         {e.date_note && <p className="note">{e.date_note}</p>}
         {e.date_status === "estimated" && (

@@ -1,5 +1,5 @@
 import type { Event } from "../src/model.ts";
-import { listingKey } from "./listing.ts";
+import { listingKey, type Notice } from "./listing.ts";
 import { slug } from "./normalize.ts";
 import { fold } from "./relevance.ts";
 
@@ -95,6 +95,45 @@ export function matches(a: Event, b: Event) {
   return similar(mainTitle(a), mainTitle(b));
 }
 
+function historicalRanges(e: Event) {
+  return e.source?.previous_dates ?? e.source?.original_dates ?? [];
+}
+function sameRange(a: { start_date: string; end_date: string }, b: typeof a) {
+  return a.start_date === b.start_date && a.end_date === b.end_date;
+}
+function sourceHistory(old: Event, next: Event, listing = next) {
+  const superseded = ranges(old).filter((r) => !ranges(next).some((n) => sameRange(n, r)));
+  const history = [...historicalRanges(old).filter((r) => !superseded.some((s) => sameRange(s, r))), ...superseded];
+  const aliases = new Set(old.source?.aliases);
+  for (const key of [listingKey(old), listingKey(listing)]) {
+    if (key) aliases.add(key);
+  }
+  return {
+    ...(history.length && {
+      original_dates: old.source?.original_dates?.length ? old.source.original_dates : superseded.length ? superseded : [history[0]],
+      previous_dates: history,
+    }),
+    ...(aliases.size && { aliases: [...aliases] }),
+  };
+}
+
+// Scanner exports may drop weekends or move one. Match unchanged starts first.
+// Carry a moved weekend's UID only when exactly one old and new range remain.
+function calendarIdentity(old: Event, next: Event): Partial<Event> {
+  if (!next.occurrences?.length) {
+    const original = old.original_start_date ?? old.source?.original_dates?.[0]?.start_date ?? historicalRanges(old)[0]?.start_date ?? old.start_date;
+    return original && original !== next.start_date ? { original_start_date: original } : {};
+  }
+  const previous = old.occurrences ?? [];
+  const missing = previous.filter((r) => !next.occurrences!.some((n) => n.start_date === r.start_date));
+  const added = next.occurrences.filter((r) => !previous.some((p) => p.start_date === r.start_date));
+  return { occurrences: next.occurrences.map((r) => {
+    const match = previous.find((p) => p.start_date === r.start_date) ??
+      (missing.length === 1 && added.length === 1 ? missing[0] : undefined);
+    return { ...r, original_start_date: match?.original_start_date ?? r.original_start_date ?? match?.start_date ?? r.start_date };
+  }) };
+}
+
 function reconcileScanner(existing: Event[], imported: Event[]) {
   const byId = new Map(existing.map((event) => [event.id, event]));
   const byExportId = new Map(
@@ -124,6 +163,7 @@ function reconcileScanner(existing: Event[], imported: Event[]) {
     used.add(previous);
     return {
       ...event,
+      ...calendarIdentity(previous, event),
       ...(previous.id !== event.id && { id: previous.id, scanner_export_id: event.id }),
       ...(previous.outreach !== undefined && { outreach: previous.outreach }),
     };
@@ -140,7 +180,7 @@ export function merge(
   today: string,
   imported?: Event[],
   sourceOrder: readonly string[] = [],
-  notices: Event[] = [],
+  notices: Notice[] = [],
 ) {
   const rank = (id: string) => {
     const index = sourceOrder.indexOf(id);
@@ -153,59 +193,140 @@ export function merge(
   const retained = old.filter(
     (e) => e.outreach || !scanner.some((s) => s.id === e.id || matches(s, e)),
   );
-  const keys = new Map<string, number>();
-  for (const e of [...incoming, ...notices]) {
-    const key = listingKey(e);
-    if (key) keys.set(key, (keys.get(key) ?? 0) + 1);
+  function samePlace(a: Event, b: Event) {
+    return (!a.city || !b.city || fold(a.city) === fold(b.city)) &&
+      (!a.country_code || !b.country_code || a.country_code === b.country_code);
   }
-  function stableIndex(event: Event) {
-    const key = listingKey(event);
-    if (!key || keys.get(key) !== 1) return -1;
-    const first = retained.findIndex((e) => listingKey(e) === key);
-    return first >= 0 && !retained.slice(first + 1).some((e) => listingKey(e) === key)
-      ? first : -1;
+  const snapshot = retained.slice();
+  const editionRanges = (e: Event) => [...ranges(e), ...historicalRanges(e)];
+  function keyMatches(stored: Event, listing: Event) {
+    const key = listingKey(listing);
+    return !!key && (listingKey(stored) === key || !!stored.source!.aliases?.includes(key));
   }
-  function compatibleListing(a: Event, b: Event) {
-    if (a.source!.id !== b.source!.id) return true;
-    const x = listingKey(a), y = listingKey(b);
-    return !x || !y || x === y;
+  function sameSubject(stored: Event, listing: Event) {
+    if (stored.source!.id !== listing.source!.id || !samePlace(stored, listing)) return false;
+    if (fold(stored.name) === fold(listing.name)) return true;
+    const named = fold(listing.name).match(/^(.+) (20\d\d)$/);
+    return !!named && fold(stored.name) === named[1] &&
+      !!stored.city && !!listing.city && !!stored.country_code && !!listing.country_code &&
+      (keyMatches(stored, listing) || editionRanges(stored).some((r) =>
+        r.start_date.startsWith(named[2]) || r.end_date.startsWith(named[2])));
+  }
+  function compatibleKeys(a: Event, b: Event) {
+    return !listingKey(a) || !listingKey(b) || keyMatches(a, b);
+  }
+  function announced(stored: Event, listing: Event) {
+    return !!listing.start_date && (stored.estimated_month === listing.start_date.slice(0, 7) ||
+      ranges(stored).some((r) => r.start_date === listing.start_date));
+  }
+  function canRelist(stored: Event, listing: Event) {
+    if (!sameSubject(stored, listing)) return false;
+    if (keyMatches(stored, listing) || announced(stored, listing)) return true;
+    if (!compatibleKeys(stored, listing)) return false;
+    if (!listing.start_date) return listing.date_status === "tba";
+    return editionRanges(stored).some((r) => Math.abs(stamp(r.start_date) - stamp(listing.start_date!)) <= 31 * day);
+  }
+  function candidates(listing: Event) {
+    const rows = snapshot.filter((stored) => {
+      if (stored.source!.id !== listing.source!.id) return matches(stored, listing);
+      if (stored.event_status) return canRelist(stored, listing);
+      if (!compatibleKeys(stored, listing)) return false;
+      return (sameSubject(stored, listing) && keyMatches(stored, listing)) || matches(stored, listing) ||
+        (sameSubject(stored, listing) && (!stored.start_date || !listing.start_date) &&
+          (!stored.estimated_month || !listing.estimated_month || stored.estimated_month === listing.estimated_month) &&
+          (stored.date_status === "tba" || listing.date_status === "tba" || stored.id === listing.id));
+    });
+    // A city page may list multiple fully dated stops at the same URL.
+    const exact = rows.filter((stored) => sameSubject(stored, listing) && ranges(stored).some((r) =>
+      r.start_date === listing.start_date && r.end_date === listing.end_date));
+    return exact.length ? exact : rows;
+  }
+  const claims = new Map(incoming.map((event) => [event, candidates(event)]));
+  const known: Record<string, number> = {};
+  const byEdition = new Map<number, Notice[]>();
+  const applied: Notice[] = [], unmatched: Notice[] = [];
+  const blocked = new Set<Event>();
+  for (const notice of notices) {
+    const editions = snapshot.filter((stored) => {
+      if (notice.unknownOriginal || !sameSubject(stored, notice) || !compatibleKeys(stored, notice)) return false;
+      const dates = editionRanges(stored);
+      if (notice.originalStart)
+        return dates.some((r) => r.start_date === notice.originalStart && r.end_date === notice.originalEnd);
+      return keyMatches(stored, notice) || (!!stored.city && !!notice.city && !!stored.country_code &&
+        !!notice.country_code && (dates.length > 0 || !!stored.estimated_month));
+    });
+    if (editions.length !== 1 || incoming.some((card) => card.source!.id === notice.source!.id &&
+        (editions.some((stored) => claims.get(card)!.includes(stored)) ||
+          (!notice.originalStart && sameSubject(card, notice) && compatibleKeys(card, notice))))) {
+      editions.forEach((e) => blocked.add(e));
+      unmatched.push(notice);
+      continue;
+    }
+    const index = snapshot.indexOf(editions[0]);
+    byEdition.set(index, [...(byEdition.get(index) ?? []), notice]);
+  }
+  const updates = new Map<number, Notice>();
+  for (const [index, group] of byEdition) {
+    if (group.length !== 1 || blocked.has(snapshot[index])) {
+      unmatched.push(...group);
+      continue;
+    }
+    const notice = group[0];
+    updates.set(index, notice);
+    applied.push(notice);
+    const owner = notice.source!.id;
+    known[owner] = (known[owner] ?? 0) + 1;
   }
   const newIds = new Set<string>();
-  const known: Record<string, number> = {};
-  for (const event of incoming) {
+  const ambiguous: Event[] = [];
+  const orderedIncoming = [...incoming].sort((a, b) => rank(a.source!.id) - rank(b.source!.id) ||
+    a.source!.id.localeCompare(b.source!.id) || (a.start_date ?? "").localeCompare(b.start_date ?? "") ||
+    a.id.localeCompare(b.id));
+  for (const event of orderedIncoming) {
     const owner = event.source!.id;
-    const scannerMatch = scanner.some(
-      (s) => s.id === event.id || matches(s, event),
-    );
-    let i = stableIndex(event);
-    if (i < 0) i = retained.findIndex((e) =>
-      compatibleListing(e, event) && (
-        matches(e, event) ||
-        (e.source!.id === owner &&
-          e.name === event.name &&
-          e.city === event.city &&
-          e.country_code === event.country_code &&
-          (!e.start_date || !event.start_date) &&
-          (!e.estimated_month || !event.estimated_month || e.estimated_month === event.estimated_month) &&
-          (e.date_status === "tba" || event.date_status === "tba" || e.id === event.id))
-      ),
-    );
+    const scannerMatch = scanner.some((s) => s.id === event.id || matches(s, event));
+    const rows = claims.get(event)!;
+    if (rows.length > 1 || rows.some((row) => incoming.some((other) => other !== event &&
+        other.source!.id === owner && claims.get(other)!.includes(row)))) {
+      ambiguous.push(event);
+      continue;
+    }
+    if (rows.some((row) => blocked.has(row))) continue;
+    let i = rows.length ? snapshot.indexOf(rows[0]) : -1;
+    // An organizer and a venue may publish a previously unseen show together.
+    if (i < 0) i = retained.findIndex((row, j) => j >= snapshot.length && row.source!.id !== owner && matches(row, event));
+    // A secondary calendar can continue advertising the pre-postponement
+    // schedule even after the owner has published its replacement.
+    if (i < 0 && snapshot.some((e) => e.source!.id !== owner && historicalRanges(e).length &&
+        matches({ ...e, occurrences: historicalRanges(e), estimated_month: null }, event))) {
+      known[owner] = (known[owner] ?? 0) + 1;
+      continue;
+    }
     if (scannerMatch || i >= 0) known[owner] = (known[owner] ?? 0) + 1;
-    if (scannerMatch) continue;
+    if (scannerMatch || byEdition.has(i)) continue;
     if (i >= 0) {
       const earlier = retained[i];
       const oldOwner = earlier.source!.id;
       if (oldOwner === owner || rank(owner) < rank(oldOwner)) {
+        // Only a dated re-listing by the owner can withdraw a published notice.
+        if (earlier.event_status && (oldOwner !== owner || !event.start_date)) continue;
         const { outreach: _outreach, ...update } = event;
         retained[i] = {
           ...earlier,
           ...update,
           id: earlier.id,
+          logo: event.logo ?? earlier.logo,
+          logo_kind: event.logo ? event.logo_kind : earlier.logo_kind,
+          description: event.description ?? earlier.description,
+          verification: earlier.verification === "verified" ? "verified" : event.verification,
           source: {
+            ...earlier.source!,
             ...event.source!,
+            ...sourceHistory(earlier, event),
             discovered_at: earlier.source!.discovered_at,
           },
         };
+        delete retained[i].event_status;
       }
     } else {
       // A recurring show can list two different weekends in the same month.
@@ -220,27 +341,37 @@ export function merge(
         for (let n = 2; retained.some((e) => e.id === id) || scanner.some((e) => e.id === id); n++)
           id = qualified + "-" + n;
       }
-      retained.push({ ...event, id });
+      const location = event.venue ? " at " + event.venue :
+        event.city && !fold(event.name).includes(fold(event.city)) ? " in " + event.city : "";
+      retained.push({
+        ...event, id,
+        description: event.description ?? `${event.source!.name} lists ${event.name}${location}.`,
+      });
       newIds.add(id);
     }
   }
-  for (const notice of notices) {
-    let i = stableIndex(notice);
-    if (i < 0) {
-      const candidates = retained.filter((e) => e.source!.id === notice.source!.id &&
-        compatibleListing(e, notice) && e.name === notice.name && e.city === notice.city &&
-        e.country_code === notice.country_code && notice.start_date && e.start_date === notice.start_date);
-      if (candidates.length === 1) i = retained.indexOf(candidates[0]);
-    }
-    if (i < 0 || newIds.has(retained[i].id)) continue;
+  for (const [i, notice] of updates) {
     const earlier = retained[i];
-    retained[i] = {
-      ...earlier, date_status: "tba", section: "watchlist", date_note: notice.date_note,
-      start_date: null, end_date: null, estimated_month: null,
-      source: { ...earlier.source!, confidence: 0.5 },
+    const updated: Event = { ...earlier, event_status: notice.event_status, date_note: notice.date_note };
+    if (notice.event_status === "postponed") {
+      updated.start_date = notice.start_date;
+      updated.end_date = notice.end_date;
+      updated.estimated_month = notice.estimated_month;
+      updated.date_status = notice.date_status;
+      updated.section = notice.section;
+      delete updated.occurrences;
+    } else if (!earlier.start_date) {
+      const history = historicalRanges(earlier);
+      const range = notice.originalStart ? history.find((r) => r.start_date === notice.originalStart &&
+        r.end_date === notice.originalEnd) : history.at(-1);
+      if (range) Object.assign(updated, range, { date_status: "confirmed", estimated_month: null, section: "timeline" });
+    }
+    updated.source = {
+      ...earlier.source!,
+      ...sourceHistory(earlier, updated, notice),
+      confidence: notice.event_status === "postponed" ? notice.source!.confidence : earlier.source!.confidence,
     };
-    delete retained[i].occurrences;
-    known[notice.source!.id] = (known[notice.source!.id] ?? 0) + 1;
+    retained[i] = updated;
   }
   // Reconcile rescheduled shows before pruning. Shared outreach keeps past events addressable.
   const active = retained.filter((e) =>
@@ -268,6 +399,9 @@ export function merge(
     events: ordered,
     added: ordered.filter((e) => newIds.has(e.id)),
     known,
+    applied,
+    unmatched,
+    ambiguous,
     removed: existing.filter((e) => e.source).length - active.filter((e) => !newIds.has(e.id)).length,
   };
 }

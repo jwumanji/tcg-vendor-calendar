@@ -1,5 +1,6 @@
 import { clean, document, link, required } from "../html.ts";
-import { scheduleNotice } from "../listing.ts";
+import { parseDates } from "../dates.ts";
+import { scheduleField, titleSubject } from "../listing.ts";
 import { pageSource, type RawFind } from "../types.ts";
 const url = "https://www.sgcardshow.com/";
 export function parse(html: string): RawFind[] {
@@ -8,18 +9,24 @@ export function parse(html: string): RawFind[] {
     .toArray()
     .map((el) => clean($(el).text()))
     .join("\n");
-  const name = required(
-    text.match(/About the Event:\s*(Singapore Card Show[^\n]*)/i)?.[1],
-    "event name",
-  );
-  const notice = text.split("\n").find((s) => /^(?:event )?(?:cancelled|canceled|postponed)\b/i.test(s));
-  const date = notice ?? (scheduleNotice(name, null) ? null : required(
-    text
-      .split("\n")
-      .find((s) => /^\d\d?(st|nd|rd|th)?\s*[-–].*20\d\d$/i.test(s)),
-    "show date",
-  ));
-  const venue = text.match(/Singapore Expo Hall[^\n]*/i)?.[0];
+  const about = $("h1,h2,h3").filter((_, el) => /^About the Event:/i.test(clean($(el).text()))).first();
+  const name = required(clean(about.text()).match(/^About the Event:\s*(.*Singapore Card Show.*)$/i)?.[1], "event name");
+  // The organizer prints the date immediately above the venue in the same
+  // schedule style. Activity announcements elsewhere on the page are unrelated.
+  const lines = $("p.font_7:has(span.color_36)").toArray().map((el) =>
+    clean($(el).clone().find("span").append(" ").end().text()));
+  const venueIndex = lines.findIndex((line) => /^Singapore Expo Hall\b/i.test(line));
+  const venue = lines[venueIndex] ?? null;
+  const fields = venue ? lines.slice(0, venueIndex) : lines;
+  const dated = fields.filter((line) => parseDates(scheduleField(line).date));
+  let date = dated.length === 1 ? dated[0] : null;
+  if (venue) {
+    const last = fields.at(-1);
+    if (last && date && fields.at(-2) === date && /^(?:event |has been |now )*(?:cancell?ed|postponed)\b/i.test(last))
+      date += " " + last;
+    else date ??= last ?? null;
+  }
+  if (titleSubject(name) === name) required(date, "show date");
   const vendors = text.match(
     /Expected Number of Vendors:\s*([\d,]+(?: and counting|\+)?)/i,
   )?.[1];

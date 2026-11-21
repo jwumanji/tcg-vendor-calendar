@@ -31,7 +31,12 @@ export function Logo({ e, size = "md" }: { e: Event; size?: LogoSize }) {
     </span>
   );
 }
+export function ScheduleBadge({ e }: { e: Event }) {
+  if (!e.event_status) return null;
+  return <span className={"badge " + e.event_status}>{e.event_status === "cancelled" ? "Cancelled" : "Postponed"}</span>;
+}
 export function Status({ e }: { e: Event }) {
+  if (e.event_status) return <ScheduleBadge e={e} />;
   return (
     <span className={"badge " + e.date_status}>
       {e.date_status === "confirmed"

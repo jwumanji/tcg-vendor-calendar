@@ -23,28 +23,18 @@
   --muted: #c8c3e4;
   --line: #352f68;
   --line-2: #4f4898;
-  --accent: #ffd24a;
-  --accent-hi: #ffe58a;
+  --accent: #c5b8fa;
+  --accent-hi: #ded6ff;
   --on-accent: #1a1233;
-  --link: #a8e9ff;
-  --focus: #ffe14d;
+  --link: #c5b8fa;
+  --focus: #ded6ff;
   --overlay: rgb(5 4 14 / 0.72);
   --header-bg: rgb(10 9 20 / 0.78);
 
-  --foil: linear-gradient(
-    115deg,
-    #ff6bd6 0%,
-    #ffb454 18%,
-    #fff07a 34%,
-    #6bffb8 50%,
-    #6bc8ff 66%,
-    #a58bff 82%,
-    #ff6bd6 100%
-  );
-  --foil-text: var(--foil);
+  --foil: linear-gradient(115deg, #a99aee, #6a4fd6, #a99aee);
   --glow-a: rgb(131 92 255 / 0.34);
-  --glow-b: rgb(255 107 214 / 0.2);
-  --glow-c: rgb(80 220 200 / 0.14);
+  --glow-b: rgb(169 154 238 / 0.2);
+  --glow-c: rgb(106 79 214 / 0.14);
   --shadow-card:
     0 1px 0 rgb(255 255 255 / 0.06) inset, 0 18px 30px -18px rgb(0 0 0 / 0.9),
     0 3px 8px rgb(0 0 0 / 0.35);
@@ -56,16 +46,16 @@
   --sheen: rgb(255 255 255 / 0.2);
 
   /* status + stage colours (rgb triplets so they can take any alpha) */
-  --ok: 78 227 143;
-  --warn: 255 184 74;
-  --tbc: 185 163 255;
-  --st-0: 164 169 204;
-  --st-1: 150 150 170;
-  --st-2: 255 122 89;
-  --st-3: 255 210 74;
-  --st-4: 88 196 255;
-  --st-5: 255 122 217;
-  --st-6: 78 227 143;
+  --ok: 184 167 247;
+  --warn: 202 192 235;
+  --tbc: 170 159 205;
+  --st-0: 174 167 199;
+  --st-1: 164 164 169;
+  --st-2: 187 179 214;
+  --st-3: 198 186 241;
+  --st-4: 168 149 233;
+  --st-5: 191 173 250;
+  --st-6: 211 198 255;
 }
 :root[data-theme="light"] {
   color-scheme: light;
@@ -85,18 +75,9 @@
   --focus: #4b22cf;
   --overlay: rgb(40 28 80 / 0.5);
   --header-bg: rgb(242 234 217 / 0.82);
-  --foil-text: linear-gradient(
-    115deg,
-    #c2189a 0%,
-    #cf5a00 22%,
-    #9a6a00 40%,
-    #08915b 58%,
-    #1368c9 76%,
-    #6a3df0 100%
-  );
   --glow-a: rgb(131 92 255 / 0.2);
-  --glow-b: rgb(255 140 120 / 0.22);
-  --glow-c: rgb(80 200 190 / 0.18);
+  --glow-b: rgb(169 154 238 / 0.22);
+  --glow-c: rgb(106 79 214 / 0.18);
   --shadow-card:
     0 1px 0 rgb(255 255 255 / 0.8) inset, 0 16px 26px -18px rgb(60 36 110 / 0.5),
     0 2px 5px rgb(60 36 110 / 0.12);
@@ -106,58 +87,20 @@
   --art-bg: rgb(60 36 110 / 0.07);
   --art-line: rgb(60 36 110 / 0.05);
   --sheen: rgb(255 255 255 / 0.55);
-  --ok: 10 128 70;
-  --warn: 176 104 0;
-  --tbc: 112 74 220;
-  --st-0: 94 99 140;
-  --st-1: 118 118 140;
-  --st-2: 196 70 30;
-  --st-3: 168 118 0;
-  --st-4: 12 120 180;
-  --st-5: 182 30 140;
-  --st-6: 12 128 70;
+  --ok: 90 66 177;
+  --warn: 107 87 171;
+  --tbc: 103 92 137;
+  --st-0: 99 90 126;
+  --st-1: 102 102 107;
+  --st-2: 104 94 134;
+  --st-3: 95 76 153;
+  --st-4: 87 64 161;
+  --st-5: 80 56 163;
+  --st-6: 69 44 154;
 }
 
-/* Game accents (triplets) — from the existing game normalisation */
-[data-game="pokemon"] {
-  --g-rgb: 255 203 5;
-}
-[data-game="onepiece"] {
-  --g-rgb: 255 71 87;
-}
-[data-game="mtg"] {
-  --g-rgb: 255 132 48;
-}
-[data-game="yugioh"] {
-  --g-rgb: 157 107 255;
-}
-[data-game="dragonball"] {
-  --g-rgb: 61 184 255;
-}
-[data-game="unionarena"] {
-  --g-rgb: 182 224 58;
-}
-[data-game="lorcana"] {
-  --g-rgb: 255 95 194;
-}
-[data-game="digimon"] {
-  --g-rgb: 25 211 197;
-}
-[data-game="weissschwarz"] {
-  --g-rgb: 205 210 235;
-}
-[data-game="vanguard"] {
-  --g-rgb: 107 120 255;
-}
-[data-game="fleshandblood"] {
-  --g-rgb: 205 140 90;
-}
-[data-game="gundam"] {
-  --g-rgb: 60 210 120;
-}
-[data-game="other"] {
-  --g-rgb: 150 146 190;
-}
+/* Game labels carry the identity. All game accents share the theme's violet. */
+[data-game] { --g-rgb: var(--tbc); }
 
 /* ---------- Base ---------- */
 *,
@@ -567,14 +510,7 @@ section[id],
       var(--sheen),
       transparent 42%
     ),
-    linear-gradient(
-      115deg,
-      transparent 20%,
-      rgb(255 107 214 / 0.13) 40%,
-      rgb(107 255 184 / 0.13) 50%,
-      rgb(107 200 255 / 0.13) 60%,
-      transparent 80%
-    );
+    linear-gradient(115deg, transparent 25%, rgb(130 100 240 / 0.12) 50%, transparent 75%);
 }
 @media (hover: hover) {
   .holo:hover,
@@ -714,7 +650,7 @@ section[id],
   color: rgb(var(--warn));
 }
 :root[data-theme="light"] .deadline-date {
-  color: #8a5200;
+  color: var(--score-1-fg);
 }
 .deadline-box strong {
   font-size: 16px;
@@ -1174,16 +1110,17 @@ legend {
   border: 1.5px dotted rgb(var(--tbc) / 0.95);
   border-radius: 999px;
 }
-.badge.priority {
-  background: rgb(var(--g-dot, 150 140 220) / 0.12);
-  border: 1.5px solid transparent;
-  background:
-    linear-gradient(var(--surface), var(--surface)) padding-box,
-    var(--foil) border-box;
+.badge.cancelled, .badge.postponed {
+  color: var(--score-1-fg);
+  background: var(--score-1-bg);
+  border-color: var(--score-1-bd);
+}
+[data-event-status="cancelled"] :is(.row-dates, .card-when span) {
+  color: var(--muted);
+  text-decoration: line-through;
 }
 /* Pipeline stages: icon + label + colour */
 .badge.stage {
-  --s: var(--st-0);
   background: rgb(var(--s) / 0.18);
   border: 1.5px solid rgb(var(--s) / 0.85);
   border-radius: 999px;
@@ -2262,7 +2199,7 @@ footer > small {
   color: rgb(var(--warn));
 }
 :root[data-theme="light"] .storage-warning > p svg {
-  color: #8a5200;
+  color: var(--score-1-fg);
 }
 
 /* range slider */
@@ -2522,7 +2459,7 @@ input[type="range"]::-moz-range-thumb {
   color: rgb(var(--warn));
 }
 :root[data-theme="light"] .save-status[data-state="unsaved"] svg {
-  color: #8a5200;
+  color: var(--score-1-fg);
 }
 .detail-body > p.detail-stat {
   display: inline-flex;
@@ -2595,7 +2532,7 @@ input[type="range"]::-moz-range-thumb {
   border: 1.5px solid rgb(var(--warn));
 }
 :root[data-theme="light"] .error-icon {
-  color: #8a5200;
+  color: var(--score-1-fg);
 }
 .error-card h1 {
   font: 800 clamp(24px, 7vw, 32px) / 1.15 var(--font-display);
@@ -2866,9 +2803,6 @@ input[type="range"]::-moz-range-thumb {
 @media (max-width: 420px) {
   .priority-chip .chip-label { font-size: 8px; letter-spacing: 0.04em; }
 }
-.priority-must { background: var(--foil); color: #17102a; border-color: transparent; }
-.priority-strong { background: #ddc6ff; color: #321d59; border-color: #a182cb; }
-.priority-maybe, .priority-skip { background: #e0dfe4; color: #393840; border-color: #b9b7c1; }
 .source-chip { color: var(--muted); background: var(--surface-2); }
 .priority-chip[data-confidence="low"] { border-style: dashed; border-color: currentColor; }
 .source-chip, .basis { border: 1px solid var(--line-2); padding: 3px 7px; font-size: 11px; }
@@ -2994,7 +2928,7 @@ a.source-chip { text-underline-offset: 2px; }
 .basis-estimated { border-style: dashed; }
 .factor-points { font: 700 12px var(--font-mono); color: var(--muted); }
 .factor-track { grid-column: 1/-1; height: 4px; border-radius: 8px; background: var(--surface-3); overflow: hidden; }
-.factor-track i { display: block; height: 100%; background: var(--foil); }
+.factor-track i { display: block; height: 100%; }
 .factor-list ul { list-style: disc; padding-left: 18px; font-size: 13px; }
 .factor-list p { font-size: 13px; margin: 5px 0 12px; }
 .override-form, .clash-note { background: var(--surface-2); padding: 12px; margin: 12px 0; border-radius: 9px; }
@@ -3167,7 +3101,7 @@ input[type="checkbox"]:indeterminate::after { content: ""; width: 10px; height: 
 }
 .row-dates[data-status="confirmed"] i { background: rgb(var(--ok)); border-color: rgb(var(--ok)); }
 .row-dates[data-status="tba"] i { border: 1.5px dashed currentColor; }
-.row-markers { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
+.row-markers { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
 .row-markers:not(:empty) { margin-top: 2px; }
 .row-markers .source-chip, .going-marker { font-size: 10px; padding: 1px 5px; }
 .going-marker { background: var(--surface-3); border-radius: 5px; color: var(--accent); }
@@ -3306,7 +3240,7 @@ input[type="checkbox"]:indeterminate::after { content: ""; width: 10px; height: 
   --score-3-bg: linear-gradient(135deg, #5b3cd0, #371c9c); --score-3-fg: #ffffff; --score-3-bd: #371c9c;
   --score-bar: linear-gradient(90deg, #a99aee, #5a3fcb);
 }
-.priority-skip { background: var(--score-0-bg); color: var(--score-0-fg); border-color: var(--score-0-bd); }
+.priority-cancelled, .priority-skip { background: var(--score-0-bg); color: var(--score-0-fg); border-color: var(--score-0-bd); }
 .priority-maybe { background: var(--score-1-bg); color: var(--score-1-fg); border-color: var(--score-1-bd); }
 .priority-strong { background: var(--score-2-bg); color: var(--score-2-fg); border-color: var(--score-2-bd); }
 .priority-must { background: var(--score-3-bg); color: var(--score-3-fg); border-color: var(--score-3-bd); box-shadow: 0 3px 12px -4px #7e5df2aa; }
@@ -3371,14 +3305,6 @@ input[type="checkbox"]:indeterminate::after { content: ""; width: 10px; height: 
 .outreach-actions .button[aria-disabled="true"] { opacity: .65; cursor: default; }
 .outreach-research { font-size: 14px; color: var(--muted); }
 .outreach-research summary { align-content: center; cursor: pointer; }
-
-/* Card edge + hover sheen: violet only (no rainbow) */
-.holo::before { background: linear-gradient(115deg, #a99aee 0%, #6a4fd6 50%, #a99aee 100%); background-size: 300% 100%; }
-.holo::after {
-  background:
-    radial-gradient(circle at var(--mx, 30%) var(--my, 0%), var(--sheen), transparent 42%),
-    linear-gradient(115deg, transparent 25%, rgb(130 100 240 / 0.12) 50%, transparent 75%);
-}
 
 /* Country filter dropdown (sits outside the scrolling chip row so the panel is never clipped) */
 .quick-row { display: flex; align-items: flex-start; gap: 8px; }

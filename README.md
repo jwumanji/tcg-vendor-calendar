@@ -19,19 +19,19 @@ The development and preview URLs are served at `/` (or the configured `VITE_BASE
 ## Features
 
 - List opens directly in Rows for fast scanning. Top picks ranks up to 12 upcoming dated events by Priority and includes the tier legend and up to six vendor deadline notices.
-- Month calendar (agenda on mobile), chronological timeline, sortable cards, watchlist, recurring Singapore shows and a seven-stage Pipeline board whose cards show logo, game-coloured edge, dates, location, date status, score rarity, note indicator and a stage picker.
+- Month calendar (agenda on mobile), chronological timeline, sortable cards, watchlist, recurring Singapore shows and a seven-stage Pipeline board whose cards show logo, violet edge, dates, location, date status, score rarity, note indicator and a stage picker.
 - Country/game multi-select, market, size, date, status, score and multi-select pipeline filters; free-text search and removable filter chips.
 - Confirmed, estimated and TBA dates have distinct labels and styling. Going calendar downloads identify estimated months as tentative.
 - Top vendor picks and application radar with original deadline notes. Notices can describe player registration, booking openings or historical dates; verify vendor terms with the organizer.
 - Full-page event details at `/event/<id>`, source links, all recurring occurrences, autosaved notes with edit times, stage picker and light/dark themes.
-- "Holo Vault" visual design: dark-first (default when no theme is saved; a saved light/dark choice is respected), vendor scores shown as card-rarity tiers (Common <30, Uncommon 30–49, Rare 50–64, Ultra 65–79, Secret 80+) with the numeric score always visible, per-game colour accents, foil/tilt hover effects that are disabled under `prefers-reduced-motion`. Fonts (Unbounded, Figtree, Space Mono) are self-hosted latin subsets under `src/fonts/` (SIL OFL licences included).
+- "Holo Vault" visual design: dark-first (default when no theme is saved; a saved light/dark choice is respected), vendor scores shown as card-rarity tiers (Common <30, Uncommon 30–49, Rare 50–64, Ultra 65–79, Secret 80+) with the numeric score always visible, violet game accents, foil/tilt hover effects that are disabled under `prefers-reduced-motion`. Fonts (Unbounded, Figtree, Space Mono) are self-hosted latin subsets under `src/fonts/` (SIL OFL licences included).
 - Individual or filtered ICS export, exclusive all-day end dates, UTF-8 line folding and CSV export. Filtered export includes all occurrences of matching recurring shows.
 
 Filters, theme, notes, stages and the passed-event visibility toggle are stored in this browser’s localStorage. They do not sync between devices. Filtered exports use the complete filtered set across views; a view tab or calendar month does not further narrow the export. Use the date filters to narrow the set. Unknown scores stay visible until a positive minimum score is selected.
 
 Going choices, notes and stages use the versioned `tcg-pipeline-v1` key. Refreshes never prune saved IDs absent from the dataset. The old `tcg-plans` key is retained and migrated on first load: Interested → Interested, Planning to vend → Interested, Applied → Contacted, Accepted → Need to pay, Skip → Pass. Old entries have no recorded timestamps.
 
-Use **Export backup** for a JSON backup before switching devices. Import validates version 1 and previews absent IDs before confirmation. Merge takes the newest Going choice, note and stage independently for each ID, retaining local edits on timestamp ties; Replace explicitly discards entries outside the backup. Unknown JSON fields are ignored. Pass and Too expensive are hidden by default outside Pipeline; use the persisted visibility toggle to include them. Pipeline always renders every stage column and honors search and filters. Timeline can group by stage; card views can sort by stage. CSV includes stage and notes. Storage errors leave edits in memory and display a warning so they can be exported.
+Use **Export backup** for a JSON backup before switching devices. Import validates version 1 and previews absent IDs before confirmation. Merge takes the newest Going choice, note and stage independently for each ID, retaining local edits on timestamp ties; Replace explicitly discards entries outside the backup. Unknown JSON fields are ignored. Pass and Too expensive are hidden by default in every view; use the persisted visibility toggle to include them. Pipeline always renders every stage column and honors search and filters. Timeline can group by stage; card views can sort by stage. CSV includes stage and notes. Storage errors leave edits in memory and display a warning so they can be exported.
 
 ## Views
 
@@ -39,7 +39,7 @@ The List opens in **Rows**, soonest dates first. Grid and Rows use the same filt
 
 Open an event by tapping the row or pressing Enter on its name. Back or Escape returns to the previous view. Each event has a shareable URL, including shows hidden by the season filter. Use ↑/↓ or Home/End to move between names. **Grid** switches to cards. **Top picks** ranks upcoming dated events, **Calendar** shows a monthly agenda on phones, and **Timeline** can group by month or pipeline stage. Watchlist and Recurring SG have their own tabs.
 
-**Going** marks events you plan to attend. Tap the bookmark or press Space or G on a focused event name. Marking Going moves a New application to Interested. Removing Going keeps the current stage. A warning icon identifies a scored date clash with a Going event. In **Bulk select**, tap a row, Shift-click a range or check **Select all visible**, then choose **Mark Going** or **Unmark**. Applying clears the selection. **Undo** is available for eight seconds after a single or bulk change. It restores the previous Going choices and any stage changed automatically, preserving subsequent note and stage edits.
+**Going** marks events you plan to attend. Tap the bookmark or press G on a focused row button outside bulk selection. Space activates the focused control. Marking Going moves a New application to Interested. Removing Going keeps the current stage. A warning icon identifies a scored date clash with a Going event. In **Bulk select**, tap a row, Shift-click a range or check **Select all visible**, then choose **Mark Going** or **Unmark**. Applying clears the selection. **Undo** is available for eight seconds after a single or bulk change. It restores the previous Going choices and any stage changed automatically, preserving subsequent note and stage edits.
 
 **Quick filters** let you combine Confirmed, Singapore, Hong Kong, Malaysia, Next 90 days and Not yet Going with the other filters. Selected countries match any of those markets. Next 90 days includes today and checks for overlap with published occurrences or estimated months. Clear in the quick-filter strip resets its active chips. The Filters panel also contains **Show passed / too expensive**. Past dates carry a Past tag.
 
@@ -89,7 +89,7 @@ scripts/deploy.sh               # tests, build, vercel deploy --prod of dist/ to
 scripts/deploy.sh --skip-tests
 ```
 
-`public/vercel.json` also sets the SPA fallback (deep links rewrite to `/index.html`, assets and logos are served as files) and long-lived caching for hashed assets. After the deploy the script checks the project's production URL (root, a deep link, and the noindex header) and then https://planner.grailfoxtcg.com, which may only warn while DNS propagates.
+`public/vercel.json` also sets the SPA fallback (deep links rewrite to `/index.html`, assets and logos are served as files) and long-lived caching for hashed assets. After deployment the script checks the immutable deployment URL, the project alias and the custom domain. The root and a deep link must serve the local build ID and noindex header. Entry assets must match the local files byte for byte, with the expected JavaScript and CSS content types. A protected immutable URL returning HTTP 401 requires successful verification on both public domains. After a successful immutable check, the custom domain can still be propagating if DNS or the connection fails.
 
 | Variable | Default |
 |---|---|
@@ -119,7 +119,7 @@ Each scraper-owned event carries a stable `scan-` ID, its source and discovery t
 
 To add a source, save a small fragment of its actual public listing in `scanner/fixtures/`, add its pure parser and source module in `scanner/sources/`, and register it in `scanner/sources/index.ts`. Venue calendars can configure `venueParser` with selectors, location and date extraction. Add a dated parser case and document the live result in the source review. Use `ctx.get` for all network access. It checks robots.txt, serializes requests per host with at least a one-second gap, uses a 15-second request timeout, retries transient failures once and sends no-cache headers. The user agent is `Mozilla/5.0 (compatible; GrailfoxEventScanner/1.0; +https://www.grailfoxtcg.com)`. Only public HTML and documented public feeds are eligible.
 
-The report counts parsed listings, relevant in-window listings, junk, out-of-window records, new finds and matches against Scanner or scraper records. Source failures include their reason. Failed sources retain their upcoming finds. Finds age out 30 days after their end date; a later Scanner export takes precedence when its date, location and title match. [Latest scan](scanner/last-run.json)
+The report counts parsed listings, relevant in-window listings, junk, out-of-window records, new finds, matches against Scanner or scraper records, ambiguous listings, and applied and unmatched schedule notices. Source failures include their reason. Failed sources retain their upcoming finds. Finds age out 30 days after their end date; a later Scanner export takes precedence when its date, location and title match. [Latest scan](scanner/last-run.json)
 
 ## 2027+ focus
 

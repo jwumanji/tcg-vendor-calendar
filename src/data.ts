@@ -131,6 +131,8 @@ export function normalizeEvents(value: unknown): Event[] {
         ? v.date_status
         : "tba",
     };
+    if (v.event_status === "cancelled" || v.event_status === "postponed")
+      e.event_status = v.event_status;
     for (const key of nullableStrings)
       e[key] = typeof v[key] === "string" ? v[key] : null;
     if (record(v.outreach)) e.outreach = mergeOutreach(null, normalizeOutreachPatch(v.outreach));
@@ -154,15 +156,13 @@ export function normalizeEvents(value: unknown): Event[] {
       /^\d{4}-(0[1-9]|1[0-2])$/.test(v.estimated_month)
         ? v.estimated_month
         : null;
-    e.occurrences = Array.isArray(v.occurrences)
-      ? v.occurrences.filter(
-          (r: { start_date?: unknown; end_date?: unknown } | null) =>
-            r &&
-            validDate(r.start_date) &&
-            validDate(r.end_date) &&
-            r.end_date >= r.start_date,
-        )
-      : undefined;
+    const validRange = (r: { start_date?: unknown; end_date?: unknown } | null) =>
+      r && validDate(r.start_date) && validDate(r.end_date) && r.end_date >= r.start_date;
+    if (validDate(v.original_start_date)) e.original_start_date = v.original_start_date;
+    e.occurrences = Array.isArray(v.occurrences) ? v.occurrences.filter(validRange).map((r: Record<string, unknown>) => ({
+      start_date: r.start_date, end_date: r.end_date,
+      ...(validDate(r.original_start_date) && { original_start_date: r.original_start_date }),
+    })) : undefined;
     if (v.source && typeof v.source === "object" && !Array.isArray(v.source)) {
       const src = v.source;
       const ratio = (n: unknown) =>
@@ -178,6 +178,9 @@ export function normalizeEvents(value: unknown): Event[] {
           /^https?:\/\//i.test(src.url)
             ? src.url
             : "",
+        ...(Array.isArray(src.original_dates) && { original_dates: src.original_dates.filter(validRange) }),
+        ...(Array.isArray(src.previous_dates) && { previous_dates: src.previous_dates.filter(validRange) }),
+        ...(Array.isArray(src.aliases) && { aliases: src.aliases.filter((key: unknown) => typeof key === "string" && key) }),
         discovered_at:
           typeof src.discovered_at === "string" &&
           /^\d{4}-\d{2}-\d{2}T/.test(src.discovered_at) &&
@@ -190,7 +193,7 @@ export function normalizeEvents(value: unknown): Event[] {
     }
     e.is_new_find = v.is_new_find === true;
     if (e.is_new_find) {
-      e.verification = "unverified";
+      e.verification = v.verification === "verified" ? "verified" : "unverified";
       const dated =
         e.date_status === "estimated"
           ? e.estimated_month
@@ -203,7 +206,7 @@ export function normalizeEvents(value: unknown): Event[] {
           : "timeline"
         : "watchlist";
     } else if (
-      v.verification === "scanner" ||
+      v.verification === "verified" || v.verification === "scanner" ||
       v.verification === "unverified"
     ) {
       e.verification = v.verification;

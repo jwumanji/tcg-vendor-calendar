@@ -48,22 +48,25 @@ export function ranges(e: Event) {
       ? [{ start_date: e.start_date, end_date: e.end_date || e.start_date }]
       : [];
 }
+export function visibleRanges(e: Event) {
+  return e.visible_ranges ?? ranges(e);
+}
 const normalizeSearch = (s: string) =>
   s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
-export function matches(
+export function matchingEvent(
   e: Event,
   f: Filters,
   p: Entries,
   priorityScore = 0,
   today = localDate(),
 ) {
-  if (f.going && !p[e.id]?.going) return false;
-  if (f.notGoing && p[e.id]?.going) return false;
-  if (f.newOnly && !e.is_new_find) return false;
+  if (f.going && !p[e.id]?.going) return null;
+  if (f.notGoing && p[e.id]?.going) return null;
+  if (f.newOnly && !e.is_new_find) return null;
   const contacted = (e.outreach?.status ?? "not_contacted") !== "not_contacted";
-  if (f.outreach && contacted !== (f.outreach === "contacted")) return false;
+  if (f.outreach && contacted !== (f.outreach === "contacted")) return null;
   if (f.minTier !== "any" && priorityScore < TIER_THRESHOLDS[f.minTier])
-    return false;
+    return null;
   if (
     f.search &&
     !normalizeSearch(
@@ -85,51 +88,72 @@ export function matches(
         .join(" "),
     ).includes(normalizeSearch(f.search))
   )
-    return false;
+    return null;
   if (f.countries.length && !f.countries.includes(e.country || "Unknown"))
-    return false;
+    return null;
   if (f.games.length && !games(e).some((g) => f.games.includes(g)))
-    return false;
+    return null;
   if (
     f.priority !== "any" &&
     (f.priority === "top"
       ? e.priority_market_level !== "top"
       : !e.priority_market)
   )
-    return false;
+    return null;
   if (
     (f.size && e.size_tier !== f.size) ||
-    (f.status && e.date_status !== f.status) ||
+    (f.status && scheduleStatus(e) !== f.status) ||
     (f.stages.length > 0 && !f.stages.includes((p[e.id] || emptyEntry).stage))
   )
-    return false;
+    return null;
   if (f.score > 0 && (e.vendor_score === null || e.vendor_score < f.score))
-    return false;
-  if (e.date_status === "tba") return f.tba && !f.next90;
-  if (!f.from && !f.to && !f.next90) return true;
+    return null;
+  return eventInDateWindow(e, f, today);
+}
+
+function eventInDateWindow(e: Event, f: Filters, today: string): Event | null {
+  if (e.date_status === "tba") return f.tba && !f.next90 ? e : null;
+  if (!f.from && !f.to && !f.next90) return e;
   let from = f.from,
     to = f.to;
   if (f.next90) {
-    if (isUndated(e)) return false;
+    if (isUndated(e)) return null;
     const end = new Date(today + "T00:00:00Z");
     end.setUTCDate(end.getUTCDate() + 89);
     const last = end.toISOString().slice(0, 10);
     if (from < today) from = today;
     if (!to || to > last) to = last;
-    if (from > to) return false;
   }
-  const rr =
-    e.date_status === "estimated" && e.estimated_month
-      ? [
-          {
-            start_date: e.estimated_month + "-01",
-            end_date: monthEnd(e.estimated_month),
-          },
-        ]
-      : ranges(e);
-  return rr.some(
-    (r) => (!from || r.end_date >= from) && (!to || r.start_date <= to),
-  );
+  if (from && to && from > to) return null;
+  const overlaps = (r: { start_date: string; end_date: string }) =>
+    (!from || r.end_date >= from) && (!to || r.start_date <= to);
+  if (e.date_status === "estimated" && e.estimated_month) {
+    return overlaps({ start_date: e.estimated_month + "-01", end_date: monthEnd(e.estimated_month) }) ? e : null;
+  }
+  const selected = e.occurrences?.length ? selectOccurrences(e, overlaps) : e;
+  if (!selected) return null;
+  const published = ranges(selected);
+  const visible = published.filter(overlaps).map((r) => ({
+    start_date: from && from > r.start_date ? from : r.start_date,
+    end_date: to && to < r.end_date ? to : r.end_date,
+  }));
+  if (!visible.length) return null;
+  return visible.some((r, i) => r.start_date !== published[i].start_date || r.end_date !== published[i].end_date)
+    ? { ...selected, visible_ranges: visible } : selected;
+}
+
+export function matches(...args: Parameters<typeof matchingEvent>) {
+  return matchingEvent(...args) !== null;
+}
+
+function selectOccurrences(e: Event, keep: (r: { start_date: string; end_date: string }) => boolean) {
+  const all = e.occurrences!;
+  if (all.every(keep)) return e;
+  const kept = all.filter(keep);
+  if (!kept.length) return null;
+  return {
+    ...e, occurrences: kept, start_date: kept[0].start_date, end_date: kept[0].end_date,
+  };
 }
 export function monthEnd(m: string) {
   const [y, mo] = m.split("-").map(Number);
@@ -152,6 +176,9 @@ export function occurrenceOn(e: Event, day: string) {
   const range = e.occurrences?.find((r) => r.start_date <= day && day <= r.end_date);
   if (!range) return undefined;
   return dateLabel({ ...e, ...range });
+}
+export function scheduleStatus(e: Event) {
+  return e.event_status ?? e.date_status;
 }
 export function dateLabel(e: Event) {
   if (e.date_status === "estimated")
@@ -291,12 +318,15 @@ export function ics(events: Event[], includeEstimated = false) {
     const dates = estimated
       ? [{ start_date: first, end_date: first }]
       : ranges(e);
-    for (const r of dates) {
+    for (const [index, r] of dates.entries()) {
+      const occurrence = e.occurrences?.[index];
+      const publishedStart = occurrence ? occurrence.original_start_date ?? occurrence.start_date :
+        e.original_start_date ?? e.source?.original_dates?.[0]?.start_date ?? e.source?.previous_dates?.[0]?.start_date ?? r.start_date;
       const next = new Date(r.end_date + "T00:00:00Z");
       next.setUTCDate(next.getUTCDate() + 1);
       lines.push(
         "BEGIN:VEVENT",
-        `UID:${e.id}-${r.start_date}@tcg-vendor-calendar`,
+        `UID:${e.id}-${publishedStart}@tcg-vendor-calendar`,
         `DTSTAMP:${new Date()
           .toISOString()
           .replace(/[-:]/g, "")
@@ -304,7 +334,8 @@ export function ics(events: Event[], includeEstimated = false) {
         `DTSTART;VALUE=DATE:${r.start_date.replaceAll("-", "")}`,
         `DTEND;VALUE=DATE:${next.toISOString().slice(0, 10).replaceAll("-", "")}`,
         `SUMMARY:${escapeICS(estimated ? "Est. " + monthLabel(e.estimated_month!) + " · " + e.name : e.name)}`,
-        ...(estimated ? ["STATUS:TENTATIVE", "TRANSP:TRANSPARENT"] : []),
+        ...(e.event_status === "cancelled" ? ["STATUS:CANCELLED", "TRANSP:TRANSPARENT"] :
+          estimated ? ["STATUS:TENTATIVE", "TRANSP:TRANSPARENT"] : []),
         `LAST-MODIFIED:${meta.updatedAt.replaceAll("-", "")}T000000Z`,
         ...([e.venue, e.city, e.country].some(Boolean)
           ? [
@@ -342,7 +373,8 @@ export function csv(events: Event[], entries: Entries = {}) {
         "Name",
         "Country",
         "City",
-        "Status",
+        "Date status",
+        "Event status",
         "Start",
         "End",
         "Estimated month",
@@ -357,6 +389,7 @@ export function csv(events: Event[], entries: Entries = {}) {
         e.country,
         e.city,
         e.date_status,
+        e.event_status ?? "scheduled",
         e.start_date,
         e.end_date,
         e.estimated_month,
@@ -409,7 +442,7 @@ export function nextMonth(events: Event[], today: string) {
       .flatMap((e) =>
         e.estimated_month && monthEnd(e.estimated_month) >= today
           ? [e.estimated_month]
-          : ranges(e)
+          : visibleRanges(e)
               .filter((r) => r.end_date >= today)
               .map((r) =>
                 r.start_date < today
@@ -420,37 +453,55 @@ export function nextMonth(events: Event[], today: string) {
       .sort()[0] || today.slice(0, 7)
   );
 }
+function nextRangeIndex(e: Event, today: string) {
+  return visibleRanges(e).map((r, i) => ({ r, i })).sort((a, b) =>
+    Number(a.r.end_date < today) - Number(b.r.end_date < today) ||
+    compareText(a.r.start_date, b.r.start_date))[0]?.i;
+}
 export function dateSortRange(e: Event, today: string) {
-  const dates = ranges(e)
-    .slice()
-    .sort((a, b) => compareText(a.start_date, b.start_date));
-  return dates.find((r) => r.end_date >= today) ?? dates[0];
+  return ranges(e)[nextRangeIndex(e, today)];
+}
+
+export function displayDateLabel(e: Event, today: string) {
+  if (e.date_status === "tba" && e.estimated_month) return "Est. " + monthLabel(e.estimated_month);
+  const range = dateSortRange(e, today);
+  return dateLabel(range ? { ...e, ...range } : e);
 }
 export function dateSortKey(e: Event, today: string) {
   if (e.date_status !== "confirmed")
     return e.estimated_month ? e.estimated_month + "-32" : "9999";
-  return dateSortRange(e, today)?.start_date ?? "9999";
+  return visibleRanges(e)[nextRangeIndex(e, today)]?.start_date ?? "9999";
 }
 export function timelineGroups(
   events: Event[],
   filters: Filters,
   entries: Entries,
   byStage: boolean,
+  today = localDate(),
 ) {
   const groups = new Map<string, { e: Event; label?: string }[]>();
-  for (const e of events) {
-    const rr = ranges(e).filter(
-      (r) =>
-        (!filters.from || r.end_date >= filters.from) &&
-        (!filters.to || r.start_date <= filters.to),
-    );
+  for (const event of events) {
+    const e = eventInDateWindow(event, filters, today);
+    if (!e) continue;
+    const rr = ranges(e);
+    const visible = visibleRanges(e);
+    const months = visible.flatMap((r) => {
+      const keys = [];
+      for (let month = r.start_date.slice(0, 7); month <= r.end_date.slice(0, 7);) {
+        keys.push(month);
+        const next = new Date(month + "-01T00:00:00Z");
+        next.setUTCMonth(next.getUTCMonth() + 1);
+        month = next.toISOString().slice(0, 7);
+      }
+      return keys;
+    });
     const keys = byStage
       ? [(entries[e.id] || emptyEntry).stage]
       : isUndated(e)
         ? ["9999"]
         : e.date_status === "estimated"
           ? [e.estimated_month!]
-          : [...new Set(rr.map((r) => r.start_date.slice(0, 7)))];
+          : [...new Set(months)];
     for (const key of keys) {
       groups.set(key, [
         ...(groups.get(key) || []),
@@ -459,7 +510,7 @@ export function timelineGroups(
           label:
             !byStage && e.occurrences
               ? rr
-                  .filter((r) => r.start_date.startsWith(key))
+                  .filter((_, i) => visible[i].start_date.slice(0, 7) <= key && visible[i].end_date.slice(0, 7) >= key)
                   .map(
                     (r) =>
                       prettyDate(r.start_date) +
@@ -489,13 +540,8 @@ export function seasonEvents(events: Event[], includeEarlier = false): Event[] {
   const out: Event[] = [];
   for (const e of events) {
     if (e.occurrences?.length) {
-      const kept = e.occurrences.filter((o) => o.end_date >= SEASON_START);
-      if (!kept.length) continue;
-      out.push(
-        kept.length === e.occurrences.length
-          ? e
-          : { ...e, occurrences: kept, start_date: kept[0].start_date, end_date: kept[0].end_date },
-      );
+      const kept = selectOccurrences(e, (r) => r.end_date >= SEASON_START);
+      if (kept) out.push(kept);
       continue;
     }
     const last = e.end_date || e.start_date;

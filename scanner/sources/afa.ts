@@ -1,4 +1,5 @@
-import { document, required, urlOf } from "../html.ts";
+import { titleSubject } from "../listing.ts";
+import { clean, document, required, urlOf } from "../html.ts";
 import { pageSource, type RawFind } from "../types.ts";
 const url = "https://animefestival.asia/afasg26/";
 export function parse(html: string): RawFind[] {
@@ -11,15 +12,17 @@ export function parse(html: string): RawFind[] {
       .find(".et_pb_blurb_description")
       .first()
       .text()
-      .trim()
-      .split("\n")[0];
+      .trim();
   const booth = $(".et_pb_promo").filter((_, el) =>
     /exhibitor applications are open/i.test($(el).text()),
   );
+  const name = required(fact("EVENT NAME"), "event name");
+  const date = clean(fact("DATES").replace(/\b(?:MON|TUE|WED|THU|FRI|SAT|SUN)\s*[-–]\s*(?:MON|TUE|WED|THU|FRI|SAT|SUN)\b/gi, ""));
+  if (titleSubject(name) === name) required(date, "dates");
   return [
     {
-      name: required(fact("EVENT NAME"), "event name"),
-      date: required(fact("DATES").match(/^.*?20\d\d/)?.[0], "dates"),
+      name,
+      date,
       venue: fact("VENUE") || null,
       city: "Singapore",
       code: "SG",

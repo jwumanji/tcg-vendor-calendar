@@ -25,7 +25,7 @@ export function normalizeFilters(value: unknown): Filters {
   for (const [key, allowed] of [
     ["priority", ["any", "top", "high"]],
     ["size", ["", "S", "M", "L", "XL"]],
-    ["status", ["", "confirmed", "estimated", "tba"]],
+    ["status", ["", "confirmed", "estimated", "tba", "cancelled", "postponed"]],
   ] as const) {
     if (
       typeof v[key] === "string" &&

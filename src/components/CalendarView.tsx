@@ -11,6 +11,7 @@ import type { Event } from "../model";
 import { emptyEntry, type Entries } from "../storage";
 import {
   ranges,
+  visibleRanges,
   monthEnd,
   monthLabel,
   prettyDate,
@@ -21,7 +22,7 @@ import {
 import { EventCard } from "./EventCard";
 import { EmptyState } from "./EmptyState";
 import type { SetGoing } from "./GoingButton";
-import { ClashCue, NoteTag, Place, Logo } from "./EventIdentity";
+import { ClashCue, NoteTag, Place, Logo, ScheduleBadge } from "./EventIdentity";
 import { StageBadge } from "./Pipeline";
 export function CalendarView({
   filtered,
@@ -52,6 +53,7 @@ export function CalendarView({
         score={scores[e.id]}
         entries={entries}
         entry={entries[e.id] || emptyEntry}
+        today={today}
         occurrence={occurrence}
         setGoing={setGoing}
         open={open}
@@ -63,7 +65,7 @@ export function CalendarView({
       filtered.filter(
         (e) =>
           e.date_status === "confirmed" &&
-          ranges(e).some(
+          visibleRanges(e).some(
             (r) =>
               r.start_date <= monthEnd(month) && r.end_date >= month + "-01",
           ),
@@ -86,7 +88,7 @@ export function CalendarView({
       map.set(
         date,
         monthEvents.filter((e) =>
-          ranges(e).some((r) => r.start_date <= date && r.end_date >= date),
+          visibleRanges(e).some((r) => r.start_date <= date && r.end_date >= date),
         ),
       );
     }
@@ -98,7 +100,7 @@ export function CalendarView({
         <div>
           <h3>{monthLabel(month)}</h3>
           <span>
-            {monthEvents.length} confirmed shows · {estimated.length} estimated
+            {monthEvents.length} dated {monthEvents.length === 1 ? "show" : "shows"} · {estimated.length} estimated
           </span>
         </div>
         <div className="month-controls">
@@ -159,6 +161,7 @@ export function CalendarView({
                     <Logo e={e} />
                     <ClashCue score={scores[e.id]} entries={entries} />
                     <span className="calendar-event-name">{e.name}</span>{" "}
+                    <ScheduleBadge e={e} />
                     <Place e={e} countryOnly />
                     <PriorityChip result={scores[e.id]} />
                     <StageBadge stage={(entries[e.id] || emptyEntry).stage} />
@@ -177,9 +180,9 @@ export function CalendarView({
               e,
               ranges(e)
                 .filter(
-                  (r) =>
-                    r.start_date <= monthEnd(month) &&
-                    r.end_date >= month + "-01",
+                  (_, i) =>
+                    visibleRanges(e)[i].start_date <= monthEnd(month) &&
+                    visibleRanges(e)[i].end_date >= month + "-01",
                 )
                 .map(
                   (r) =>
@@ -194,7 +197,7 @@ export function CalendarView({
         ) : (
           <EmptyState
             icon={CalendarX2}
-            title="No confirmed shows this month"
+            title="No dated shows this month"
             action={
               <button className="button" onClick={() => setMonth(initialMonth)}>
                 Jump to next shows
@@ -222,6 +225,7 @@ export function CalendarView({
             {tba.map((e) => (
               <button key={e.id} onClick={() => open(e)}>
                 {e.name}
+                <ScheduleBadge e={e} />
                 <Place e={e} countryOnly />
                 <PriorityChip result={scores[e.id]} />
                 <StageBadge stage={(entries[e.id] || emptyEntry).stage} />

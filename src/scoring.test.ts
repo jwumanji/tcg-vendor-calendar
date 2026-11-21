@@ -476,6 +476,7 @@ describe("timing, overrides and presentation", () => {
       strong: "Strong",
       maybe: "Maybe",
       skip: "Skip",
+      cancelled: "Cancelled",
     });
     const a = { name: "A", score: 60, startDate: "2027-03-05" };
     const b = { ...a, name: "B" };
@@ -557,4 +558,18 @@ it("keeps all scores finite with extreme or fractional counts", () => {
   const result = scoreEvent({ ...empty, visitors: Number.MAX_VALUE, vendor_count: Number.MIN_VALUE, vendor_cost: "S$350" }, { today });
   expect(Number.isInteger(result.score)).toBe(true);
   expect(result.factors.every((f) => Number.isFinite(f.points))).toBe(true);
+});
+
+it("assigns zero to cancelled events despite overrides and removes them from both sides of a clash", () => {
+  const high = { ...calibration[0], id: "high", date_status: "confirmed" as const, start_date: "2027-01-02", end_date: "2027-01-02" };
+  const low = { ...empty, id: "low", start_date: high.start_date, end_date: high.end_date, date_status: high.date_status };
+  expect(scoreEvents([high, low])[1].clashes).toHaveLength(1);
+  for (const id of ["high", "low"]) {
+    const list = [high, low].map((e) => e.id === id ? { ...e, event_status: "cancelled" as const } : e);
+    const results = scoreEvents(list, { overrides: { [id]: 99 } });
+    expect(results.every((r) => !r.clashes.length)).toBe(true);
+    expect(results.find((r) => r.id === id)).toMatchObject({ score: 0, computedScore: 0, tier: "cancelled", overridden: false });
+    expect(scoreEvent(list.find((e) => e.id === id)!, { overrides: { [id]: 99 } }).score).toBe(0);
+  }
+  expect(scoreEvent({ ...high, event_status: "postponed" }).confidencePct).toBeLessThan(scoreEvent(high).confidencePct);
 });

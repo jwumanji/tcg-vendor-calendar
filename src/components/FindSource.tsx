@@ -60,7 +60,7 @@ export function FindDetails({ e }: { e: Event }) {
           <dd>{percent(source?.relevance)}</dd>
         </div>
       </dl>
-      <p>Unverified: check the organiser page before applying.</p>
+      <p>{e.verification === "verified" ? "Verified" : "Unverified: check the organiser page before applying."}</p>
     </section>
   );
 }

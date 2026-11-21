@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronDown, Copy } from "lucide-react";
 import { explainScore, type ScoreResult } from "../scoring";
 import { eventPath } from "../route";
@@ -14,6 +14,7 @@ export function PriorityDetail({
   openClash: (id: string) => void;
 }) {
   const [draft, setDraft] = useState(String(result.score));
+  useEffect(() => setDraft(String(result.score)), [result.id, result.score]);
   const [copied, setCopied] = useState("");
   const evidence = result.factors.filter((f) => f.key !== "clash");
   const contributing = evidence.filter((f) => f.weight > 0);
@@ -24,6 +25,9 @@ export function PriorityDetail({
     Number.isInteger(Number(draft)) &&
     Number(draft) >= 0 &&
     Number(draft) <= 100;
+  if (result.tier === "cancelled") return (
+    <section className="priority-detail"><h2>Priority score</h2><PriorityChip result={result} /></section>
+  );
   return (
     <section className="priority-detail" aria-labelledby="priority-title">
       <h2 id="priority-title">Priority score</h2>
@@ -32,7 +36,7 @@ export function PriorityDetail({
         <div>
           <strong>{result.confidence} confidence</strong>
           <small>
-            {result.confidencePct}% of weight backed by real factors
+            {result.confidencePct}% {result.postponed ? "after halving confidence for postponement" : "of weight backed by real factors"}
           </small>
         </div>
       </div>

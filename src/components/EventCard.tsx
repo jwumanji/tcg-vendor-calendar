@@ -7,7 +7,7 @@ import { memo } from "react";
 import { CalendarDays } from "lucide-react";
 import type { Event } from "../model";
 import type { Entries, Entry } from "../storage";
-import { games, dateLabel, gameKey, primaryGameKey } from "../utils";
+import { games, displayDateLabel, gameKey, primaryGameKey } from "../utils";
 import { holo } from "../holo";
 import {
   ClashCue,
@@ -23,6 +23,7 @@ export const EventCard = memo(function EventCard({
   entries,
   score,
   setGoing,
+  today,
   occurrence,
   titleLevel = 3,
   open,
@@ -32,6 +33,7 @@ export const EventCard = memo(function EventCard({
   entries: Entries;
   score: ScoreResult;
   setGoing: SetGoing;
+  today: string;
   occurrence?: string;
   titleLevel?: 3 | 4;
   open: (e: Event, occurrence?: string) => void;
@@ -41,6 +43,7 @@ export const EventCard = memo(function EventCard({
     <article
       className={`event-card holo status-${e.date_status}`}
       data-game={primaryGameKey(e)}
+      data-event-status={e.event_status}
       data-going={entry.going}
       {...holo}
     >
@@ -52,7 +55,7 @@ export const EventCard = memo(function EventCard({
               {e.name}
               <span className="sr-only">
                 {" "}
-                · {occurrence || dateLabel(e)} · {entry.stage}
+                · {occurrence || displayDateLabel(e, today)} · {entry.stage}
               </span>
             </button>
           </Title>
@@ -61,7 +64,7 @@ export const EventCard = memo(function EventCard({
         <div className="card-art">
           <div className="card-when">
             <CalendarDays size={16} aria-hidden="true" />
-            <span>{occurrence || dateLabel(e)}</span>
+            <span>{occurrence || displayDateLabel(e, today)}</span>
           </div>
           <div className="card-location">
             <Place e={e} />

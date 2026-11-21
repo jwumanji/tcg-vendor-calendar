@@ -2,7 +2,7 @@ import { useEventRoute } from "./hooks/useEventRoute";
 import { usePriority } from "./hooks/usePriority";
 import { Modal } from "./components/Modal";
 import { EventRows, RowColumns, RowSortControl } from "./components/EventRows";
-import { normalizeColumns, normalizeListView, loadSort, SORT_STORAGE_KEY, groupSortedRows, listCardDate, sortRows } from "./rows";
+import { normalizeColumns, normalizeListView, loadSort, SORT_STORAGE_KEY, groupSortedRows, orderTimelineGroups, sortRows } from "./rows";
 import { CalendarView } from "./components/CalendarView";
 import { CardSections } from "./components/ListSections";
 import { EventCard } from "./components/EventCard";
@@ -12,7 +12,7 @@ import { EventExports } from "./components/EventExports";
 import { TopPicks } from "./components/TopPicks";
 import { Pipeline } from "./components/Pipeline";
 import { BackupControls } from "./components/BackupControls";
-import { stages, emptyEntry, saveValue, type Stage } from "./storage";
+import { stages, emptyEntry, saveValue } from "./storage";
 import {
   lazy,
   Suspense,
@@ -61,7 +61,7 @@ import {
   timelineGroups,
   gameRules,
   ranges,
-  matches,
+  matchingEvent,
   goingEvents,
   monthLabel,
   prettyDate,
@@ -202,12 +202,11 @@ export default function App() {
   }, [theme]);
   const filtered = useMemo(
     () =>
-      events.filter(
-        (e) =>
-          matches(e, filters, entries, scores[e.id].score, today) &&
-          (view === "Pipeline" || visible(e)),
-      ),
-    [events, filters, entries, view, visible, scores, today],
+      events.flatMap((e) => {
+        const match = visible(e) && matchingEvent(e, filters, entries, scores[e.id].score, today);
+        return match ? [match] : [];
+      }),
+    [events, filters, entries, visible, scores, today],
   );
   const attending = useMemo(
     () => goingEvents(events, entries),
@@ -253,7 +252,7 @@ export default function App() {
                 ? filters.priority === "top"
                   ? "Top priority markets"
                   : "High or top priority markets"
-                : `${k === "size" ? "Size" : "Date status"}: ${filters[k]}`,
+                : `${k === "size" ? "Size" : "Status"}: ${filters[k]}`,
         clear: () => set(k, emptyFilters[k]),
       });
   for (const stage of filters.stages)
@@ -406,6 +405,7 @@ export default function App() {
         score={scores[e.id]}
         entries={entries}
         setGoing={setGoing}
+        today={today}
         occurrence={occurrence}
         titleLevel={titleLevel}
         open={open}
@@ -419,8 +419,9 @@ export default function App() {
         filters,
         entries,
         groupByStage,
+        today,
       ),
-    [view, sorted, filters, entries, groupByStage],
+    [view, sorted, filters, entries, groupByStage, today],
   );
   const filterTrigger = useRef<HTMLButtonElement>(null);
   const filterPanel = useRef<HTMLElement>(null);
@@ -520,7 +521,7 @@ export default function App() {
               </button>
             ))}
           </nav>
-          <div className="toolbar" hidden={view === "Top picks"}>
+          <div className="toolbar">
             <label className="search">
               <Search size={18} />
               <input
@@ -566,59 +567,55 @@ export default function App() {
               <Settings2 size={16} /> <span>Tools</span>
             </button>
           </div>
-          {view !== "Top picks" && (
-            <>
-              {filters.going && (
-                <div className="going-summary">
-                  <strong>Showing {filtered.length} Going</strong>
-                  <span aria-hidden="true"> · </span>
-                  <button
-                    className="clear-going"
-                    onClick={() => set("going", false)}
-                  >
-                    Clear
-                  </button>
-                  <EventExports
-                    events={attending}
-                    entries={entries}
-                    goingOnly
-                    compact
-                  />
-                </div>
-              )}
-              <div className="quick-row">
-              <CountryFilter
-                options={countryOptions(events)}
-                selected={filters.countries}
-                change={(countries) => set("countries", countries)}
-              />
-              <div
-                className="quick-filters"
-                role="group"
-                aria-label="Quick filters"
+          {filters.going && (
+            <div className="going-summary">
+              <strong>Showing {filtered.length} Going</strong>
+              <span aria-hidden="true"> · </span>
+              <button
+                className="clear-going"
+                onClick={() => set("going", false)}
               >
-                {quick.map((q) => (
-                  <button
-                    key={q.id}
-                    aria-pressed={q.active}
-                    onClick={q.toggle}
-                    className={"outreach" in q ? "outreach-filter" : undefined}
-                    title={"outreach" in q ? "Outreach status" : undefined}
-                  >
-                    {"code" in q && <CountryFlag code={q.code} />}
-                    {q.label}
-                  </button>
-                ))}
-                {activeQuick.length > 0 && (
-                  <button className="clear-quick" onClick={clearQuick}>
-                    Clear
-                  </button>
-                )}
-              </div>
-              </div>
-            </>
+                Clear
+              </button>
+              <EventExports
+                events={attending}
+                entries={entries}
+                goingOnly
+                compact
+              />
+            </div>
           )}
-          {view !== "Top picks" && filterOpen && (
+          <div className="quick-row">
+            <CountryFilter
+              options={countryOptions(events)}
+              selected={filters.countries}
+              change={(countries) => set("countries", countries)}
+            />
+            <div
+              className="quick-filters"
+              role="group"
+              aria-label="Quick filters"
+            >
+              {quick.map((q) => (
+                <button
+                  key={q.id}
+                  aria-pressed={q.active}
+                  onClick={q.toggle}
+                  className={"outreach" in q ? "outreach-filter" : undefined}
+                  title={"outreach" in q ? "Outreach status" : undefined}
+                >
+                  {"code" in q && <CountryFlag code={q.code} />}
+                  {q.label}
+                </button>
+              ))}
+              {activeQuick.length > 0 && (
+                <button className="clear-quick" onClick={clearQuick}>
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+          {filterOpen && (
             <section
               className="filters"
               id="filters"
@@ -720,13 +717,13 @@ export default function App() {
                     </select>
                   </label>
                   <label>
-                    Date status
+                    Status
                     <select
                       value={filters.status}
                       onChange={(e) => set("status", e.target.value)}
                     >
                       <option value="">All statuses</option>
-                      {["confirmed", "estimated", "tba"].map((s) => (
+                      {["confirmed", "estimated", "tba", "cancelled", "postponed"].map((s) => (
                         <option key={s}>{s}</option>
                       ))}
                     </select>
@@ -834,7 +831,7 @@ export default function App() {
               </div>
             </section>
           )}
-          {view !== "Top picks" && otherChips.length > 0 && (
+          {otherChips.length > 0 && (
             <div className="chips">
               {otherChips.map((c) => (
                 <button
@@ -854,23 +851,22 @@ export default function App() {
               </button>
             </div>
           )}
-          {view === "Timeline" && (
+          {["Calendar", "Timeline", "Top picks", "Pipeline"].includes(view) && (
             <div className="timeline-controls">
               {sortControl}
-              <label className="passed-toggle">
+              {view === "Timeline" && <label className="passed-toggle">
                 <input
                   type="checkbox"
                   checked={groupByStage}
                   onChange={(e) => setGroupByStage(e.target.checked)}
                 />
                 Group by pipeline stage
-              </label>
+              </label>}
             </div>
           )}
           {view === "Top picks" ? (
             <TopPicks
-              events={events}
-              visible={visible}
+              events={sorted}
               today={today}
               scores={scores}
               entries={entries}
@@ -879,6 +875,8 @@ export default function App() {
             />
           ) : view === "Pipeline" ? (
             <Pipeline
+              today={today}
+              sort={sort}
               events={sorted}
               scores={scores}
               entries={entries}
@@ -888,7 +886,7 @@ export default function App() {
             />
           ) : view === "Calendar" ? (
             <CalendarView
-              filtered={filtered}
+              filtered={sorted}
               scores={scores}
               entries={entries}
               setGoing={setGoing}
@@ -900,14 +898,7 @@ export default function App() {
             />
           ) : view === "Timeline" ? (
             <div className="timeline">
-              {[...groups]
-                .sort(([a], [b]) =>
-                  groupByStage
-                    ? stages.indexOf(a as Stage) - stages.indexOf(b as Stage)
-                    : sort.key === "dates" && sort.direction === "desc" && a !== "9999" && b !== "9999"
-                      ? b.localeCompare(a)
-                      : a.localeCompare(b),
-                )
+              {orderTimelineGroups(groups, groupByStage, sort)
                 .map(([m, items]) => (
                   <section key={m}>
                     <h3>
@@ -990,7 +981,7 @@ export default function App() {
                 <CardSections groups={listGroups} sortKey={sort.key}>
                   {(e, titleLevel) => (
                     <div key={e.id}>
-                      {card(e, listCardDate(e, today), titleLevel)}
+                      {card(e, undefined, titleLevel)}
                       {view === "Recurring SG" && (
                         <div
                           className="occurrences"
@@ -1122,6 +1113,7 @@ export default function App() {
           {selected ? (
             <Suspense fallback={<p role="status">Loading event…</p>}>
               <Detail
+                today={today}
                 toast={toast}
                 e={selected}
                 score={scores[selected.id]}

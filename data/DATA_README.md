@@ -28,6 +28,7 @@ Unknown values are `null`; nothing is invented.
 - `section`: `timeline`, `recurring_sg` or `watchlist`
 - **Dates**
   - `start_date`, `end_date`: ISO `YYYY-MM-DD`. Set only for confirmed dates; `null` for estimated and TBA events.
+  - `event_status` is optional. Its values are `cancelled` and `postponed`. Omit it for scheduled events. Cancellation retains the edition’s dates. Postponement replaces them with any published replacement dates or month, or moves the event to the watchlist until dates are known. The original notice is stored in `date_note`. A dated re-listing by the source clears the status when its edition key, announced replacement schedule, or proximity to the original dates identifies the same edition.
   - `date_status`: `confirmed`, `estimated` or `tba`
   - `date_note`: the Page's date text, including the estimate basis (for example "Est. Mar 2027 (2026: 14–15 Mar)")
   - `estimated_month`: `YYYY-MM`, only when `date_status` is `estimated`. It is the expected month and should not be used as a booking date.
@@ -120,9 +121,13 @@ The 97-event breakdown above describes the 16 November 2026 Scanner export. The 
 | --- | --- |
 | `source.id`, `source.name`, `source.url` | Stable adapter ID, source display name and public evidence page. |
 | `source.discovered_at` | ISO timestamp of the first sighting, preserved through updates. |
+| `source.original_dates` | First published ranges retained when a schedule changes. The original start identifies a single event in calendar exports. |
+| `source.previous_dates` | Superseded dated ranges, retained for follow-up notices, cancellation exports and stale venue listings. |
+| `source.aliases` | Edition keys corroborated on earlier notices or listings. |
+| `original_start_date`, `occurrences[].original_start_date` | First published start used in calendar UIDs when an imported event or one of its weekends moves. Older records use the published start. |
 | `source.confidence`, `source.relevance` | Parser confidence and keyword relevance, each on a 0–1 scale. |
 | `is_new_find` | True for scraper discoveries; the badge persists across runs. The run report counts first sightings separately. |
-| `verification` | Scraped records are `unverified`. Scanner records may omit this field or use `scanner`. |
+| `verification` | Scraped records start as `unverified`. A reviewed find can be marked `verified` and retains that value on refresh. Scanner records may omit this field or use `scanner`. |
 | `region_group` | Also accepts `Other` for lower-priority expansion markets, including the Philippines for this planner. |
 
 Dated discoveries enter the timeline. Estimated months are recorded separately from confirmed travel dates. Undated finds enter the watchlist. For a published forecast range, the numeric field holds its lower bound and `expected_size` retains the range and forecast wording. `previous_editions_count` can count documented past listings. A year on the earliest available listing alone does not establish `first_year`. Scraper `vendor_score` and `logo` are null. A vendor link can be an enquiry or expression of interest; a blank application field means the source did not supply one.

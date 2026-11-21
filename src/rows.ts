@@ -1,12 +1,11 @@
 import { outreachStatuses, type Event } from "./model";
 import type { ScoreResult } from "./scoring";
-import { emptyEntry, stages, type Entries } from "./storage";
+import { emptyEntry, stages, type Entries, type Stage } from "./storage";
 import {
   compareText,
-  dateLabel,
+  scheduleStatus,
   dateSortKey,
   dateSortRange,
-  monthLabel,
   prettyDate,
 } from "./utils";
 
@@ -16,7 +15,7 @@ export const ROW_SORT_LABELS = {
   dates: "Dates",
   country: "Country",
   city: "City",
-  status: "Date status",
+  status: "Status",
   priority: "Priority",
   scanner: "Scanner score",
   size: "Size tier",
@@ -29,6 +28,19 @@ export type RowKey = keyof typeof ROW_SORT_LABELS;
 export type RowSort = { key: RowKey; direction: "asc" | "desc" };
 export const SORT_STORAGE_KEY = "tcg-sort-v2";
 export const defaultRowSort: RowSort = { key: "dates", direction: "asc" };
+
+export function orderedStages(sort: RowSort) {
+  return sort.key === "stage" && sort.direction === "desc" ? [...stages].reverse() : stages;
+}
+
+export function orderTimelineGroups<T>(groups: Map<string, T>, byStage: boolean, sort: RowSort) {
+  const order = orderedStages(sort);
+  return [...groups].sort(([a], [b]) => {
+    if (byStage) return order.indexOf(a as Stage) - order.indexOf(b as Stage);
+    if (a === "9999" || b === "9999") return Number(a === "9999") - Number(b === "9999");
+    return sort.key === "dates" && sort.direction === "desc" ? b.localeCompare(a) : a.localeCompare(b);
+  });
+}
 
 export function loadSort(storage?: Pick<Storage, "getItem" | "removeItem">): RowSort {
   try {
@@ -90,15 +102,6 @@ export function rowDateLabel(e: Event, today: string) {
   return left + "–" + prettyDate(end);
 }
 
-export function listCardDate(e: Event, today: string) {
-  if (e.date_status === "tba" && e.estimated_month)
-    return "Est. " + monthLabel(e.estimated_month);
-  if (e.date_status === "confirmed" && e.occurrences?.length) {
-    const range = dateSortRange(e, today);
-    if (range) return dateLabel({ ...e, ...range });
-  }
-}
-
 export function sortRows(
   events: Event[],
   sort: RowSort,
@@ -122,7 +125,7 @@ export function sortRows(
         return date === "9999" ? null : date;
       }
       case "status":
-        return e.date_status;
+        return scheduleStatus(e);
       case "priority":
         return scores[e.id]?.score ?? null;
       case "scanner":

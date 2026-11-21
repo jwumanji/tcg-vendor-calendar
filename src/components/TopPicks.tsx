@@ -4,7 +4,7 @@ import type { Event } from "../model";
 import { compareByScore, TIER_THRESHOLDS, type ScoreResult } from "../scoring";
 import { emptyEntry, type Entries } from "../storage";
 import {
-  dateLabel,
+  displayDateLabel,
   deadlineDate,
   isUndated,
   prettyDate,
@@ -13,7 +13,7 @@ import {
 } from "../utils";
 import { holo } from "../holo";
 import { EmptyState } from "./EmptyState";
-import { ClashCue, Logo, NoteTag, Place } from "./EventIdentity";
+import { ClashCue, Logo, NoteTag, Place, ScheduleBadge } from "./EventIdentity";
 import { FindBadges } from "./FindSource";
 import { GoingButton, type SetGoing } from "./GoingButton";
 import { StageBadge } from "./Pipeline";
@@ -21,7 +21,6 @@ import { PriorityChip } from "./PriorityChip";
 
 export function TopPicks({
   events,
-  visible,
   today,
   scores,
   entries,
@@ -29,7 +28,6 @@ export function TopPicks({
   open,
 }: {
   events: Event[];
-  visible: (e: Event) => boolean;
   today: string;
   scores: Record<string, ScoreResult>;
   entries: Entries;
@@ -39,14 +37,14 @@ export function TopPicks({
   const top = useMemo(
     () =>
       events
-        .filter((e) => visible(e) && !isUndated(e) && upcoming(e, today))
+        .filter((e) => e.event_status !== "cancelled" && !isUndated(e) && upcoming(e, today))
         .sort((a, b) => compareByScore(scores[a.id], scores[b.id])),
-    [events, visible, today, scores],
+    [events, today, scores],
   );
   const deadlines = useMemo(
     () =>
       events
-        .filter((e) => visible(e) && e.vendor_deadline && upcoming(e, today))
+        .filter((e) => e.event_status !== "cancelled" && e.vendor_deadline && upcoming(e, today))
         .sort((a, b) =>
           (deadlineDate(a.vendor_deadline) || "9999").localeCompare(
             deadlineDate(b.vendor_deadline) || "9999",
@@ -57,14 +55,17 @@ export function TopPicks({
             !deadlineDate(e.vendor_deadline) ||
             deadlineDate(e.vendor_deadline)! >= today,
         ),
-    [events, visible, today],
+    [events, today],
   );
+  // Select by rank and deadline, then display both subsets in the shared view order.
+  const ranks = new Map(top.slice(0, 12).map((e, i) => [e.id, i + 1]));
+  const soonest = new Set(deadlines.slice(0, 6).map((e) => e.id));
   return (
     <section className="overview">
       <div className="picks">
         <div className="section-label">
           <span>✦ TOP VENDOR PICKS</span>
-          <span>RANKED BY PRIORITY</span>
+          <span>PRIORITY RANK</span>
         </div>
         {top.length === 0 && (
           <EmptyState icon={Gem} title="No scored events to show">
@@ -72,7 +73,7 @@ export function TopPicks({
           </EmptyState>
         )}
         <div className="pick-grid">
-          {top.slice(0, 12).map((e, i) => (
+          {events.filter((e) => ranks.has(e.id)).map((e) => (
             <article
               className="pick holo"
               key={e.id}
@@ -81,7 +82,7 @@ export function TopPicks({
               {...holo}
             >
               <span className="pick-rank" aria-hidden="true">
-                {String(i + 1).padStart(2, "0")}
+                {String(ranks.get(e.id)).padStart(2, "0")}
               </span>
               <div className="pick-meta">
                 <Logo e={e} />
@@ -98,16 +99,17 @@ export function TopPicks({
                   {e.name}
                   <span className="sr-only">
                     {" "}
-                    · {dateLabel(e)} · {(entries[e.id] || emptyEntry).stage}
+                    · Priority rank {ranks.get(e.id)} · {displayDateLabel(e, today)} · {(entries[e.id] || emptyEntry).stage}
                   </span>
                 </button>
               </h3>
+              <ScheduleBadge e={e} />
               <StageBadge stage={(entries[e.id] || emptyEntry).stage} />
               {entries[e.id]?.note.trim() && <NoteTag />}
               <FindBadges e={e} />
               <p>
                 <Place e={e} />
-                <span>· {dateLabel(e)}</span>
+                <span>· {displayDateLabel(e, today)}</span>
               </p>
             </article>
           ))}
@@ -144,7 +146,7 @@ export function TopPicks({
         {deadlines.length === 0 && (
           <p className="deadline-empty">No open vendor deadlines right now.</p>
         )}
-        {deadlines.slice(0, 6).map((e) => (
+        {events.filter((e) => soonest.has(e.id)).map((e) => (
           <button key={e.id} onClick={() => open(e)}>
             <span className="deadline-date">
               {deadlineDate(e.vendor_deadline)
@@ -154,6 +156,7 @@ export function TopPicks({
             <strong>{e.name}</strong>
             <span className="card-tags">
               <PriorityChip result={scores[e.id]} />
+              <ScheduleBadge e={e} />
               <StageBadge stage={(entries[e.id] || emptyEntry).stage} />
               {entries[e.id]?.note.trim() && <NoteTag />}
             </span>

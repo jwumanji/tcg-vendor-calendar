@@ -87,6 +87,7 @@ export const TIER_LABELS = {
   strong: "Strong",
   maybe: "Maybe",
   skip: "Skip",
+  cancelled: "Cancelled",
 } as const;
 export type Tier = keyof typeof TIER_LABELS;
 export function tierOf(score: number): Tier {
@@ -123,6 +124,7 @@ export interface ScoreResult {
   tier: Tier;
   confidence: "high" | "medium" | "low";
   confidencePct: number;
+  postponed?: boolean;
   factors: FactorResult[];
   clashes: ClashInfo[];
   overridden: boolean;
@@ -646,6 +648,11 @@ function baseScore(
   weights: Weights,
   today: number | null,
 ): ScoreResult {
+  if (e.event_status === "cancelled") return {
+    id: e.id, name: e.name, startDate: e.start_date ?? e.estimated_month,
+    score: 0, computedScore: 0, tier: "cancelled", factors: [], clashes: [],
+    confidence: "high", confidencePct: 100, overridden: false,
+  };
   const year =
     Number((e.start_date || e.estimated_month || "").slice(0, 4)) ||
     (today === null ? 0 : new Date(today * dayMs).getUTCFullYear());
@@ -666,11 +673,14 @@ function baseScore(
     points: evidence[key].value * weights[key],
   }));
   const score = Math.round(factors.reduce((s, f) => s + f.points, 0));
-  const confidencePct = factors.reduce(
+  const evidencePct = factors.reduce(
     (s, f) => s + (f.basis === "real" ? f.weight : 0),
     0,
   );
+  const postponed = e.event_status === "postponed";
+  const confidencePct = postponed ? Math.round(evidencePct / 2) : evidencePct;
   return {
+    ...(postponed && { postponed }),
     id: e.id,
     name: e.name,
     startDate: e.start_date ?? e.estimated_month,
@@ -689,6 +699,7 @@ function finish(
   r: ScoreResult,
   overrides?: ScoreOptions["overrides"],
 ): ScoreResult {
+  if (r.tier === "cancelled") return r;
   const override =
     overrides && Object.hasOwn(overrides, r.id) ? overrides[r.id] : undefined;
   const score = finite(override)
@@ -713,7 +724,7 @@ export function scoreEvent(e: Event, options: ScoreOptions = {}): ScoreResult {
   );
 }
 function confirmedRanges(e: Event) {
-  if (e.date_status !== "confirmed") return [];
+  if (e.date_status !== "confirmed" || e.event_status === "cancelled") return [];
   const ranges =
     e.section === "recurring_sg" && e.occurrences?.length ? e.occurrences : [e];
   return ranges
@@ -797,9 +808,10 @@ export function scoreEvents(
   });
 }
 export function explainScore(r: ScoreResult): string {
+  if (r.tier === "cancelled") return `${r.name}: 0/100 · Cancelled`;
   return [
     `${r.name}: ${r.score}/100 · ${TIER_LABELS[r.tier]}${r.overridden ? ` (manual override, computed ${r.computedScore})` : ""}`,
-    `Confidence: ${r.confidence} (${r.confidencePct}% of weight backed by real factors).`,
+    `Confidence: ${r.confidence} (${r.confidencePct}% ${r.postponed ? "after postponement adjustment" : "of weight backed by real factors"}).`,
     ...r.factors.map(
       (f) =>
         `${f.label}: ${f.points.toFixed(1)} points (${f.weight}%, ${f.basis}). ${[...f.signals, f.note].join(". ")}`,

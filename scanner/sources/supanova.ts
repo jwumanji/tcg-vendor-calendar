@@ -1,3 +1,4 @@
+import { titleSubject } from "../listing.ts";
 import { clean, document, link } from "../html.ts";
 import { pageSource, type RawFind } from "../types.ts";
 const url = "https://www.supanova.com.au/";
@@ -8,11 +9,13 @@ export function parse(html: string): RawFind[] {
   if (!cities.length) throw Error("Missing Supanova schedule");
   const finds = new Map<string, RawFind>();
   for (const el of cities) {
-    const city = clean($(el).text());
+    const title = clean($(el).text());
+    const place = titleSubject(title);
+    const city = place.replace(/\s+20\d\d$/, "");
     const rows = $(el).siblings("p");
     const date = clean(rows.first().text());
-    finds.set(city + date, {
-      name: "Supanova Comic Con & Gaming – " + city,
+    finds.set(JSON.stringify([title, date, clean(rows.eq(1).text())]), {
+      name: title.replace(place, () => "Supanova Comic Con & Gaming – " + place),
       code: "AU",
       city,
       date,

@@ -33,25 +33,4 @@ url="$(printf '%s' "$out" | grep -Eo 'https://[^[:space:]"]+\.vercel\.app' | tai
 echo "Deployment URL: $url"
 cd "$repo_dir"
 
-check() { # base path
-  local base="$1" path="$2" hdr status
-  hdr="$(mktemp)"
-  status="$(curl -sS --max-time 25 --retry 4 --retry-all-errors -o /dev/null -D "$hdr" -w '%{http_code}' "$base$path")" || { rm -f "$hdr"; return 1; }
-  if [[ "$status" != 200 ]]; then echo "Smoke check failed: $base$path returned HTTP $status" >&2; rm -f "$hdr"; return 1; fi
-  if ! grep -qi '^x-robots-tag:.*noindex' "$hdr"; then echo "Smoke check failed: $base$path missing X-Robots-Tag noindex" >&2; rm -f "$hdr"; return 1; fi
-  rm -f "$hdr"
-}
-# The production alias URL of the project (preview-protected URLs may answer 401).
-alias_url="https://$PROJECT.vercel.app"
-ok=false
-for attempt in 1 2 3 4; do
-  if check "$alias_url" / && check "$alias_url" /some/deep/link; then ok=true; break; fi
-  echo 'Waiting for production alias propagation...' >&2; sleep 5
-done
-[[ "$ok" == true ]] || { echo "ERROR: smoke checks failed on $alias_url" >&2; exit 1; }
-echo "Smoke checks passed on $alias_url (root + deep-link fallback, noindex header)."
-if check "$SITE_URL" / 2>/dev/null; then
-  echo "Live at $SITE_URL"
-else
-  echo "Note: $SITE_URL is not answering yet (DNS or domain still propagating); the project deployment itself is healthy."
-fi
+bash scripts/check-deployment.sh "$url" "https://$PROJECT.vercel.app" "$SITE_URL"

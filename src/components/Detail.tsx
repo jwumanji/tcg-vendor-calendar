@@ -13,7 +13,7 @@ import {
   LoaderCircle,
   Download,
 } from "lucide-react";
-import type { Event } from "../model";
+import type { Event, VendorMilestone } from "../model";
 import {
   displayDateLabel,
   safeUrl,
@@ -30,6 +30,7 @@ import type { Entry, Stage } from "../storage";
 import type { Outreach, OutreachPatch } from "../model";
 import { OutreachChip } from "./OutreachChip";
 import { OutreachSection } from "./OutreachSection";
+import { BookingMilestones } from "./BookingMilestones";
 export function Detail({
   e,
   today,
@@ -40,6 +41,10 @@ export function Detail({
   onNote,
   knownOutreach,
   onOutreach,
+  onMilestone,
+  sharedMilestones,
+  localMilestones,
+  onRemoveMilestone,
   saved,
   score,
   setOverride,
@@ -55,6 +60,10 @@ export function Detail({
   onNote: (s: string) => void;
   knownOutreach?: Outreach | null;
   onOutreach: (patch: OutreachPatch) => void;
+  onMilestone: (milestone: VendorMilestone) => void;
+  sharedMilestones?: readonly VendorMilestone[];
+  localMilestones?: readonly VendorMilestone[];
+  onRemoveMilestone: (id: string) => void;
   saved: boolean;
   score: ScoreResult;
   setOverride: (value: number | null) => void;
@@ -146,6 +155,8 @@ export function Detail({
         </div>
       </div>
       <div className="detail-body event-information">
+        <BookingMilestones event={e} sharedMilestones={sharedMilestones} localMilestones={localMilestones}
+          onSave={onMilestone} onRemove={onRemoveMilestone} />
         <FindDetails e={e} />
         <PriorityDetail
           result={score}
@@ -272,7 +283,7 @@ export function Detail({
               ? link(e.vendor_application, "Application information")
               : e.vendor_application,
           )}
-          {row("Deadline / notice", e.vendor_deadline)}
+          {!e.event_status && row(e.vendor_milestones?.length ? "Vendor notice" : "Deadline / notice", e.vendor_deadline)}
           {row("Cost", e.vendor_cost)}
           {row("Booth details", e.booth_detail)}
           {row(

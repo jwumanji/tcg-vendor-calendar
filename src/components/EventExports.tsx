@@ -1,5 +1,6 @@
 import { CalendarDays, Download } from "lucide-react";
-import type { Event } from "../model";
+import type { Event, VendorMilestone } from "../model";
+import { milestoneCalendarUnavailable } from "../milestones";
 import type { Entries } from "../storage";
 import {
   csv,
@@ -7,7 +8,26 @@ import {
   hasConfirmedDates,
   hasEstimatedMonth,
   ics,
+  milestoneIcs,
 } from "../utils";
+
+export function MilestoneExport({ event, milestone }: { event: Event; milestone: VendorMilestone }) {
+  const blocked = milestoneCalendarUnavailable(event, milestone);
+  if (blocked) return <span className="milestone-notes">{blocked}</span>;
+  return (
+    <button
+      className="button milestone-export"
+      aria-label={`Add to calendar: ${event.name}, ${milestone.label}`}
+      onClick={() => download(
+        milestoneIcs(event, milestone),
+        `${event.id}-${milestone.id}.ics`,
+        "text/calendar;charset=utf-8",
+      )}
+    >
+      <CalendarDays size={15} aria-hidden="true" /> Add to calendar
+    </button>
+  );
+}
 
 export function EventExports({
   events,
@@ -36,7 +56,7 @@ export function EventExports({
           )
         }
       >
-        <CalendarDays size={15} /> Download .ics{suffix}
+        <CalendarDays size={15} /> Add to calendar{suffix}
       </button>
       <button
         className="button"

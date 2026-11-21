@@ -640,6 +640,17 @@
     "vendor_booths": "Yes, tables",
     "vendor_application": "Google Form on urbanops.hk; Cardlover WhatsApp +852 5926 9384, cardloverhk1111@gmail.com",
     "vendor_deadline": "20 Dec 2026 (general registration)",
+    "vendor_milestones": [
+      {
+        "id": "general-registration",
+        "type": "application_closes",
+        "at": "2026-12-20",
+        "timeZone": "Asia/Hong_Kong",
+        "label": "Apply by",
+        "source": "https://urbanops.hk/urban-card-show-2027-01/",
+        "verified": true
+      }
+    ],
     "vendor_cost": "HK$1,888 (Area 1) / HK$1,488 (Area 2) per 150×60 cm table, 2 days, 2 chairs + 1 card box; extras: chair HK$50, card box (about 80×60 cm) HK$300; early-bird has ended",
     "booth_detail": "150×60 cm table for both days, 2 chairs and 1 card box included. Area 1 HK$1,888, Area 2 HK$1,488. Extra chair HK$50, extra card box HK$300. Early-bird ended.",
     "contact": "WhatsApp +852 5926 9384; cardloverhk1111@gmail.com; also [@cardlover_hk_1111](https://www.instagram.com/cardlover_hk_1111/)",
@@ -1770,7 +1781,18 @@
     "first_year": null,
     "vendor_booths": "Yes, tables by zone",
     "vendor_application": "bangkokcardshow.com/Tablereservations; bangkokinternationalcardshow@gmail.com, 092-899-1614 (contacts from search results, unverified)",
-    "vendor_deadline": "Not published (zone-based, book early)",
+    "vendor_deadline": "Table reservations open 1 Dec 2026 at 12:00 Bangkok / Saigon time. Tables are offered by zone.",
+    "vendor_milestones": [
+      {
+        "id": "table-reservations",
+        "type": "booking_opens",
+        "at": "2026-12-01T12:00:00+07:00",
+        "timeZone": "Asia/Bangkok",
+        "label": "Table reservations open",
+        "source": "https://bangkokcardshow.com/Tablereservations",
+        "verified": true
+      }
+    ],
     "vendor_cost": "Not published (unverified): search snippets of the organizer's table pages show THB 8,900 per table for 2 days with 2 chairs and 2 badges; the pages would not render and the year is unclear",
     "booth_detail": "Tables by zone. A THB 8,900 two-day rate appears in search snippets but is unverified (page would not render; year unclear).",
     "contact": "bangkokinternationalcardshow@gmail.com, 092-899-1614 (unverified from search results)",
@@ -2153,9 +2175,21 @@
     "first_year": "2025",
     "vendor_booths": "Yes, pick a spot on the floor plan",
     "vendor_application": "cardcon.asia/pricing (sign in, pick a table, pay to confirm); cardcon@myrepublic.net",
-    "vendor_deadline": "Booking opens 1 Dec 2026, 00:00 SGT, first come first served (Card Con 2 exhibitors first)",
+    "vendor_deadline": "General booking opens 30 Nov 2026 at 23:00 Saigon time (1 Dec at 00:00 Singapore time), first come, first served.",
+    "vendor_milestones": [
+      {
+        "id": "general-booking",
+        "type": "booking_opens",
+        "at": "2026-12-01T00:00:00+08:00",
+        "timeZone": "Asia/Singapore",
+        "label": "General booking opens",
+        "source": "https://cardcon.asia/pricing",
+        "verified": true,
+        "notes": "First come, first served. The Card Con 2 returning-exhibitor priority window has closed."
+      }
+    ],
     "vendor_cost": "S$350 per 1.8×0.7 m table for 2 days; L-shaped booth S$680; 13A power point +S$150; Card Con 2 exhibitors get S$150 off the first table; all prices include 9% GST; max 10 tables per account",
-    "booth_detail": "S$350 standard table, S$680 L-booth, +S$150 for a 13A power point, S$150 off the first table for Card Con 2 exhibitors, GST included, max 10 tables. Booking opens 1 Dec 2026 at midnight SGT, Card Con 2 exhibitors first.",
+    "booth_detail": "S$350 standard table, S$680 L-booth, +S$150 for a 13A power point, S$150 off the first table for Card Con 2 exhibitors, GST included, max 10 tables. The returning-exhibitor priority window has closed.",
     "contact": "cardcon@myrepublic.net; cardcon.asia/pricing",
     "vendor_score": 74,
     "shortlist_priority": 1,
@@ -2166,7 +2200,7 @@
     "instagram_followers": null,
     "description": "MyRepublic's third Card Con at Suntec Halls 403-404, with published 2027 table prices including GST, power and a returning-exhibitor discount.",
     "audience": "Singapore and regional TCG collectors across Pokémon, One Piece, Lorcana and MTG.",
-    "fit": "Clear 2027 pricing, game zones, and a central venue. Book on 1 Dec 2026.",
+    "fit": "Clear 2027 pricing, game zones, and a central venue.",
     "source_urls": [
       "https://cardcon.asia/"
     ],

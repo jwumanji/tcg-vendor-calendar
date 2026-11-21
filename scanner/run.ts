@@ -43,6 +43,9 @@ export function validate(value: unknown): asserts value is Event[] {
       !["timeline", "watchlist", "recurring_sg"].includes(raw.section) ||
       !["estimated", "confirmed", "tba"].includes(raw.date_status) ||
       raw.event_status !== row.event_status ||
+      (raw.vendor_milestones !== undefined &&
+        (!Array.isArray(raw.vendor_milestones) ||
+          raw.vendor_milestones.length !== (row.vendor_milestones?.length ?? 0))) ||
       (raw.original_start_date !== undefined && !validDate(raw.original_start_date)) ||
       (Array.isArray(raw.occurrences) && raw.occurrences.some((r) =>
         r?.original_start_date !== undefined && !validDate(r.original_start_date))) ||

@@ -10,6 +10,7 @@ import { BrandLockup, BrandMark } from "./components/Brand";
 import { EmptyState } from "./components/EmptyState";
 import { EventExports } from "./components/EventExports";
 import { TopPicks } from "./components/TopPicks";
+import { UpcomingMilestones } from "./components/UpcomingMilestones";
 import { Pipeline } from "./components/Pipeline";
 import { BackupControls } from "./components/BackupControls";
 import { stages, emptyEntry, saveValue } from "./storage";
@@ -49,7 +50,7 @@ import { useFilters, stored } from "./hooks/useFilters";
 import { CountryFilter } from "./components/CountryFilter";
 import { CountryFlag } from "./components/EventIdentity";
 import { useToday } from "./hooks/useToday";
-import { mergeOutreach, normalizeEvents } from "./data";
+import { mergeMilestones, mergeOutreach, normalizeEvents } from "./data";
 import meta from "../data/meta.json";
 import type { Event } from "./model";
 import { emptyFilters } from "./model";
@@ -89,8 +90,11 @@ export default function App() {
   const {
     entries,
     outreach,
+    milestones,
     update,
     updateOutreach,
+    updateMilestone,
+    resetMilestone,
     applyEntries,
     setGoing,
     undo,
@@ -102,12 +106,16 @@ export default function App() {
     acknowledgeRecovery,
   } = useEntries();
   const allEvents = useMemo(
-    () => shippedEvents.map((event) =>
-      Object.hasOwn(outreach, event.id)
-        ? { ...event, outreach: mergeOutreach(event.outreach, outreach[event.id]) }
-        : event,
-    ),
-    [shippedEvents, outreach],
+    () => shippedEvents.map((event) => ({
+      ...event,
+      ...(Object.hasOwn(outreach, event.id) && {
+        outreach: mergeOutreach(event.outreach, outreach[event.id]),
+      }),
+      ...(Object.hasOwn(milestones, event.id) && {
+        vendor_milestones: mergeMilestones(event.vendor_milestones, milestones[event.id]),
+      }),
+    })),
+    [shippedEvents, outreach, milestones],
   );
   const [show2026, setShow2026] = useState(
     () => stored("tcg-show-2026-v1") === true,
@@ -163,6 +171,8 @@ export default function App() {
   const selected = onEventPage
     ? events.find((event) => event.id === route.id) ?? allEvents.find((event) => event.id === route.id)
     : null;
+  const sharedSelection = selected && shippedEvents.find((event) => event.id === selected.id);
+  const workspaceHeading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     document.title = onEventPage
       ? (selected?.name ?? "Event not found") + " – Holo Vault"
@@ -486,7 +496,7 @@ export default function App() {
         {storageWarning}
         <section className="workspace">
           <h1 className="sr-only">Holo Vault vendor calendar</h1>
-          <h2 className="sr-only" id="workspace-title" tabIndex={-1}>
+          <h2 className="sr-only" id="workspace-title" tabIndex={-1} ref={workspaceHeading}>
             {view}
           </h2>
           <nav className="tabs" aria-label="Event views">
@@ -521,6 +531,7 @@ export default function App() {
               </button>
             ))}
           </nav>
+          <UpcomingMilestones events={allEvents} open={open} focusFallback={workspaceHeading} />
           <div className="toolbar">
             <label className="search">
               <Search size={18} />
@@ -1026,7 +1037,7 @@ export default function App() {
                   Recurring SG
                 </span>
               </span>
-              <span>All dates are local to the event.</span>
+              <span>Event dates are local to the venue.</span>
             </div>
           )}
         </section>
@@ -1068,6 +1079,7 @@ export default function App() {
           <BackupControls
             entries={entries}
             outreach={outreach}
+            milestones={milestones}
             ids={allEvents.map((e) => e.id)}
             apply={applyEntries}
             priority={{
@@ -1126,8 +1138,12 @@ export default function App() {
                 setGoing={setGoing}
                 onStage={(stage) => update(selected.id, "stage", stage)}
                 onNote={(note) => update(selected.id, "note", note)}
-                knownOutreach={shippedEvents.find((e) => e.id === selected.id)?.outreach}
+                knownOutreach={sharedSelection?.outreach}
                 onOutreach={(patch) => updateOutreach(selected.id, patch)}
+                sharedMilestones={sharedSelection?.vendor_milestones}
+                localMilestones={Object.hasOwn(milestones, selected.id) ? milestones[selected.id] : undefined}
+                onMilestone={(milestone) => updateMilestone(selected.id, milestone)}
+                onRemoveMilestone={(id) => resetMilestone(selected.id, id)}
               />
             </Suspense>
           ) : (

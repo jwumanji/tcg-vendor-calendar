@@ -50,6 +50,7 @@ Unknown values are `null`; nothing is invented.
   - `vendor_booths`: whether booths are offered
   - `vendor_application`: how to apply (contact or link)
   - `vendor_deadline`
+  - `vendor_milestones` is an optional array of vendor booking dates. Each record has a stable `id` within the event, a `type` (`booking_opens`, `application_closes`, `payment_due`, or `other`), `at`, an IANA organizer `timeZone`, a `label`, a `source` URL or reference, a boolean `verified`, and optional `notes`. Use an ISO datetime with an explicit UTC offset when a time is known. Use `YYYY-MM-DD` for a published date without a time. Keep `vendor_deadline` aligned with the verified booking schedule.
   - `vendor_cost`: text in local currency. A past year's rate is labelled with its year.
   - `booth_detail`, `contact`
 - **Outreach**
@@ -102,7 +103,18 @@ backups that omit outreach preserve the browser's existing patches.
 Scanner imports and scraper updates retain the planner's outreach. Rows with
 shared outreach remain addressable if the export omits them or they pass the
 scraper's grace period. An unambiguous Scanner replacement keeps the planner
-ID and records the export's ID in `scanner_export_id` for later refreshes.
+ID and records the export's ID in `scanner_export_id` for later refreshes, even
+when the old Scanner row has no shared planner data.
+
+Booking milestones use the same planner event IDs. Refreshes preserve curated
+milestones and their vendor notice and add new IDs supplied by the export.
+Postponed and cancelled events keep their dates on hold in the editor. Their
+milestones stay out of the upcoming strip and calendar exports while that status
+applies. Browser edits override shared milestones by milestone ID and appear in
+JSON backups under `milestones`. Resetting a shared milestone or deleting a local
+addition removes just that browser edit.
+Merge restores prefer imported records with matching IDs. Backups from before
+this field was added preserve existing booking edits.
 
 ## App metadata and publishing
 

@@ -1,10 +1,12 @@
 import { expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { ics } from "../src/utils";
+import { ics, milestoneIcs } from "../src/utils";
 import { merge, matches } from "./merge.ts";
 import { normalize } from "./normalize.ts";
 import type { Event } from "../src/model.ts";
-import { mergeOutreach, normalizeEvents } from "../src/data.ts";
+import { mergeMilestones, mergeOutreach, normalizeEvents } from "../src/data.ts";
+import { upcomingMilestones } from "../src/milestones.ts";
+import { backup, loadEntries } from "../src/storage";
 import { scanSource, validate } from "./run.ts";
 import sg from "./sources/sg-card-show.ts";
 import expo from "./sources/sg-expo.ts";
@@ -30,6 +32,91 @@ const scanner = (fields: Partial<Event> = {}) => {
   delete e.is_new_find;
   return e;
 };
+const booking = {
+  id: "general-booking",
+  type: "booking_opens" as const,
+  at: "2026-11-30T12:00+08:00",
+  timeZone: "Asia/Singapore",
+  label: "General booking opens",
+  source: "Organizer notice",
+  verified: true,
+};
+
+it("retains curated booking milestones, notices and planner IDs over Scanner exports", () => {
+  const outreach = mergeOutreach(null, { notes: "Keep the venue contact" });
+  const previous = scanner({ outreach, vendor_milestones: [booking], vendor_deadline: "General booking notice" });
+  const replacement = scanner({
+    id: "new-export-id",
+    name: "Singapore Card Show 2026 (World Edition)",
+    start_date: "2027-02-01", end_date: "2027-02-02",
+    vendor_deadline: "Superseded export notice",
+    vendor_milestones: [{ ...booking, at: "2026-12-01" }, { ...booking, id: "extra-opening" }],
+  });
+  const merged = merge([previous], [], today, [replacement]).events;
+  expect(merged).toHaveLength(1);
+  expect(merged[0]).toMatchObject({
+    id: previous.id, scanner_export_id: replacement.id, vendor_deadline: previous.vendor_deadline,
+    vendor_milestones: [booking, { ...booking, id: "extra-opening" }],
+    name: replacement.name, start_date: replacement.start_date, original_start_date: previous.start_date, outreach,
+  });
+  expect(merge(merged, [], today, [replacement]).events).toEqual(merged);
+  expect(merge(merged, [], today, []).events).toEqual(merged);
+  expect(() => validate(merged)).not.toThrow();
+  expect(() => validate([{ ...previous, vendor_milestones: [booking, booking] }])).toThrow(/Invalid event output/);
+});
+
+it("keeps local-only edits and calendar UIDs on a renamed and rescheduled Scanner event", () => {
+  const previous = scanner();
+  const replacement = scanner({ id: "other-export-id", name: "Singapore Card Show 2026 (World Edition)",
+    start_date: "2027-02-01", end_date: "2027-02-02" });
+  const raw = JSON.stringify(backup({}, undefined, undefined, { [previous.id]: [booking] }));
+  const { milestones: edits } = loadEntries({ getItem: () => raw });
+  const refreshed = merge([previous], [], today, [replacement]).events;
+  expect(refreshed).toHaveLength(1);
+  const [next] = normalizeEvents(JSON.parse(JSON.stringify(refreshed)));
+  expect(next).toMatchObject({ id: previous.id, scanner_export_id: replacement.id, start_date: replacement.start_date });
+  const [reminder] = mergeMilestones(next.vendor_milestones, edits[next.id]);
+  expect(reminder).toEqual(booking);
+  const uid = (value: string) => value.match(/^UID:.+$/m)?.[0];
+  expect(uid(milestoneIcs(next, reminder))).toBe(uid(milestoneIcs(previous, booking)));
+  expect(uid(ics([next]))).toBe(uid(ics([previous])));
+  expect(merge(refreshed, [], today, [{ ...replacement, name: "A new export title" }]).events[0].id).toBe(previous.id);
+});
+
+it("uses an edition-specific listing link to preserve identity after a larger move and title change", () => {
+  const website = "https://example.com/events/singapore-card-show-2026";
+  const previous = scanner({ website, vendor_milestones: [booking] });
+  const replacement = scanner({ id: "new-title", website, name: "World Collectibles Expo",
+    start_date: "2027-05-01", end_date: "2027-05-02" });
+  expect(merge([previous], [], today, [replacement]).events).toMatchObject([{
+    id: previous.id, scanner_export_id: replacement.id, name: replacement.name, vendor_milestones: [booking],
+  }]);
+});
+
+it("keeps bookings on their original edition when another numbered edition appears", () => {
+  const previous = scanner({ name: "Card Con 3", vendor_milestones: [booking] });
+  const next = scanner({ id: "other-edition", name: "Card Con 4", start_date: "2027-02-01", end_date: "2027-02-02" });
+  expect(merge([previous], [], today, [next]).events).toEqual([next, previous]);
+});
+
+it.each(["postponed", "cancelled"] as const)("puts retained booking dates on hold when a same-ID import is %s", (event_status) => {
+  const previous = scanner({ vendor_milestones: [booking], vendor_deadline: "General booking notice" });
+  const [updated] = merge([previous], [], today, [scanner({ event_status })]).events;
+  expect(updated).toMatchObject({ id: previous.id, event_status, vendor_milestones: [booking] });
+  expect(upcomingMilestones([updated], Date.parse(now))).toEqual([]);
+  expect(() => milestoneIcs(updated, booking)).toThrow(event_status);
+  expect(ics([updated])).not.toMatch(/General booking opens|General booking notice/);
+});
+
+it("retains shared milestones on scraped shows across updates and the grace-period prune", () => {
+  const previous = find({ vendor_milestones: [booking], vendor_deadline: "Booking from the organizer" });
+  const refresh = find({ vendor_deadline: null, vendor_milestones: [{ ...booking, at: "2026-12-02" }] });
+  const merged = merge([previous], [refresh], today).events;
+  expect(merged[0]).toMatchObject({
+    id: previous.id, vendor_deadline: previous.vendor_deadline, vendor_milestones: [booking],
+  });
+  expect(merge(merged, [], "2027-02-01").events).toEqual(merged);
+});
 it("matches year, edition and subtitle variants across overlapping or nearby dates", () => {
   expect(
     matches(
@@ -113,7 +200,7 @@ it("replaces the Scanner portion and drops a find the new export covers", () => 
   });
   const other = find({ id: "another", name: "Fandom Expo" });
   expect(
-    merge([scanner({ id: "obsolete" }), base, other], [], today, [fresh])
+    merge([scanner({ id: "obsolete", name: "Unrelated old listing" }), base, other], [], today, [fresh])
       .events,
   ).toEqual([fresh, other]);
 });

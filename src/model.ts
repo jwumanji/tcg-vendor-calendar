@@ -50,6 +50,22 @@ export const emptyOutreach: Outreach = {
   published_booth_price: null,
 };
 
+export const milestoneTypes = ["booking_opens", "application_closes", "payment_due", "other"] as const;
+export type MilestoneType = (typeof milestoneTypes)[number];
+
+export interface VendorMilestone {
+  /** Stable within an event, including when its booking date is corrected. */
+  id: string;
+  type: MilestoneType;
+  /** ISO datetime with UTC offset, or YYYY-MM-DD when only the date is known. */
+  at: string;
+  timeZone: string;
+  label: string;
+  source: string;
+  verified: boolean;
+  notes?: string;
+}
+
 export interface Event {
   id: string;
   /** Scanner's ID when a replacement uses an existing planner ID to keep its history. */
@@ -87,6 +103,7 @@ export interface Event {
   vendor_booths: string | null;
   vendor_application: string | null;
   vendor_deadline: string | null;
+  vendor_milestones?: VendorMilestone[];
   vendor_cost: string | null;
   booth_detail: string | null;
   contact: string | null;

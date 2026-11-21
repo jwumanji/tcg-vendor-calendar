@@ -2,6 +2,7 @@ import { load } from "cheerio";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import fixtures from "../../tests/fixtures/new-finds.json";
+import shipped from "../../data/events.json";
 import { mergeOutreach, normalizeEvents } from "../data";
 import { defaultRowSort, groupSortedRows, orderTimelineGroups, sortRows, type OptionalColumn, type RowSort } from "../rows";
 import { scoreEvents } from "../scoring";
@@ -15,6 +16,8 @@ import { CardSections } from "./ListSections";
 import { CalendarView } from "./CalendarView";
 import { Pipeline } from "./Pipeline";
 import { TopPicks } from "./TopPicks";
+import { BookingMilestones } from "./BookingMilestones";
+import { UpcomingMilestones } from "./UpcomingMilestones";
 
 const today = "2026-11-18";
 const [harbour, kowloon, pasar] = normalizeEvents(fixtures);
@@ -22,6 +25,72 @@ const event = { ...harbour, vendor_score: 51 };
 const events = [event, kowloon, pasar, { ...pasar, id: "estimate", estimated_month: "2027-01" }];
 const scores = Object.fromEntries(scoreEvents(events, { today }).map((score) => [score.id, score]));
 const shared = { entries: {}, open: vi.fn(), setGoing: vi.fn() };
+const milestoneActions = { onSave: vi.fn(), onRemove: vi.fn() };
+const booking = {
+  id: "general-booking", type: "booking_opens" as const, at: "2026-12-01T00:00+08:00",
+  timeZone: "Asia/Singapore", label: "General booking opens", source: "https://example.com/booking",
+  verified: true,
+};
+
+it("renders a keyboard-accessible reminder list ordered by booking time", () => {
+  const clock = vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-11-21T00:00:00Z"));
+  try {
+    const $ = load(renderToStaticMarkup(<UpcomingMilestones open={shared.open} events={[
+      { ...kowloon, vendor_milestones: [{ ...booking, at: "2026-12-01T12:00+08:00" }] },
+      { ...event, vendor_milestones: [booking] },
+      { ...pasar, event_status: "cancelled", vendor_milestones: [booking] },
+    ]} />));
+    expect($(".milestone-card strong").map((_, el) => $(el).text()).get()).toEqual([event.name, kowloon.name]);
+    const time = $(".milestone-card time").first();
+    expect(time.attr("datetime")).toBe(booking.at);
+    expect(time.find("span").map((_, el) => $(el).text()).get()).toEqual([
+      "30 Nov 2026, 23:00 Saigon", "1 Dec 2026, 00:00 Singapore",
+    ]);
+    expect($(".milestone-countdown").first().text()).toBe("in 9 days");
+    expect($(".upcoming-milestones .milestone-export")).toHaveLength(2);
+  } finally {
+    clock.mockRestore();
+  }
+});
+
+it("renders an event empty state and only shows a calendar action for verified booking dates", () => {
+  const empty = load(renderToStaticMarkup(<BookingMilestones event={event} {...milestoneActions} />));
+  expect(empty(".booking-milestones > p").text()).toBe("No booking milestones recorded yet.");
+  expect(empty("button").text()).toContain("Add milestone");
+  const draft = { ...booking, id: "draft", verified: false };
+  const $ = load(renderToStaticMarkup(<BookingMilestones event={{ ...event, vendor_milestones: [booking, draft] }}
+    sharedMilestones={[booking]} localMilestones={[booking, draft]} {...milestoneActions} />));
+  expect($("button[aria-label^='Add to calendar']")).toHaveLength(1);
+  expect($("button[aria-label='Edit General booking opens']")).toHaveLength(2);
+  expect($("a[aria-label='Source for General booking opens']").first().attr("href")).toBe(booking.source);
+  expect($(".milestone-badge").text()).toBe("Unverified date");
+  expect($(".booking-milestones").text()).toContain("Verify this date to add it to your calendar.");
+  expect($("button[aria-label^='Reset to shared']")).toHaveLength(1);
+  expect($("button[aria-label^='Delete local milestone']")).toHaveLength(1);
+});
+
+it.each([
+  ["cardcon3", "General booking opens 30 Nov 2026 at 23:00 Saigon time"],
+  ["bkk-card-show", "Table reservations open 1 Dec 2026 at 12:00 Bangkok / Saigon time"],
+])("shows the corrected vendor notice on the %s event page", (id, notice) => {
+  const e = normalizeEvents(shipped).find((row) => row.id === id)!;
+  const $ = load(renderToStaticMarkup(<Detail today={today} e={e} entry={emptyEntry} score={scoreEvents([e])[0]}
+    saved setGoing={shared.setGoing} onStage={vi.fn()} onNote={vi.fn()} onOutreach={vi.fn()} onMilestone={vi.fn()}
+    onRemoveMilestone={vi.fn()} setOverride={vi.fn()} openClash={vi.fn()} toast={null} />));
+  expect($("dt").filter((_, field) => $(field).text() === "Vendor notice").next().text()).toContain(notice);
+  expect($("body").text()).not.toMatch(/Card Con 2 exhibitors first|Not published \(zone-based, book early\)/);
+});
+
+it("labels postponed bookings as on hold and removes their calendar action and vendor notice", () => {
+  const e = { ...event, event_status: "postponed" as const, vendor_milestones: [booking], vendor_deadline: "Old booking notice" };
+  const $ = load(renderToStaticMarkup(<Detail today={today} e={e} entry={emptyEntry} score={scoreEvents([e])[0]}
+    saved setGoing={shared.setGoing} onStage={vi.fn()} onNote={vi.fn()} onOutreach={vi.fn()} onMilestone={vi.fn()}
+    onRemoveMilestone={vi.fn()} setOverride={vi.fn()} openClash={vi.fn()} toast={null} />));
+  expect($(".milestone-badge").text()).toBe("Booking date on hold");
+  expect($(".booking-milestones").text()).toContain("Calendar export is paused while the event is postponed.");
+  expect($(".booking-milestones .milestone-export, .booking-milestones .milestone-countdown")).toHaveLength(0);
+  expect($("body").text()).not.toContain("Old booking notice");
+});
 
 function layouts(sort: RowSort, columns: OptionalColumn[] = [], list = events, results = scores) {
   const sorted = sortRows(list, sort, {}, results, today);
@@ -126,7 +195,7 @@ it.each([
   const $ = load(renderToStaticMarkup(
     <Detail today={today} e={{ ...event, contact, vendor_application }} entry={emptyEntry}
       score={scores[event.id]} saved setGoing={shared.setGoing}
-      onStage={vi.fn()} onNote={vi.fn()} onOutreach={vi.fn()} setOverride={vi.fn()} openClash={vi.fn()} toast={null} />,
+      onStage={vi.fn()} onNote={vi.fn()} onOutreach={vi.fn()} onMilestone={vi.fn()} onRemoveMilestone={vi.fn()} setOverride={vi.fn()} openClash={vi.fn()} toast={null} />,
   ));
   expect($(".outreach-section a").attr("href")).toBe(href);
   expect($(".outreach-section a").text()).toBe(label);
@@ -140,7 +209,7 @@ it("labels the event outreach section, editor, research links and prices indepen
   const $ = load(renderToStaticMarkup(
     <Detail today={today} e={{ ...event, outreach }} knownOutreach={outreach} entry={emptyEntry}
       score={scores[event.id]} saved setGoing={shared.setGoing}
-      onStage={vi.fn()} onNote={vi.fn()} onOutreach={vi.fn()} setOverride={vi.fn()} openClash={vi.fn()} toast={null} />,
+      onStage={vi.fn()} onNote={vi.fn()} onOutreach={vi.fn()} onMilestone={vi.fn()} onRemoveMilestone={vi.fn()} setOverride={vi.fn()} openClash={vi.fn()} toast={null} />,
   ));
   const section = $("section[aria-labelledby='outreach-heading']");
   expect($("#outreach-heading").text()).toBe("Outreach");
@@ -159,7 +228,7 @@ it("labels the event outreach section, editor, research links and prices indepen
 it("keeps the scanner value in the event page priority breakdown", () => {
   const $ = load(renderToStaticMarkup(
     <Detail today={today} e={event} entry={emptyEntry} score={scores[event.id]} saved setGoing={shared.setGoing}
-      onStage={vi.fn()} onNote={vi.fn()} onOutreach={vi.fn()} setOverride={vi.fn()} openClash={vi.fn()} toast={null} />,
+      onStage={vi.fn()} onNote={vi.fn()} onOutreach={vi.fn()} onMilestone={vi.fn()} onRemoveMilestone={vi.fn()} setOverride={vi.fn()} openClash={vi.fn()} toast={null} />,
   ));
   const factor = $(".priority-detail details").filter((_, el) => $(el).find("summary").text().includes("Scanner score"));
   expect(factor).toHaveLength(1);
@@ -211,7 +280,7 @@ it("labels cancelled calendar dates, undated postponements, pipeline cards and e
   expect(pipeline(".pcard-tags .badge.cancelled")).toHaveLength(1);
   expect(pipeline(".pcard-tags .badge.postponed")).toHaveLength(1);
   const detail = load(renderToStaticMarkup(<Detail today={today} e={cancelled} score={results[cancelled.id]} entry={emptyEntry}
-    saved setGoing={shared.setGoing} onStage={vi.fn()} onNote={vi.fn()} onOutreach={vi.fn()}
+    saved setGoing={shared.setGoing} onStage={vi.fn()} onNote={vi.fn()} onOutreach={vi.fn()} onMilestone={vi.fn()} onRemoveMilestone={vi.fn()}
     setOverride={vi.fn()} openClash={vi.fn()} toast={null} />));
   expect(detail(".badge.cancelled").text()).toBe("Cancelled");
   expect(detail(".note").text()).toContain(cancelled.date_note);

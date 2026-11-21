@@ -1,13 +1,11 @@
 import { useMemo } from "react";
-import { ArrowUpRight, Clock, Gem } from "lucide-react";
+import { Gem } from "lucide-react";
 import type { Event } from "../model";
 import { compareByScore, TIER_THRESHOLDS, type ScoreResult } from "../scoring";
 import { emptyEntry, type Entries } from "../storage";
 import {
   displayDateLabel,
-  deadlineDate,
   isUndated,
-  prettyDate,
   primaryGameKey,
   upcoming,
 } from "../utils";
@@ -41,25 +39,8 @@ export function TopPicks({
         .sort((a, b) => compareByScore(scores[a.id], scores[b.id])),
     [events, today, scores],
   );
-  const deadlines = useMemo(
-    () =>
-      events
-        .filter((e) => e.event_status !== "cancelled" && e.vendor_deadline && upcoming(e, today))
-        .sort((a, b) =>
-          (deadlineDate(a.vendor_deadline) || "9999").localeCompare(
-            deadlineDate(b.vendor_deadline) || "9999",
-          ),
-        )
-        .filter(
-          (e) =>
-            !deadlineDate(e.vendor_deadline) ||
-            deadlineDate(e.vendor_deadline)! >= today,
-        ),
-    [events, today],
-  );
-  // Select by rank and deadline, then display both subsets in the shared view order.
+  // Select by priority, then render in the shared view order.
   const ranks = new Map(top.slice(0, 12).map((e, i) => [e.id, i + 1]));
-  const soonest = new Set(deadlines.slice(0, 6).map((e) => e.id));
   return (
     <section className="overview">
       <div className="picks">
@@ -136,37 +117,6 @@ export function TopPicks({
             </li>
           ))}
         </ul>
-      </div>
-      <div className="deadline-box">
-        <div className="section-label">
-          <span>
-            <Clock size={14} /> UPCOMING DEADLINES
-          </span>
-        </div>
-        {deadlines.length === 0 && (
-          <p className="deadline-empty">No open vendor deadlines right now.</p>
-        )}
-        {events.filter((e) => soonest.has(e.id)).map((e) => (
-          <button key={e.id} onClick={() => open(e)}>
-            <span className="deadline-date">
-              {deadlineDate(e.vendor_deadline)
-                ? prettyDate(deadlineDate(e.vendor_deadline)!)
-                : "CHECK DETAILS"}
-            </span>
-            <strong>{e.name}</strong>
-            <span className="card-tags">
-              <PriorityChip result={scores[e.id]} />
-              <ScheduleBadge e={e} />
-              <StageBadge stage={(entries[e.id] || emptyEntry).stage} />
-              {entries[e.id]?.note.trim() && <NoteTag />}
-            </span>
-            <span className="deadline-copy">{e.vendor_deadline}</span>
-            <ArrowUpRight size={15} />
-          </button>
-        ))}
-        <small>
-          Registration notes may include player dates. Check vendor details.
-        </small>
       </div>
     </section>
   );

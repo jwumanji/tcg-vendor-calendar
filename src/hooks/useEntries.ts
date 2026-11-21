@@ -6,13 +6,16 @@ import {
   backup,
   emptyEntry,
   loadEntries,
+  removeMilestoneEdit,
   saveValue,
   STORAGE_KEY,
   type Entries,
   type LoadedEntries,
+  type MilestoneEdits,
   type OutreachPatches,
 } from "../storage";
-import type { OutreachPatch } from "../model";
+import type { OutreachPatch, VendorMilestone } from "../model";
+import { mergeMilestones } from "../data";
 import { download } from "../utils";
 
 export function useEntries() {
@@ -23,6 +26,7 @@ export function useEntries() {
       return {
         entries: {},
         outreach: {},
+        milestones: {},
         error: "Storage is unavailable. Export a backup to keep changes.",
         raw: null,
         recoveryKey: null,
@@ -35,13 +39,15 @@ export function useEntries() {
     patch: ReturnType<typeof inverseGoingPatch>;
     changedAt: string;
   };
-  const [{ entries, outreach, undo }, setState] = useState<{
+  const [{ entries, outreach, milestones, undo }, setState] = useState<{
     entries: Entries;
     outreach: OutreachPatches;
+    milestones: MilestoneEdits;
     undo: Undo | null;
   }>({
     entries: loaded.entries,
     outreach: loaded.outreach,
+    milestones: loaded.milestones,
     undo: null,
   });
   const [storageError, setStorageError] = useState(loaded.error);
@@ -75,12 +81,32 @@ export function useEntries() {
       },
     }));
   }, []);
+  const updateMilestone = useCallback((id: string, milestone: VendorMilestone) => {
+    setSaved(false);
+    setState((current) => ({
+      ...current,
+      milestones: {
+        ...current.milestones,
+        [id]: mergeMilestones(
+          Object.hasOwn(current.milestones, id) ? current.milestones[id] : undefined,
+          [milestone],
+        ),
+      },
+    }));
+  }, []);
+  const resetMilestone = useCallback((id: string, milestoneId: string) => {
+    setSaved(false);
+    setState((current) => ({
+      ...current,
+      milestones: removeMilestoneEdit(current.milestones, id, milestoneId),
+    }));
+  }, []);
   useEffect(() => {
     if (!canSave) return;
-    const error = saveValue(STORAGE_KEY, backup(entries, undefined, outreach));
+    const error = saveValue(STORAGE_KEY, backup(entries, undefined, outreach, milestones));
     setSaved(!error);
     setStorageError(error);
-  }, [entries, outreach, canSave]);
+  }, [entries, outreach, milestones, canSave]);
   const setGoing = useCallback((ids: readonly string[], going: boolean) => {
     const now = new Date().toISOString();
     setState((current) => {
@@ -124,15 +150,18 @@ export function useEntries() {
     setStorageError("");
     setCanSave(true);
   }
-  function applyEntries(entries: Entries, outreach: OutreachPatches) {
+  function applyEntries(entries: Entries, outreach: OutreachPatches, milestones: MilestoneEdits) {
     setSaved(false);
-    setState({ entries, outreach, undo: null });
+    setState({ entries, outreach, milestones, undo: null });
   }
   return {
     entries,
     outreach,
+    milestones,
     update,
     updateOutreach,
+    updateMilestone,
+    resetMilestone,
     undo,
     undoGoing,
     setGoing,

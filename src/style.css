@@ -432,7 +432,7 @@ section[id],
   text-align: right;
 }
 
-/* ---------- Overview: picks + deadlines ---------- */
+/* ---------- Top picks ---------- */
 .overview {
   display: grid;
   gap: 28px;
@@ -605,80 +605,6 @@ section[id],
 }
 .priority-legend li span {
   font-weight: 400;
-}
-
-/* Deadlines as perforated ticket stubs */
-.deadline-box {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.deadline-box .section-label {
-  margin-bottom: 4px;
-}
-.deadline-box > button {
-  position: relative;
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 4px 10px;
-  align-items: start;
-  text-align: left;
-  width: 100%;
-  min-height: 44px;
-  padding: 14px 16px 14px 22px;
-  border-radius: 14px;
-  background:
-    radial-gradient(circle at 0 50%, var(--bg) 8px, transparent 8.5px),
-    linear-gradient(90deg, rgb(var(--warn) / 0.16), transparent 55%),
-    var(--surface);
-  border: 1px solid var(--line);
-  border-left: 2px dashed rgb(var(--warn) / 0.8);
-  transition:
-    transform 0.2s,
-    border-color 0.2s;
-}
-.deadline-box > button:hover {
-  transform: translateX(3px);
-  border-color: var(--line-2);
-}
-.deadline-box > button > * {
-  grid-column: 1;
-}
-.deadline-date {
-  font: 700 12px var(--font-mono);
-  letter-spacing: 0.1em;
-  color: rgb(var(--warn));
-}
-:root[data-theme="light"] .deadline-date {
-  color: var(--score-1-fg);
-}
-.deadline-box strong {
-  font-size: 16px;
-  line-height: 1.3;
-  font-weight: 800;
-}
-.deadline-box > button > svg {
-  grid-column: 2;
-  grid-row: 1;
-  color: var(--muted);
-}
-.deadline-box > button .badge,
-.deadline-box > button > span:not(.deadline-date):not(.deadline-copy) {
-  justify-self: start;
-}
-.deadline-copy {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  font-size: 13.5px;
-  line-height: 1.45;
-  color: var(--muted);
-}
-.deadline-box > small {
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--muted);
 }
 
 /* ---------- Buttons ---------- */
@@ -2174,21 +2100,6 @@ footer > small {
 .empty .button {
   margin-top: 10px;
 }
-.deadline-empty {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 10px 14px;
-  border-radius: 12px;
-  border: 1px solid var(--line);
-  background: var(--surface);
-  font-size: 14px;
-  line-height: 1.5;
-  color: var(--muted);
-}
-.deadline-empty {
-  border-style: dashed;
-}
 .storage-warning > p {
   display: flex;
   align-items: flex-start;
@@ -2631,11 +2542,6 @@ input[type="range"]::-moz-range-thumb {
   .brand-word {
     font-size: 18px;
   }
-  .overview {
-    grid-template-columns: minmax(0, 2.5fr) minmax(0, 1fr);
-    gap: 36px;
-    align-items: start;
-  }
   .pick-grid {
     gap: 18px;
   }
@@ -2667,17 +2573,6 @@ input[type="range"]::-moz-range-thumb {
     gap: 2px;
     padding: 3px;
     font-size: 12px;
-  }
-  .overview {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .deadline-box {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .deadline-box .section-label,
-  .deadline-box > small {
-    grid-column: 1 / -1;
   }
   .filter-grid > :nth-child(n + 4) {
     grid-column: auto;
@@ -3327,4 +3222,183 @@ input[type="checkbox"]:indeterminate::after { content: ""; width: 10px; height: 
 .country-panel .country-count { font: 700 12px var(--font-mono); color: var(--muted); }
 .country-panel .country-clear { margin: 6px 8px 2px; color: var(--accent); font-weight: 700; text-decoration: underline; }
 .country-filter .count { background: var(--accent); color: var(--on-accent); border-radius: 99px; padding: 0 6px; font-size: 11px; }
+
+/* Vendor booking milestones */
+.upcoming-milestones {
+  margin: 12px 0;
+}
+.upcoming-milestones > h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font: 750 16px var(--font-text);
+}
+.upcoming-milestones > h3 svg {
+  flex: none;
+  color: var(--accent);
+}
+.upcoming-milestones ul {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr));
+  gap: 8px;
+}
+.upcoming-milestones li {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--score-1-bd);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--score-1-bg) 38%, var(--surface));
+}
+.milestone-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-content: start;
+  gap: 3px 8px;
+  width: 100%;
+  flex: 1;
+  min-height: 44px;
+  padding: 10px 12px 6px;
+  border: 0;
+  border-radius: 9px 9px 0 0;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.milestone-card:hover {
+  background: color-mix(in srgb, var(--score-1-bg) 68%, var(--surface));
+}
+.upcoming-milestones .milestone-export {
+  align-self: flex-start;
+  margin: 0 12px 8px;
+}
+.milestone-toggle {
+  margin-top: 8px;
+}
+.milestone-card strong {
+  font-size: 15px;
+  line-height: 1.25;
+}
+.milestone-arrow {
+  color: var(--accent);
+}
+.milestone-card > :is(.milestone-label, .milestone-time, .milestone-countdown, .milestone-notes) {
+  grid-column: 1 / -1;
+}
+.milestone-label {
+  color: var(--score-1-fg);
+  font-size: 14px;
+  font-weight: 750;
+}
+.milestone-time {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  color: var(--ink);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.milestone-time span + span {
+  color: var(--muted);
+}
+.milestone-time span:first-child {
+  font-weight: 750;
+}
+.milestone-countdown {
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 650;
+}
+.milestone-notes,
+.booking-milestones > p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.booking-milestones {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+  margin-bottom: 18px;
+  padding: 14px;
+  border: 1px solid var(--score-1-bd);
+  border-radius: 15px;
+  background: var(--surface);
+}
+.detail-body .booking-milestones > h2 {
+  margin: 0;
+}
+.booking-milestone {
+  display: grid;
+  gap: 4px;
+}
+.booking-milestone + .booking-milestone {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.booking-milestone h3 {
+  font-size: 16px;
+}
+.milestone-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+.milestone-badge {
+  padding: 2px 8px;
+  border: 1px solid var(--score-1-bd);
+  border-radius: 999px;
+  background: var(--score-1-bg);
+  color: var(--score-1-fg);
+  font-size: 12px;
+  font-weight: 750;
+}
+.milestone-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+.milestone-dialog {
+  margin: auto;
+}
+.detail-body #milestone-editor-title {
+  margin: 0;
+  font-size: 18px;
+}
+.detail-body #milestone-editor-title::before {
+  display: none;
+}
+.milestone-form {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+.milestone-form label {
+  display: grid;
+  gap: 4px;
+  font-size: 14px;
+  font-weight: 700;
+}
+.milestone-form :is(input:not([type="checkbox"]), textarea, select) {
+  min-width: 0;
+  width: 100%;
+}
+.milestone-form p {
+  color: var(--muted);
+  font-size: 13px;
+}
+.milestone-form .milestone-verified {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+}
+.milestone-verified input {
+  min-height: 0;
+}
 .place .flag-img { flex-shrink: 0; }

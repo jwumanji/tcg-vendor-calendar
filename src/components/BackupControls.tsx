@@ -15,14 +15,17 @@ import {
   validateBackup,
   importEntries,
   importOutreach,
+  importMilestoneEdits,
   unknownIds,
   type Entries,
   type OutreachPatches,
+  type MilestoneEdits,
 } from "../storage";
 import { download } from "../utils";
 export function BackupControls({
   entries,
   outreach,
+  milestones,
   ids,
   apply,
   priority,
@@ -30,20 +33,23 @@ export function BackupControls({
 }: {
   entries: Entries;
   outreach: OutreachPatches;
+  milestones: MilestoneEdits;
   ids: string[];
   priority: PriorityPreferences;
   applyPriority: (value: PriorityPreferences) => void;
-  apply: (entries: Entries, outreach: OutreachPatches) => void;
+  apply: (entries: Entries, outreach: OutreachPatches, milestones: MilestoneEdits) => void;
 }) {
   const [preview, setPreview] = useState<Backup | null>(null);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
   const [mode, setMode] = useState<"merge" | "replace">("merge");
   const absent = preview
-    ? unknownIds(preview.entries, ids, preview.priority?.overrides, preview.outreach)
+    ? unknownIds(preview.entries, ids, preview.priority?.overrides, preview.outreach, preview.milestones)
     : [];
   const outreachCount = Object.keys(preview?.outreach ?? {}).length;
   const outreachSummary = `${outreachCount} outreach ${outreachCount === 1 ? "patch" : "patches"}`;
+  const milestoneCount = Object.values(preview?.milestones ?? {}).reduce((count, records) => count + records.length, 0);
+  const milestoneSummary = `${milestoneCount} booking milestone ${milestoneCount === 1 ? "edit" : "edits"}`;
   return (
     <div className="backup-controls">
       <div className="backup-intro">
@@ -51,7 +57,7 @@ export function BackupControls({
           <HardDrive size={16} aria-hidden="true" /> Backup &amp; restore
         </span>
         <span>
-          Going choices, stages, notes, outreach edits and score settings are kept in this
+          Going choices, stages, notes, outreach edits, booking milestone edits and score settings are kept in this
           browser only. Export a backup before switching devices.
         </span>
       </div>
@@ -60,7 +66,7 @@ export function BackupControls({
           className="button"
           onClick={() =>
             download(
-              JSON.stringify(backup(entries, priority, outreach), null, 2),
+              JSON.stringify(backup(entries, priority, outreach, milestones), null, 2),
               "tcg-pipeline-backup.json",
               "application/json",
             )
@@ -110,6 +116,7 @@ export function BackupControls({
           {preview.outreach && (
             <p>{outreachSummary}</p>
           )}
+          {preview.milestones && <p>{milestoneSummary}</p>}
           <p>
             {absent.length} IDs absent from current data (kept):{" "}
             {absent.slice(0, 20).join(", ") || "none"}
@@ -141,6 +148,11 @@ export function BackupControls({
                 ? "Imported outreach edits take precedence for matching fields."
                 : "Imported outreach edits replace your current device edits. Shared outreach data still applies."}
           </p>
+          {preview.milestones && (
+            <p>{mode === "merge"
+              ? "Imported booking edits take precedence for matching milestones."
+              : "Imported booking edits replace your current device edits. Shared milestones still apply."}</p>
+          )}
           {preview.priority && (
             <p>
               Imported score weights will apply to all events.{" "}
@@ -154,17 +166,21 @@ export function BackupControls({
               className="button primary"
               onClick={() => {
                 try {
-                  if (mode === "replace") stashBeforeReplace(entries, priority, outreach);
+                  if (mode === "replace") stashBeforeReplace(entries, priority, outreach, milestones);
                   apply(
                     importEntries(entries, preview.entries, mode),
                     importOutreach(outreach, preview.outreach, mode),
+                    importMilestoneEdits(milestones, preview.milestones, mode),
                   );
                   applyPriority(
                     importPriority(priority, preview.priority, mode),
                   );
-                  setStatus(
-                    `Imported ${Object.keys(preview.entries).length} entries${preview.outreach ? " and " + outreachSummary : ""} (${mode}).`,
-                  );
+                  const summary = [
+                    `${Object.keys(preview.entries).length} entries`,
+                    preview.outreach && outreachSummary,
+                    preview.milestones && milestoneSummary,
+                  ].filter(Boolean).join(" · ");
+                  setStatus(`Imported ${summary} (${mode}).`);
                   setError("");
                   setPreview(null);
                 } catch {

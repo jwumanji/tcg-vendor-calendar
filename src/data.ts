@@ -1,12 +1,16 @@
 import {
   emptyOutreach,
+  milestoneTypes,
   outreachContactTypes,
   outreachMethods,
   outreachStatuses,
   type Event,
   type Outreach,
   type OutreachPatch,
+  type MilestoneType,
+  type VendorMilestone,
 } from "./model.ts";
+import { milestoneInstantInRange } from "./milestones.ts";
 const nullableStrings = [
   "games_note",
   "date_note",
@@ -59,6 +63,69 @@ const record = (value: unknown): value is Record<string, unknown> =>
 const isText = (value: unknown): value is string => typeof value === "string";
 const httpUrl = (value: unknown): value is string =>
   isText(value) && /^https?:\/\//i.test(value) && URL.canParse(value);
+export function milestoneSourceHref(source: string): string | undefined {
+  return httpUrl(source) ? source : undefined;
+}
+
+const zones = new Set<string>();
+function validTimeZone(zone: string) {
+  if (zones.has(zone)) return true;
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: zone });
+    zones.add(zone);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function normalizeMilestone(value: unknown): VendorMilestone {
+  if (!record(value) || !isText(value.id) || !/^[a-z0-9][a-z0-9-]*$/.test(value.id))
+    throw new Error("Booking milestone needs a stable ID.");
+  if (!milestoneTypes.includes(value.type as MilestoneType))
+    throw new Error("Choose a booking milestone type.");
+  const at = isText(value.at) ? value.at.trim() : "";
+  const timed = /^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,3})?)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/.test(at);
+  if (!(timed && validDate(at.slice(0, 10)) && Number.isFinite(Date.parse(at))) && !validDate(at))
+    throw new Error("Enter a valid date or an ISO datetime with a UTC offset.");
+  const timeZone = isText(value.timeZone) ? value.timeZone.trim() : "";
+  if (!/^(?:UTC|[a-z][\w+-]*(?:\/[\w+-]+)+)$/i.test(timeZone) || !validTimeZone(timeZone))
+    throw new Error("Enter a valid organizer time zone, such as Asia/Singapore.");
+  if (at.startsWith("0000-") || (timed && !milestoneInstantInRange(Date.parse(at), timeZone)))
+    throw new Error("Use years 0001–9999 in the entered date, UTC, Saigon and the organizer time zone.");
+  const label = isText(value.label) ? value.label.trim() : "";
+  const source = isText(value.source) ? value.source.trim() : "";
+  if (!label || !source) throw new Error("Enter a label and a source for the milestone.");
+  if (typeof value.verified !== "boolean") throw new Error("Milestone verification must be true or false.");
+  const notes = isText(value.notes) ? value.notes.trim() : "";
+  return { id: value.id, type: value.type as MilestoneType, at, timeZone, label, source, verified: value.verified, ...(notes && { notes }) };
+}
+
+export function normalizeMilestones(value: unknown, strict = false): VendorMilestone[] {
+  if (!Array.isArray(value)) {
+    if (strict) throw new Error("Expected an array of booking milestones.");
+    return [];
+  }
+  const milestones = new Map<string, VendorMilestone>();
+  for (const item of value) {
+    try {
+      const milestone = normalizeMilestone(item);
+      if (milestones.has(milestone.id)) throw new Error(`Duplicate booking milestone ID ${milestone.id}.`);
+      milestones.set(milestone.id, milestone);
+    } catch (error) {
+      if (strict) throw error;
+    }
+  }
+  return [...milestones.values()];
+}
+
+/** Incoming records replace matching milestones and keep unrelated dates. */
+export function mergeMilestones(
+  base: readonly VendorMilestone[] = [],
+  incoming: readonly VendorMilestone[] = [],
+): VendorMilestone[] {
+  return [...new Map([...base, ...incoming].map((milestone) => [milestone.id, milestone])).values()];
+}
 
 export function outreachContactHref(value: unknown): string | undefined {
   if (httpUrl(value)) return value;
@@ -133,10 +200,14 @@ export function normalizeEvents(value: unknown): Event[] {
     };
     if (v.event_status === "cancelled" || v.event_status === "postponed")
       e.event_status = v.event_status;
+    if (typeof v.scanner_export_id === "string" && v.scanner_export_id)
+      e.scanner_export_id = v.scanner_export_id;
     for (const key of nullableStrings)
       e[key] = typeof v[key] === "string" ? v[key] : null;
     if (record(v.outreach)) e.outreach = mergeOutreach(null, normalizeOutreachPatch(v.outreach));
     else if (v.outreach === null) e.outreach = null;
+    const milestones = normalizeMilestones(v.vendor_milestones);
+    if (milestones.length) e.vendor_milestones = milestones;
     for (const key of nullableNumbers)
       e[key] =
         typeof v[key] === "number" && Number.isFinite(v[key]) ? v[key] : null;

@@ -1,7 +1,9 @@
 import { emptyEntry, type Entries } from "./storage";
 import { TIER_THRESHOLDS } from "./scoring";
 import meta from "../data/meta.json";
-import type { Event, Filters } from "./model";
+import type { Event, Filters, VendorMilestone } from "./model";
+import { milestoneSourceHref } from "./data";
+import { isTimedMilestone, milestoneCalendarUnavailable, milestoneTimes } from "./milestones";
 export const gameRules: [string, RegExp][] = [
   ["Pokémon", /pok[eé]mon/i],
   ["One Piece", /one piece/i],
@@ -298,6 +300,36 @@ export function hasConfirmedDates(e: Event) {
 export function hasEstimatedMonth(e: Event) {
   return e.date_status === "estimated" && Boolean(e.estimated_month);
 }
+const calendarHeader = [
+  "BEGIN:VCALENDAR",
+  "VERSION:2.0",
+  "PRODID:-//Holo Vault//TCG Vendor Calendar//EN",
+  "CALSCALE:GREGORIAN",
+];
+const icsInstant = (at: Date) => at.toISOString().replace(/[-:]|\.\d{3}/g, "");
+function serializeCalendar(lines: string[]) {
+  return [...calendarHeader, ...lines, "END:VCALENDAR"].map(foldLine).join("\r\n") + "\r\n";
+}
+
+export function milestoneIcs(event: Event, milestone: VendorMilestone) {
+  const blocked = milestoneCalendarUnavailable(event, milestone);
+  if (blocked) throw new Error(blocked);
+  const sourceUrl = milestoneSourceHref(milestone.source);
+  return serializeCalendar([
+    "BEGIN:VEVENT",
+    `UID:${encodeURIComponent(event.id)}:${milestone.id}@milestones.tcg-vendor-calendar`,
+    `DTSTAMP:${icsInstant(new Date())}`,
+    isTimedMilestone(milestone)
+      ? `DTSTART:${icsInstant(new Date(milestone.at))}`
+      : `DTSTART;VALUE=DATE:${milestone.at.replaceAll("-", "")}`,
+    `SUMMARY:${escapeICS(`${event.name} — ${milestone.label}`)}`,
+    `DESCRIPTION:${escapeICS([...milestoneTimes(milestone), milestone.notes, sourceUrl ? null : milestone.source].filter(Boolean).join("\n"))}`,
+    ...(sourceUrl ? [`URL:${escapeICS(sourceUrl)}`] : []),
+    "TRANSP:TRANSPARENT",
+    "END:VEVENT",
+  ]);
+}
+
 export function ics(events: Event[], includeEstimated = false) {
   if (
     !events.some(
@@ -305,12 +337,7 @@ export function ics(events: Event[], includeEstimated = false) {
     )
   )
     throw new Error("No confirmed dates to export.");
-  const lines = [
-    "BEGIN:VCALENDAR",
-    "VERSION:2.0",
-    "PRODID:-//Holo Vault//TCG Vendor Calendar//EN",
-    "CALSCALE:GREGORIAN",
-  ];
+  const lines: string[] = [];
   for (const e of events) {
     const estimated = includeEstimated && hasEstimatedMonth(e);
     if (!estimated && !hasConfirmedDates(e)) continue;
@@ -318,6 +345,14 @@ export function ics(events: Event[], includeEstimated = false) {
     const dates = estimated
       ? [{ start_date: first, end_date: first }]
       : ranges(e);
+    const verified = e.vendor_milestones?.filter((milestone) => !milestoneCalendarUnavailable(e, milestone));
+    const description = [
+      e.description,
+      ...(verified ?? []).map((milestone) =>
+        [milestone.label, ...milestoneTimes(milestone), milestone.notes].filter(Boolean).join(" · "),
+      ),
+      !e.event_status && e.vendor_deadline ? `${verified?.length ? "Vendor notice" : "Vendor deadline"}: ${e.vendor_deadline}` : null,
+    ].filter(Boolean).join("\n");
     for (const [index, r] of dates.entries()) {
       const occurrence = e.occurrences?.[index];
       const publishedStart = occurrence ? occurrence.original_start_date ?? occurrence.start_date :
@@ -327,10 +362,7 @@ export function ics(events: Event[], includeEstimated = false) {
       lines.push(
         "BEGIN:VEVENT",
         `UID:${e.id}-${publishedStart}@tcg-vendor-calendar`,
-        `DTSTAMP:${new Date()
-          .toISOString()
-          .replace(/[-:]/g, "")
-          .replace(/\.\d{3}/, "")}`,
+        `DTSTAMP:${icsInstant(new Date())}`,
         `DTSTART;VALUE=DATE:${r.start_date.replaceAll("-", "")}`,
         `DTEND;VALUE=DATE:${next.toISOString().slice(0, 10).replaceAll("-", "")}`,
         `SUMMARY:${escapeICS(estimated ? "Est. " + monthLabel(e.estimated_month!) + " · " + e.name : e.name)}`,
@@ -342,18 +374,13 @@ export function ics(events: Event[], includeEstimated = false) {
               `LOCATION:${escapeICS([e.venue, e.city, e.country].filter(Boolean).join(", "))}`,
             ]
           : []),
-        ...([e.description, e.vendor_deadline].some(Boolean)
-          ? [
-              `DESCRIPTION:${escapeICS([e.description, e.vendor_deadline ? `Vendor deadline: ${e.vendor_deadline}` : null].filter(Boolean).join("\n"))}`,
-            ]
-          : []),
+        ...(description ? [`DESCRIPTION:${escapeICS(description)}`] : []),
         ...(safeUrl(e.website) ? [`URL:${escapeICS(e.website!)}`] : []),
         "END:VEVENT",
       );
     }
   }
-  lines.push("END:VCALENDAR");
-  return lines.map(foldLine).join("\r\n") + "\r\n";
+  return serializeCalendar(lines);
 }
 export function download(content: string, name: string, type: string) {
   const url = URL.createObjectURL(new Blob([content], { type }));

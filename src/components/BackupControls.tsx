@@ -22,6 +22,7 @@ import {
   type MilestoneEdits,
 } from "../storage";
 import { download } from "../utils";
+import { findHomeBase, homeBaseLabel, resolveHomeBase } from "../homeBase";
 export function BackupControls({
   entries,
   outreach,
@@ -50,6 +51,9 @@ export function BackupControls({
   const outreachSummary = `${outreachCount} outreach ${outreachCount === 1 ? "patch" : "patches"}`;
   const milestoneCount = Object.values(preview?.milestones ?? {}).reduce((count, records) => count + records.length, 0);
   const milestoneSummary = `${milestoneCount} booking milestone ${milestoneCount === 1 ? "edit" : "edits"}`;
+  const currentHomeBase = resolveHomeBase(priority.homeBase);
+  const importedHomeBaseId = preview?.priority?.homeBase;
+  const importedHomeBase = findHomeBase(importedHomeBaseId);
   return (
     <div className="backup-controls">
       <div className="backup-intro">
@@ -160,6 +164,12 @@ export function BackupControls({
                 ? "Imported overrides take precedence for matching IDs."
                 : "Imported overrides replace all saved overrides."}
             </p>
+          )}
+          {importedHomeBase && importedHomeBase.id !== currentHomeBase.id && (
+            <p>Home base will change from {homeBaseLabel(currentHomeBase)} to {homeBaseLabel(importedHomeBase)}.</p>
+          )}
+          {importedHomeBaseId !== undefined && !importedHomeBase && (
+            <p>The backup specifies an unknown home base. Your home base will stay set to {homeBaseLabel(currentHomeBase)}.</p>
           )}
           <div className="import-actions">
             <button

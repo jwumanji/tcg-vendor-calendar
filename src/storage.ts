@@ -1,5 +1,6 @@
 import { normalizeWeights, type Weights } from "./scoring";
 import { mergeMilestones, normalizeMilestones, normalizeOutreachPatch } from "./data";
+import { findHomeBase } from "./homeBase";
 import type { OutreachPatch, VendorMilestone } from "./model";
 
 export const stages = [
@@ -103,6 +104,7 @@ export function undoGoingPatch(
 export const STORAGE_KEY = "tcg-pipeline-v1";
 export const WEIGHTS_KEY = "tcg-priority-weights";
 export const OVERRIDES_KEY = "tcg-priority-overrides";
+export const HOME_BASE_KEY = "tcg-priority-home-base";
 export function normalizeOverrides(value: unknown): Record<string, number> {
   if (!object(value)) return {};
   return Object.fromEntries(
@@ -116,6 +118,7 @@ export function normalizeOverrides(value: unknown): Record<string, number> {
 export interface PriorityPreferences {
   weights: Weights;
   overrides: Record<string, number>;
+  homeBase?: string;
 }
 export interface Backup {
   priority?: PriorityPreferences;
@@ -210,9 +213,13 @@ export function validateBackup(value: unknown): Backup {
       !object(value.priority.overrides)
     )
       throw new Error("Invalid priority settings in backup.");
+    const homeBase = value.priority.homeBase;
+    if (homeBase !== undefined && typeof homeBase !== "string")
+      throw new Error("Invalid home base ID in backup.");
     result.priority = {
       weights: normalizeWeights(value.priority.weights),
       overrides: normalizeOverrides(value.priority.overrides),
+      ...(homeBase !== undefined && { homeBase }),
     };
   }
   return result;
@@ -238,12 +245,14 @@ export function importPriority(
   mode: "merge" | "replace",
 ): PriorityPreferences {
   if (!incoming) return current;
+  const homeBase = findHomeBase(incoming.homeBase)?.id ?? current.homeBase;
   return {
     weights: incoming.weights,
     overrides:
       mode === "merge"
         ? { ...current.overrides, ...incoming.overrides }
         : incoming.overrides,
+    ...(homeBase !== undefined && { homeBase }),
   };
 }
 export function importEntries(

@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Event } from "../model";
+import { resolveHomeBase } from "../homeBase";
 import { normalizeWeights, scoreEvents } from "../scoring";
 import {
   normalizeOverrides,
+  HOME_BASE_KEY,
   OVERRIDES_KEY,
   WEIGHTS_KEY,
   saveValue,
@@ -20,6 +22,9 @@ export function usePriority(
   const [overrides, setOverrides] = useState(() =>
     normalizeOverrides(stored(OVERRIDES_KEY)),
   );
+  const [homeBase, setHomeBase] = useState(() =>
+    resolveHomeBase(stored(HOME_BASE_KEY)).id,
+  );
   useEffect(() => {
     const error = saveValue(WEIGHTS_KEY, weights);
     if (error) reportError(error);
@@ -28,6 +33,10 @@ export function usePriority(
     const error = saveValue(OVERRIDES_KEY, overrides);
     if (error) reportError(error);
   }, [overrides, reportError]);
+  useEffect(() => {
+    const error = saveValue(HOME_BASE_KEY, homeBase);
+    if (error) reportError(error);
+  }, [homeBase, reportError]);
   // Keep several open tabs in sync: adopt another tab's change, but only when
   // the content really differs, so two tabs never ping-pong writes.
   useEffect(() => {
@@ -38,6 +47,8 @@ export function usePriority(
       } else if (event.key === OVERRIDES_KEY) {
         const next = normalizeOverrides(stored(OVERRIDES_KEY));
         setOverrides((cur) => (JSON.stringify(cur) === JSON.stringify(next) ? cur : next));
+      } else if (event.key === HOME_BASE_KEY) {
+        setHomeBase(resolveHomeBase(stored(HOME_BASE_KEY)).id);
       }
     }
     window.addEventListener("storage", onStorage);
@@ -46,12 +57,12 @@ export function usePriority(
   const scores = useMemo(
     () =>
       Object.fromEntries(
-        scoreEvents(events, { weights, overrides, today }).map((result) => [
+        scoreEvents(events, { weights, overrides, today, homeBase }).map((result) => [
           result.id,
           result,
         ]),
       ),
-    [events, weights, overrides, today],
+    [events, weights, overrides, today, homeBase],
   );
   function setOverride(id: string, value: number | null) {
     setOverrides((current) => {
@@ -61,5 +72,5 @@ export function usePriority(
       return next;
     });
   }
-  return { weights, overrides, scores, setWeights, setOverrides, setOverride };
+  return { weights, overrides, homeBase, scores, setWeights, setOverrides, setHomeBase, setOverride };
 }

@@ -1,4 +1,5 @@
 import type { Event } from "./model";
+import { estimateTravel, resolveHomeBase, type HomeBase } from "./homeBase";
 
 export const DEFAULT_WEIGHTS = Object.freeze({
   scale: 20,
@@ -38,7 +39,7 @@ export const FACTOR_META = {
   },
   logistics: {
     label: "Logistics",
-    description: "Date certainty, travel from Singapore and time to apply.",
+    description: "Date certainty, estimated travel from your home base and time to apply.",
   },
   scanner_score: {
     label: "Scanner score",
@@ -133,6 +134,7 @@ export interface ScoreOptions {
   weights?: unknown;
   overrides?: Readonly<Record<string, number>>;
   today?: string | Date;
+  homeBase?: string;
 }
 const missing = (note: string): Evidence => ({
   value: 0.4,
@@ -552,46 +554,17 @@ function deadline(text: string | null) {
   }
   return null;
 }
-const travelCities: Record<string, string> = {
-  singapore: "SG",
-  "hong kong": "HK",
-  "kuala lumpur": "MY",
-  "johor bahru": "MY",
-  jakarta: "ID",
-  bangkok: "TH",
-  manila: "PH",
-  hanoi: "VN",
-  "ho chi minh city": "VN",
-  dubai: "AE",
-  "abu dhabi": "AE",
-  riyadh: "SA",
-  doha: "QA",
-  manama: "BH",
-  "kuwait city": "KW",
-};
-function logistics(e: Event, today: number | null): Evidence {
-  const c = country(e) ?? travelCities[fold(e.city?.trim() ?? "")];
+function logistics(e: Event, today: number | null, homeBase: HomeBase): Evidence {
+  const travel = estimateTravel(e, homeBase);
   const certainty = { confirmed: 1, estimated: 0.6, tba: 0.25 }[e.date_status];
   const parts: { v: number; w: number; signal: string }[] = [];
   if (finite(certainty))
     parts.push({ v: certainty, w: 5, signal: `Date status: ${e.date_status}` });
-  if (c) {
-    const v =
-      c === "SG"
-        ? 1
-        : c === "MY"
-          ? 0.9
-          : sea.includes(c)
-            ? 0.7
-            : c === "HK"
-              ? 0.6
-              : gulf.includes(c)
-                ? 0.35
-                : 0.3;
+  if (travel) {
     parts.push({
-      v,
+      v: travel.value,
       w: 3,
-      signal: `Travel from Singapore to ${e.city || c} (estimated)`,
+      signal: travel.signal,
     });
   }
   const due = deadline(e.vendor_deadline);
@@ -611,8 +584,9 @@ function logistics(e: Event, today: number | null): Evidence {
       signal: `${due.clause} (${Math.abs(days)} days ${days < 0 ? "past" : "left"})`,
     });
   }
+  const unavailableTravel = "Travel cannot be estimated because the event location is unknown.";
   if (!parts.length)
-    return missing("No date, country or application deadline.");
+    return missing(`${unavailableTravel} Date certainty and application deadline are also unavailable.`);
   const value =
     parts.reduce((s, p) => s + p.v * p.w, 0) /
     parts.reduce((s, p) => s + p.w, 0);
@@ -622,7 +596,8 @@ function logistics(e: Event, today: number | null): Evidence {
   return basis(
     value,
     parts.map((p) => p.signal),
-    "Date certainty 50%, travel 30%, deadline 20%, redistributed across available inputs.",
+    "Date certainty 50%, travel 30%, deadline 20%, redistributed across available inputs. " +
+      (travel ? "Travel estimates use city and country bands." : unavailableTravel),
   );
 }
 function scanner(e: Event): Evidence {
@@ -647,6 +622,7 @@ function baseScore(
   e: Event,
   weights: Weights,
   today: number | null,
+  homeBase: HomeBase,
 ): ScoreResult {
   if (e.event_status === "cancelled") return {
     id: e.id, name: e.name, startDate: e.start_date ?? e.estimated_month,
@@ -662,7 +638,7 @@ function baseScore(
     tcg_fit: tcgFit(e),
     market: market(e),
     commercial: commercial(e),
-    logistics: logistics(e, today),
+    logistics: logistics(e, today, homeBase),
     scanner_score: scanner(e),
   };
   const factors = keys.map((key) => ({
@@ -719,6 +695,7 @@ export function scoreEvent(e: Event, options: ScoreOptions = {}): ScoreResult {
       e,
       normalizeWeights(options.weights),
       referenceDay(options.today),
+      resolveHomeBase(options.homeBase),
     ),
     options.overrides,
   );
@@ -762,7 +739,8 @@ export function scoreEvents(
 ): ScoreResult[] {
   const weights = normalizeWeights(options.weights),
     today = referenceDay(options.today);
-  const base = events.map((e) => baseScore(e, weights, today));
+  const homeBase = resolveHomeBase(options.homeBase);
+  const base = events.map((e) => baseScore(e, weights, today, homeBase));
   const ranges = events.map(confirmedRanges);
   return base.map((r, i) => {
     const clashes: ClashInfo[] = [];

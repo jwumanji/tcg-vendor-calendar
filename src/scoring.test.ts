@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import frozen from "../scanner/fixtures/scoring-calibration.json";
 import { normalizeEvents } from "./data";
+import { DEFAULT_HOME_BASE, HOME_BASES } from "./homeBase";
 import raw from "../data/events.json";
 import type { Event } from "./model";
 import {
@@ -333,6 +334,72 @@ describe("booth economics", () => {
 });
 
 describe("logistics", () => {
+  it("defaults to Ho Chi Minh City in Asia/Saigon and labels local travel", () => {
+    expect(DEFAULT_HOME_BASE).toMatchObject({
+      city: "Ho Chi Minh City", country: "Vietnam", countryCode: "VN", timeZone: "Asia/Saigon",
+    });
+    const event = { ...empty, city: "Hồ Chí Minh City", country: "Vietnam", date_status: "confirmed" } as const;
+    const result = scoreEvent(event);
+    expect(result.factors.find((f) => f.key === "logistics")?.value).toBe(1);
+    expect(explainScore(result)).toContain(
+      "Travel from Ho Chi Minh City, Vietnam to Hồ Chí Minh City (estimated: Local)",
+    );
+  });
+
+  it("recalculates the logistics factor and Priority when the origin changes", () => {
+    const event = { ...empty, city: "Singapore", country_code: "SG", date_status: "confirmed" } as const;
+    const [fromHcmc] = scoreEvents([event]);
+    const [fromSingapore] = scoreEvents([event], { homeBase: "sg-singapore" });
+    const [fromSydney] = scoreEvents([event], { homeBase: "au-sydney" });
+    expect(homeBasePoints(fromSingapore)).toBeGreaterThan(homeBasePoints(fromHcmc));
+    expect(homeBasePoints(fromHcmc)).toBeGreaterThan(homeBasePoints(fromSydney));
+    expect(fromSingapore.score).toBeGreaterThan(fromHcmc.score);
+    expect(fromHcmc.score).toBeGreaterThan(fromSydney.score);
+    expect(explainScore(fromHcmc)).toContain("to Singapore (estimated: Regional international)");
+    expect(explainScore(fromSydney)).toContain("Travel from Sydney, Australia to Singapore (estimated: Other international)");
+    expect(fromSydney).toEqual(scoreEvent(event, { homeBase: "au-sydney" }));
+  });
+
+  it("scores Hanoi as domestic from Ho Chi Minh City and local from Hanoi", () => {
+    expect(HOME_BASES.some(({ id }) => id === "vn-hanoi")).toBe(true);
+    const event = { ...empty, city: "Hanoi", date_status: "confirmed" } as const;
+    const fromHcmc = scoreEvent(event);
+    const fromHanoi = scoreEvent(event, { homeBase: "vn-hanoi" });
+    expect(homeBasePoints(fromHcmc)).toBeCloseTo(10 * (5 + 3 * 0.9) / 8);
+    expect(homeBasePoints(fromHanoi)).toBe(10);
+    expect(explainScore(fromHcmc)).toContain("Travel from Ho Chi Minh City, Vietnam to Hanoi (estimated: Domestic)");
+  });
+
+  it.each([
+    ["Hà Nội, Việt Nam", "vn-hanoi", "Domestic", "Domestic"],
+    ["Đà Nẵng", "vn-da-nang", "Domestic", "Local"],
+    ["Sài Gòn", DEFAULT_HOME_BASE.id, "Local", "Domestic"],
+  ])("matches %s without a country code", (city, localBase, fromHcmcBand, fromDaNangBand) => {
+    const event = { ...empty, city, date_status: "confirmed" } as const;
+    expect(explainScore(scoreEvent(event))).toContain(`(estimated: ${fromHcmcBand})`);
+    expect(explainScore(scoreEvent(event, { homeBase: "vn-da-nang" })))
+      .toContain(`(estimated: ${fromDaNangBand})`);
+    expect(homeBasePoints(scoreEvent(event, { homeBase: localBase }))).toBe(10);
+  });
+
+  it.each([
+    { city: "Huế, Việt Nam" },
+    { city: "Huế", country: "Việt Nam" },
+  ])("estimates domestic travel to an unlisted city from its country (%o)", (location) => {
+    expect(factor("logistics", location).signals)
+      .toContain("Travel from Ho Chi Minh City, Vietnam to Huế (estimated: Domestic)");
+  });
+
+  it("explains when travel is unavailable while using available date evidence", () => {
+    const event = { ...empty, city: "Location TBA", country: "Unknown", date_status: "confirmed" } as const;
+    const result = scoreEvent(event);
+    expect(homeBasePoints(result)).toBe(10);
+    expect(explainScore(result)).toContain("Travel cannot be estimated because the event location is unknown.");
+    const missingDate = undefined as unknown as Event["date_status"];
+    expect(explainScore(scoreEvent({ ...empty, date_status: missingDate })))
+      .toContain("Travel cannot be estimated because the event location is unknown.");
+  });
+
   it("redistributes absent components and labels the travel estimate", () => {
     expect(factor("logistics", { date_status: "estimated" }).value).toBe(0.6);
     expect(factor("logistics").value).toBe(0.25);
@@ -360,7 +427,8 @@ describe("logistics", () => {
     const calc = (vendor_deadline: string) =>
       factor("logistics", {
         date_status: "confirmed",
-        country_code: "SG",
+        city: "Ho Chi Minh City",
+        country_code: "VN",
         vendor_deadline,
       }).value;
     expect(calc("Closed 17 Nov 2026")).toBeCloseTo(0.82);
@@ -376,6 +444,9 @@ describe("logistics", () => {
       expect(calc(s)).toBe(1);
   });
 });
+
+const homeBasePoints = (result: ReturnType<typeof scoreEvent>) =>
+  result.factors.find((f) => f.key === "logistics")!.points;
 
 const show = (
   id: string,

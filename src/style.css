@@ -2940,7 +2940,13 @@ input[type="checkbox"]:indeterminate::after { content: ""; width: 10px; height: 
 .calendar-event .logo { --logo-inset: 2px; width: 30px; height: 30px; border-radius: 5px; vertical-align: middle; margin-right: 5px; font-size: 11px; }
 .calendar-event .place { display: flex; margin-block: 4px; }
 .tools-dialog { margin: auto; }
-.tool-settings { padding-block: 12px; }
+.tool-settings { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; padding-block: 12px 16px; }
+.tool-settings h3 { font-size: 16px; }
+.tool-settings .button { justify-self: start; }
+.home-base-setting { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
+.home-base-setting label { font-weight: 750; }
+.home-base-setting select { width: 100%; min-width: 0; min-height: 44px; font-size: 16px; }
+.home-base-setting small { color: var(--muted); line-height: 1.45; }
 .tool-exports { display: grid; gap: 14px; padding: 14px 0 18px; border-top: 1px solid var(--line); }
 .tool-exports h3 { display: flex; align-items: center; gap: 8px; font-size: 16px; margin-bottom: 6px; }
 .tool-exports p { color: var(--muted); margin-top: 4px; font-size: 14px; }

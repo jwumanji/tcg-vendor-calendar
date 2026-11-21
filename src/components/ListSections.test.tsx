@@ -236,6 +236,25 @@ it("keeps the scanner value in the event page priority breakdown", () => {
   expect($("meter, .vendor-meter, .gem")).toHaveLength(0);
 });
 
+it("shows the same home-base Priority in Grid, Rows, Top picks and event details", () => {
+  const list = [event];
+  const defaultScore = scoreEvents(list, { today })[0].score;
+  const result = scoreEvents(list, { today, homeBase: "au-sydney" })[0];
+  expect(result.score).toBeLessThan(defaultScore);
+  const results = { [event.id]: result };
+  const { grid, rows } = layouts({ key: "priority", direction: "desc" }, [], list, results);
+  const picks = load(renderToStaticMarkup(<TopPicks events={list} scores={results} today={today} {...shared} />));
+  const detail = load(renderToStaticMarkup(<Detail today={today} e={event} score={result} entry={emptyEntry}
+    saved setGoing={shared.setGoing} onStage={vi.fn()} onNote={vi.fn()} onOutreach={vi.fn()} onMilestone={vi.fn()}
+    onRemoveMilestone={vi.fn()} setOverride={vi.fn()} openClash={vi.fn()} toast={null} />));
+  const label = grid(".priority-chip").attr("aria-label");
+  expect(label).toContain(`Score ${result.score} of 100`);
+  expect(rows(".priority-chip").attr("aria-label")).toBe(label);
+  expect(picks(".priority-chip").attr("aria-label")).toBe(label);
+  expect(detail(".priority-detail .priority-chip").attr("aria-label")).toBe(label);
+  expect(detail(".priority-detail").text()).toContain("Travel from Sydney, Australia to Singapore (estimated: Other international)");
+});
+
 it("shows the same schedule status and zero priority in Rows and Grid and excludes cancellations from picks and deadlines", () => {
   const cancelled = { ...event, event_status: "cancelled" as const, vendor_deadline: "1 Dec 2026" };
   const postponed = { ...kowloon, event_status: "postponed" as const };

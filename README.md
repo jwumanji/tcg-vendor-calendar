@@ -58,7 +58,7 @@ Priority rates each event from 0 to 100. It drives the upcoming top picks, the P
 | TCG fit | 20% | Event format, featured games, card-show naming and evidence that vendors can take part. |
 | Market | 15% | Host country, with the highest ratings for Singapore and Hong Kong, followed by Malaysia. |
 | Commercial potential | 15% | Quoted booth cost per thousand attendees, attendees per vendor, booth availability and applications. Size and market supply proxies when comparable prices are unavailable. |
-| Logistics | 10% | Date certainty, travel from Singapore and time until the vendor deadline. The available inputs share this factor’s weight. |
+| Logistics | 10% | Date certainty, estimated travel from your home base and time until the vendor deadline. The available inputs share this factor’s weight. |
 | Scanner score | 10% | The original vendor score, with shortlist priority as a fallback estimate. The separate Scanner score filter still uses the original vendor score. |
 
 The model labels each factor **real**, **estimated** or **missing**. Real factors have direct supporting evidence. Most proxy ratings are capped at 75% of the factor’s weight, with an 80% cap for the Scanner shortlist proxy. Missing factors receive 40% of their weight. Confidence measures the share of total weight backed by real factors. **High** starts at 65%, **medium** at 40%, and **low** falls below 40%. A dashed score chip and a tilde identify low confidence. Expand a factor in event details to see its signals and assumptions.
@@ -67,7 +67,9 @@ The model rounds the weighted total, then deducts one point per higher-scored co
 
 Use **Use my score** in event details to override an individual event. The pencil identifies your score wherever it appears. Details retain the calculated score, factor breakdown and confidence. **Reset to calculated** removes the override. **Copy explanation** copies the score, confidence and supporting signals.
 
-Effective weights are saved in `tcg-priority-weights` and event-ID overrides in `tcg-priority-overrides`. JSON backups include both alongside the existing notes and stages. Importing a backup with score settings applies its weights. Merge adds imported overrides and uses the imported value for matching IDs. Replace restores the imported override set, including IDs absent from the current snapshot. Older version-1 backups restore notes and stages and preserve the current score settings.
+**Tools → Priority and travel → Home base** defaults to Ho Chi Minh City, Vietnam (`Asia/Saigon`). Changing it immediately updates calculated Priority in Grid, Rows, Top picks and event details. Logistics uses qualitative city and country bands for local, domestic and international trips. The score explanation shows the selected origin and estimated band when travel can be estimated.
+
+The home base is saved in this browser’s `tcg-priority-home-base` localStorage key. JSON backups include it along with the weights (`tcg-priority-weights`), event overrides (`tcg-priority-overrides`) and planner data. Merge and Replace apply a recognized imported home base. The preview flags an unknown home base ID and the current selection is kept. Older backups without a home base also preserve the current selection. Merge adds imported overrides and uses the imported value for matching IDs. Replace restores the imported override set, including IDs absent from the current snapshot.
 
 ## Refresh data
 

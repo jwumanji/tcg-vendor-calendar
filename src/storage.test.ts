@@ -1,11 +1,13 @@
 import { DEFAULT_WEIGHTS, normalizeWeights } from "./scoring";
 import { stored } from "./hooks/useFilters";
 import { mergeOutreach } from "./data";
+import { resolveHomeBase } from "./homeBase";
 import {
   importPriority,
   normalizeOverrides,
   WEIGHTS_KEY,
   OVERRIDES_KEY,
+  HOME_BASE_KEY,
 } from "./storage";
 import { describe, it, expect, vi } from "vitest";
 import {
@@ -25,7 +27,7 @@ import {
   unknownIds,
   STORAGE_KEY,
 } from "./storage";
-import type { OutreachPatches } from "./storage";
+import type { MilestoneEdits, OutreachPatches } from "./storage";
 const entry = {
   ...emptyEntry,
   stage: "Interested" as const,
@@ -287,7 +289,7 @@ describe("priority preferences and backups", () => {
     weights: normalizeWeights({ scale: 52 }),
     overrides: { known: 0, absent: 88 },
   };
-  it("reads both storage keys, tolerates corrupt JSON, and keeps zero overrides", () => {
+  it("reads score settings from storage, tolerates corrupt JSON, and keeps zero overrides", () => {
     const memory = new Map<string, string>();
     vi.stubGlobal("localStorage", {
       setItem: (k: string, v: string) => memory.set(k, v),
@@ -296,6 +298,10 @@ describe("priority preferences and backups", () => {
     try {
       expect(saveValue(WEIGHTS_KEY, priority.weights)).toBe("");
       expect(saveValue(OVERRIDES_KEY, priority.overrides)).toBe("");
+      expect(saveValue(HOME_BASE_KEY, "vn-hanoi")).toBe("");
+      expect(resolveHomeBase(stored(HOME_BASE_KEY)).city).toBe("Hanoi");
+      memory.set(HOME_BASE_KEY, "{broken");
+      expect(resolveHomeBase(stored(HOME_BASE_KEY)).city).toBe("Ho Chi Minh City");
       expect(normalizeWeights(stored(WEIGHTS_KEY))).toEqual(priority.weights);
       expect(normalizeOverrides(stored(OVERRIDES_KEY))).toEqual(
         priority.overrides,
@@ -341,6 +347,35 @@ describe("priority preferences and backups", () => {
       expect(
         importPriority(current, validateBackup(backup({})).priority, mode),
       ).toBe(current);
+  });
+
+  it("round trips the home base alongside outreach and booking milestone edits", () => {
+    const withHomeBase = { ...priority, homeBase: "th-bangkok" };
+    const outreach = { known: { notes: "Confirm booth size" } };
+    const milestones: MilestoneEdits = { known: [{
+      id: "balance-due", label: "Balance due", type: "payment_due", at: "2026-12-21",
+      timeZone: "Asia/Singapore", source: "Organizer email", verified: true,
+    }] };
+    const restored = validateBackup(JSON.parse(JSON.stringify(
+      backup({ known: entry }, withHomeBase, outreach, milestones),
+    )));
+    expect(restored).toMatchObject({ entries: { known: entry }, priority: withHomeBase, outreach, milestones });
+    const current = { ...priority, homeBase: "vn-hanoi" };
+    for (const mode of ["merge", "replace"] as const) {
+      expect(importPriority(current, restored.priority, mode)).toEqual(withHomeBase);
+      expect(importPriority(current, validateBackup(backup({}, priority)).priority, mode)).toEqual(current);
+      expect(importPriority(current, validateBackup(backup({})).priority, mode)).toBe(current);
+    }
+  });
+
+  it("retains an unknown home base ID for preview and applies the other priority settings", () => {
+    const imported = validateBackup(backup({}, { ...priority, homeBase: "not-a-preset" })).priority;
+    expect(imported?.homeBase).toBe("not-a-preset");
+    const current = { weights: { ...DEFAULT_WEIGHTS }, overrides: { other: 75 }, homeBase: "vn-hanoi" };
+    expect(importPriority(current, imported, "merge")).toEqual({
+      ...priority, overrides: { ...priority.overrides, other: 75 }, homeBase: current.homeBase,
+    });
+    expect(importPriority(current, imported, "replace")).toEqual({ ...priority, homeBase: current.homeBase });
   });
 });
 

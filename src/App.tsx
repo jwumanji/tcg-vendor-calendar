@@ -1,5 +1,6 @@
 import { useEventRoute } from "./hooks/useEventRoute";
 import { usePriority } from "./hooks/usePriority";
+import { DEFAULT_HOME_BASE, HOME_BASE_GROUPS } from "./homeBase";
 import { Modal } from "./components/Modal";
 import { EventRows, RowColumns, RowSortControl } from "./components/EventRows";
 import { normalizeColumns, normalizeListView, loadSort, SORT_STORAGE_KEY, groupSortedRows, orderTimelineGroups, sortRows } from "./rows";
@@ -1064,6 +1065,39 @@ export default function App() {
           close={() => setToolsOpen(false)}
           className="tools-dialog"
         >
+          <section className="tool-settings" aria-labelledby="priority-travel-title">
+            <h3 id="priority-travel-title">Priority and travel</h3>
+            <div className="home-base-setting">
+              <label htmlFor="home-base">Home base</label>
+              <select
+                id="home-base"
+                value={priority.homeBase}
+                aria-describedby="home-base-help"
+                onChange={(event) => priority.setHomeBase(event.target.value)}
+              >
+                {HOME_BASE_GROUPS.map(({ country, bases }) => (
+                  <optgroup key={country} label={country}>
+                    {bases.map(({ id, city }) => (
+                      <option key={id} value={id}>
+                        {city}{id === DEFAULT_HOME_BASE.id && " (default)"}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+              <small id="home-base-help">
+                Home base only affects Logistics in Priority. Travel uses qualitative city and country bands.
+                If your scores previously used Singapore, the new default changes your Logistics scores.
+              </small>
+            </div>
+            <button
+              className="button"
+              aria-haspopup="dialog"
+              onClick={() => setSettingsOpen(true)}
+            >
+              <SlidersHorizontal size={16} /> Score weights
+            </button>
+          </section>
           <section className="tool-exports" aria-label="Event exports">
             <EventExports events={attending} entries={entries} goingOnly />
             <EventExports events={filtered} entries={entries} />
@@ -1085,22 +1119,15 @@ export default function App() {
             priority={{
               weights: priority.weights,
               overrides: priority.overrides,
+              homeBase: priority.homeBase,
             }}
             applyPriority={(value) => {
               priority.setWeights(value.weights);
               priority.setOverrides(value.overrides);
+              if (value.homeBase !== undefined) priority.setHomeBase(value.homeBase);
             }}
           />
 
-          <div className="tool-settings">
-            <button
-              className="button"
-              aria-haspopup="dialog"
-              onClick={() => setSettingsOpen(true)}
-            >
-              <SlidersHorizontal size={16} /> Score weights
-            </button>
-          </div>
           {toast}
         </Modal>
       )}

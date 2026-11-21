@@ -605,7 +605,9 @@
       "quoted_price": null,
       "notes": "The site also lists info@oracle-e.com.",
       "published_booth_price": null,
-      "research_notes": "Official contact form on mtgseachampionships.com. No vendor/exhibitor email was visible in the page HTML (the address is masked). No public vendor programme found; this is a competitive championship weekend at The Royal River Hotel. Enquire via the form only if seeking a vendors' area."
+      "research_notes": "Official contact form on mtgseachampionships.com. No vendor/exhibitor email was visible in the page HTML (the address is masked). No public vendor programme found; this is a competitive championship weekend at The Royal River Hotel. Enquire via the form only if seeking a vendors' area.",
+      "next_action": null,
+      "follow_up_due_at": null
     }
   },
   {
@@ -736,17 +738,19 @@
     "logo_kind": "logo",
     "section": "timeline",
     "outreach": {
-      "status": "contacted",
+      "status": "replied",
       "method": "email",
       "contact": "contact@colorfiesta.vn",
       "contact_type": "email",
       "contacted_at": "2026-11-19",
-      "response_at": null,
-      "message_ref": "1a1f34bb1e70beec",
-      "quoted_price": null,
-      "notes": "",
+      "response_at": "2026-11-20",
+      "message_ref": "1a1f71da66fca555",
+      "quoted_price": "VND 15,000,000 for a 9 m² Commercial Booth (standard or self-built).",
+      "notes": "Hau Phan confirmed the Commercial Booth area is available for TCG vendors. There is no dedicated TCG area. The attached rate card includes one table, two chairs, four badges, 5A power and one Color Fiesta fanpage post.",
       "published_booth_price": null,
-      "research_notes": "Email and phone +84 789 829 891 published on https://colorfiesta.vn/ and the #18 page. Venue confirmed as V.E.C Hà Nội, Đông Anh. This is primarily an artist event; commercial booth rates were not published. Instagram @colorfiestavn / official fanpage."
+      "research_notes": "Email and phone +84 789 829 891 published on https://colorfiesta.vn/ and the #18 page. Venue confirmed as V.E.C Hà Nội, Đông Anh. This is primarily an artist event; commercial booth rates were not published. Instagram @colorfiestavn / official fanpage.",
+      "next_action": null,
+      "follow_up_due_at": null
     }
   },
   {
@@ -872,12 +876,15 @@
       "contact_type": "email",
       "contacted_at": "2026-11-19",
       "response_at": null,
-      "message_ref": "1a1f34bb7db7b9c5",
+      "message_ref": "1a1f5d493ba2a84d",
       "quoted_price": null,
-      "notes": "",
+      "notes": "Automatic acknowledgement received 2026-11-19 at 22:01:26 UTC. Still awaiting a human reply.",
       "published_booth_price": null,
       "price_source_url": "https://www.hktdc.com/event/hktoyfair/en/participation-fee-format",
-      "research_notes": "General exhibitions desk +852 1830668 and exhibitions@hktdc.org are in the official 2027 Exhibitor Package (https://hktoyfair.hktdc.com/pdf/2027/exhibitor-package-1.pdf). Named sales contacts in that PDF include john.yy.lam@hktdc.org, jess.lh.hui@hktdc.org, ben.cy.ng@hktdc.org, ceci.ly.lam@hktdc.org, anna.wl.lai@hktdc.org, queena.mw.lo@hktdc.org; Pop & Play zone: alex.cf.lee@hktdc.org, melody.tn.wan@hktdc.org. This is a B2B trade fair (HKCEC), not a consumer card-table show. Official participation-fee page exists but was blocked (HTTP 403) from this environment, so stand rates are not quoted here. Apply via the HKTDC exhibitor portal."
+      "research_notes": "General exhibitions desk +852 1830668 and exhibitions@hktdc.org are in the official 2027 Exhibitor Package (https://hktoyfair.hktdc.com/pdf/2027/exhibitor-package-1.pdf). Named sales contacts in that PDF include john.yy.lam@hktdc.org, jess.lh.hui@hktdc.org, ben.cy.ng@hktdc.org, ceci.ly.lam@hktdc.org, anna.wl.lai@hktdc.org, queena.mw.lo@hktdc.org; Pop & Play zone: alex.cf.lee@hktdc.org, melody.tn.wan@hktdc.org. This is a B2B trade fair (HKCEC), not a consumer card-table show. Official participation-fee page exists but was blocked (HTTP 403) from this environment, so stand rates are not quoted here. Apply via the HKTDC exhibitor portal.",
+      "acknowledgement_at": "2026-11-20",
+      "next_action": null,
+      "follow_up_due_at": null
     }
   },
   {
@@ -1216,7 +1223,9 @@
       "quoted_price": null,
       "notes": "",
       "published_booth_price": null,
-      "research_notes": "Email and WhatsApp +60 10-896 2361 published on https://www.connectcon.asia/ under 'Vend at Connect Con 2' / Register Interest. 2027 rates and vendor line-up 'announced soon'. Starhill Atrium, Bukit Bintang."
+      "research_notes": "Email and WhatsApp +60 10-896 2361 published on https://www.connectcon.asia/ under 'Vend at Connect Con 2' / Register Interest. 2027 rates and vendor line-up 'announced soon'. Starhill Atrium, Bukit Bintang.",
+      "next_action": null,
+      "follow_up_due_at": null
     }
   },
   {
@@ -1535,17 +1544,19 @@
     "logo_kind": "poster_or_photo",
     "section": "timeline",
     "outreach": {
-      "status": "contacted",
+      "status": "replied",
       "method": "email",
       "contact": "info@gyucreative.com",
       "contact_type": "email",
       "contacted_at": "2026-11-19",
-      "response_at": null,
-      "message_ref": "1a1f34bc9759df88",
+      "response_at": "2026-11-19",
+      "message_ref": "1a1f365362759e5c",
       "quoted_price": null,
-      "notes": "",
+      "notes": "G-Yu Creative shared a proposal PDF and asked what business and products GrailFox will sell so they can recommend a zone. Justin has yet to answer. Booth quote pending.",
       "published_booth_price": null,
-      "research_notes": "Exhibitor applications stated as open on https://www.japanexpothailand.com/how-to-exhibit/. Tel +66 2 658 0557. Booth rates not published on that page. centralwOrld, Bangkok. Free admission event. Thai, Japanese and English enquiries welcome."
+      "research_notes": "Exhibitor applications stated as open on https://www.japanexpothailand.com/how-to-exhibit/. Tel +66 2 658 0557. Booth rates not published on that page. centralwOrld, Bangkok. Free admission event. Thai, Japanese and English enquiries welcome.",
+      "next_action": "reply_to_organizer",
+      "follow_up_due_at": null
     }
   },
   {
@@ -2128,17 +2139,19 @@
     "logo_kind": "logo",
     "section": "timeline",
     "outreach": {
-      "status": "contacted",
+      "status": "quoted",
       "method": "email",
       "contact": "sales@mefcc.com",
       "contact_type": "email",
       "contacted_at": "2026-11-19",
-      "response_at": null,
-      "message_ref": "1a1f34bd0d91d997",
-      "quoted_price": null,
-      "notes": "",
+      "response_at": "2026-11-19",
+      "message_ref": "1a1f36f00771f806",
+      "quoted_price": "Space only AED 1,500/sqm + AED 920 listing + 5% VAT. Shell AED 1,600/sqm + AED 920 listing + 5% VAT. Smallest shell (4 sqm) AED 7,320 + 5% VAT. 9 sqm shell AED 15,320 + 5% VAT.",
+      "notes": "Bhumika Bhinde (inD) sent booth rates. The 4 sqm and 9 sqm shell totals include the AED 920 listing fee before VAT.",
       "published_booth_price": null,
-      "research_notes": "Also info@mefcc.com. Partnering page: https://www.mefcc.com/home/partnering/. Official site: https://www.mefcc.com/home/. 2027 exhibitor packages are tailored / brochure on request; prices not published. Artist Alley is a separate track (artistalley@mefcc.com was listed in earlier planner notes; only sales@ and info@ were re-verified on the official partnering/contact HTML this session). ADNEC Centre Abu Dhabi."
+      "research_notes": "Also info@mefcc.com. Partnering page: https://www.mefcc.com/home/partnering/. Official site: https://www.mefcc.com/home/. 2027 exhibitor packages are tailored / brochure on request; prices not published. Artist Alley is a separate track (artistalley@mefcc.com was listed in earlier planner notes; only sales@ and info@ were re-verified on the official partnering/contact HTML this session). ADNEC Centre Abu Dhabi.",
+      "next_action": null,
+      "follow_up_due_at": null
     }
   },
   {
@@ -2337,18 +2350,20 @@
     "logo_kind": "logo",
     "section": "timeline",
     "outreach": {
-      "status": "contacted",
+      "status": "replied",
       "method": "email",
       "contact": "support@zubculture.com",
       "contact_type": "email",
       "contacted_at": "2026-11-19",
-      "response_at": null,
-      "message_ref": "1a1f34bdb7831450",
-      "quoted_price": null,
-      "notes": "",
+      "response_at": "2026-11-21",
+      "message_ref": "1a1fbc207bf5a3d7",
+      "quoted_price": "150 cm table for both days: S$280 regular or S$500 corner. No power.",
+      "notes": "ZubCulture Support confirmed that VeSTAGE is a general ACG event and accepts TCG vendors. ZubCulture Collectors is the partner-run series dedicated to TCG.",
       "published_booth_price": "VTuber Spotlight package S$400 (10 slots, not a standard merch table). Standard merch/TCG booth rates were not itemised on the public homepage.",
       "price_source_url": "https://zubculture.com/",
-      "research_notes": "Email published on https://zubculture.com/ (Mon–Fri 10:00–19:00). The Cathay, free entry, 100+ booths including a TCG & collectibles area. Instagram @zub.culture. Ask support@ for merch/TCG table options, sizes and inclusions."
+      "research_notes": "Email published on https://zubculture.com/ (Mon–Fri 10:00–19:00). The Cathay, free entry, 100+ booths including a TCG & collectibles area. Instagram @zub.culture. Ask support@ for merch/TCG table options, sizes and inclusions.",
+      "next_action": null,
+      "follow_up_due_at": null
     }
   },
   {
@@ -2901,7 +2916,9 @@
       "quoted_price": null,
       "notes": "Submitted as Exhibitor. They reply in 1–3 days and have a Discord.",
       "published_booth_price": null,
-      "research_notes": "Official site https://comifuro.net and contact form https://comifuro.net/contact/ (English, Bahasa Indonesia, or Japanese). No exhibitor email was visible in the retrieved HTML. Primarily a creator/circle (doujin) event; a corporate/dealer booth programme was not confirmed for CF24 on the pages retrieved (an older corporate-registration URL returned 404). ICE BSD City."
+      "research_notes": "Official site https://comifuro.net and contact form https://comifuro.net/contact/ (English, Bahasa Indonesia, or Japanese). No exhibitor email was visible in the retrieved HTML. Primarily a creator/circle (doujin) event; a corporate/dealer booth programme was not confirmed for CF24 on the pages retrieved (an older corporate-registration URL returned 404). ICE BSD City.",
+      "follow_up_due_at": "2026-11-23",
+      "next_action": null
     }
   },
   {
@@ -5938,7 +5955,9 @@
       "quoted_price": null,
       "notes": "",
       "published_booth_price": null,
-      "research_notes": "Email published on the official site https://collectfun.co/ (and play.collectfun.co). Instagram @collectfun.tcg. Recurring Sunday show at Grantral Mall #04-22. Booth rates not published."
+      "research_notes": "Email published on the official site https://collectfun.co/ (and play.collectfun.co). Instagram @collectfun.tcg. Recurring Sunday show at Grantral Mall #04-22. Booth rates not published.",
+      "next_action": null,
+      "follow_up_due_at": null
     }
   },
   {

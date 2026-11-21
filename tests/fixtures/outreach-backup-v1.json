@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "exportedAt": "2026-11-19T10:00:00.000Z",
+  "entries": {},
+  "outreach": {
+    "jet-2027": {
+      "status": "contacted",
+      "contact": "info@gyucreative.com",
+      "contacted_at": "2026-11-19",
+      "response_at": null,
+      "message_ref": "1a1f34bc9759df88",
+      "follow_up_due_at": "2026-11-24",
+      "notes": "Local note to keep."
+    }
+  }
+}

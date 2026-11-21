@@ -164,6 +164,7 @@ export function Detail({
           openClash={openClash}
         />
         <OutreachSection
+          today={today}
           outreach={e.outreach ?? undefined}
           knownOutreach={knownOutreach}
           eventContacts={[e.contact, e.vendor_application]}

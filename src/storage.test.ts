@@ -81,7 +81,10 @@ describe("outreach backup patches", () => {
     absent: { status: "declined" },
   };
   const incoming: OutreachPatches = {
-    event: { status: "quoted", notes: "", quoted_price: "$185", response_at: "2026-11-20" },
+    event: {
+      status: "quoted", notes: "", quoted_price: "$185", response_at: "2026-11-20",
+      next_action: "reply_to_organizer", follow_up_due_at: "2026-11-27", acknowledgement_at: null,
+    },
   };
   it("round trips patches through local storage and merges only fields supplied by the import", () => {
     const { outreach } = validateBackup(JSON.parse(JSON.stringify(backup({}, undefined, incoming))));

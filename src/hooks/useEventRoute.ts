@@ -25,20 +25,25 @@ export function useEventRoute() {
   const [listContext] = useState<ListContext | undefined>(() =>
     route.page === "event" && history.state?.fromPlanner ? history.state.listContext : undefined,
   );
-  const origin = useRef<{ element: HTMLElement | null; y: number } | null>(null);
+  const origin = useRef<{
+    element: HTMLElement | null;
+    y: number;
+    focusFallback?: () => HTMLElement | null;
+  } | null>(null);
   const previousPage = useRef(route.page);
 
-  function rememberList() {
+  function rememberList(focusFallback?: () => HTMLElement | null) {
     origin.current = {
       element: document.activeElement instanceof HTMLElement ? document.activeElement : null,
       y: window.scrollY,
+      focusFallback,
     };
   }
 
-  const openEvent = useCallback((id: string, occurrence?: string, list?: ListContext) => {
+  const openEvent = useCallback((id: string, occurrence?: string, list?: ListContext, focusFallback?: () => HTMLElement | null) => {
     const fromEvent = parseRoute(location.pathname).page === "event";
     if (!fromEvent) {
-      rememberList();
+      rememberList(focusFallback);
       history.replaceState({ ...history.state, eventsScrollY: window.scrollY }, "");
     }
     history.pushState({
@@ -88,7 +93,7 @@ export function useEventRoute() {
     if (previousPage.current === "event") {
       const element = origin.current?.element;
       const target = element?.isConnected && element !== document.body
-        ? element : document.getElementById("main");
+        ? element : origin.current?.focusFallback?.() ?? document.getElementById("main");
       target?.focus({ preventScroll: true });
       const top = origin.current?.y ?? history.state?.eventsScrollY ?? 0;
       // The closing page can flush a note and change a row's height during this commit.

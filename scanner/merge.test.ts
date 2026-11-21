@@ -205,7 +205,10 @@ it("replaces the Scanner portion and drops a find the new export covers", () => 
   ).toEqual([fresh, other]);
 });
 it("carries only planner outreach onto replacement Scanner records with the same ID", () => {
-  const outreach = mergeOutreach(null, { status: "quoted", method: "form", quoted_price: "$200" });
+  const outreach = mergeOutreach(null, {
+    status: "quoted", method: "form", quoted_price: "$200", message_ref: "reply",
+    next_action: "reply_to_organizer", follow_up_due_at: "2026-11-24",
+  });
   const previous = scanner({ outreach, vendor_cost: "Old cost", contact: "old@example.com" });
   const imported = scanner({ vendor_cost: "New cost", contact: "new@example.com" });
   const foreign = scanner({ id: "different", outreach });

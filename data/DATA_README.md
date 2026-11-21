@@ -59,6 +59,8 @@ Unknown values are `null`; nothing is invented.
   - `method`: `email`, `form`, `instagram_dm`, `other`, or `null`. Records the channel used and is `null` for `not_contacted`.
   - `contact`: email address or web URL used or known, or `null`. `contact_type` is the researched route type (`email`, `form`, `DM`, `none`, or `null` when unresearched).
   - `contacted_at` and `response_at`: ISO `YYYY-MM-DD` dates or `null`. The response date records a reply, quote, or decline separately from the original contact date.
+  - `acknowledgement_at`: optional ISO date for an automatic acknowledgement. Keep the event contacted and leave `response_at` empty while awaiting a human reply.
+  - `next_action`: optional `reply_to_organizer` for a reply or quote that requires a response from the vendor. `follow_up_due_at` can override the default reminder date. Nudges default to five calendar days after contact, and vendor replies default to the organizer's response date.
   - `message_ref`: optional message or submission identifier, represented by `null` when absent.
   - `quoted_price`: free text or `null`. `notes` is editable free text. Optional `research_notes` holds the separate research notes.
   - `published_booth_price`: free text or `null`, with optional `price_source_url`. The existing event-level `vendor_cost` and `contact` fields retain their original meanings.
@@ -91,13 +93,18 @@ event ID, `"status": "contacted"`, `"method": "form"`, the actual
 `contacted_at` date, and `message_ref` if available. Omit `contact` to use the
 researched route already on the event. The seeded forms use `mtg-sea-r2` and
 `comifuro24`. Append further entries for replies
-or quotes with the relevant `status`, `response_at`, `quoted_price`, and `notes`.
-Later entries update only the fields they supply. Run `node scripts/outreach-seed.ts`
+or quotes with the relevant `status`, `response_at`, `message_ref`, `quoted_price`, and `notes`.
+Use Saigon calendar dates for outreach and record original timestamps in notes.
+Each log entry starts with the follow-up action and due-date override cleared.
+Supply either field on the new entry when it applies. An earlier automatic
+acknowledgement date stays in the record when a human reply arrives. Run `node scripts/outreach-seed.ts`
 with Node 24. The seed rejects unknown IDs before writing and can be rerun
 against the same inputs without changing the file again.
 
 The app loads shared outreach from `events.json`, then applies this browser's
-saved edits field by field. JSON backups include the browser's outreach
+saved edits. A newer shared reply takes precedence over the saved status,
+dates, message reference, and reminder for an older exchange. Local notes and
+other unrelated edits are kept. JSON backups include the browser's outreach
 patches. Merge restores prefer imported values for overlapping fields. Older
 backups that omit outreach preserve the browser's existing patches.
 Scanner imports and scraper updates retain the planner's outreach. Rows with

@@ -218,7 +218,7 @@ it("labels the event outreach section, editor, research links and prices indepen
   expect(section.text()).toContain("$200");
   expect(section.find("label").map((_, el) => $(el).contents().first().text()).get()).toEqual([
     "Outreach status", "Outreach method", "Contact address or URL", "Contacted on",
-    "Response date", "Quoted price", "Outreach notes",
+    "Response date", "Next action", "Follow-up due date", "Message reference", "Quoted price", "Outreach notes",
   ]);
   expect(section.find("button").text()).toBe("Save outreach");
   expect($(".event-facts .outreach-chip").text()).toBe("Outreach: Not contacted");

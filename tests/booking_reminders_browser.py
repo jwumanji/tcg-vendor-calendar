@@ -30,11 +30,139 @@ class PlannerBrowser(TestCase):
         cls.addClassCleanup(cls.browser.close)
 
     def setUp(self):
-        context = self.browser.new_context(viewport={"width": 390, "height": 844})
+        context = self.browser.new_context(
+            viewport={"width": 390, "height": 844}, timezone_id="Asia/Ho_Chi_Minh",
+        )
         self.addCleanup(context.close)
         context.route(f"{ORIGIN}/**", serve_build)
         self.page = context.new_page()
         self.strip = self.page.get_by_role("region", name="Upcoming vendor deadlines & openings")
+
+    def test_outreach_queue_fits_both_themes_and_opens_events_by_keyboard(self):
+        page = self.page
+        page.clock.set_fixed_time(datetime.fromisoformat("2026-11-24T00:00:00+00:00"))
+        page.goto(ORIGIN)
+        queue = page.get_by_role("region", name="Outreach follow-ups")
+        toggle_theme = page.get_by_role("button", name="Toggle light and dark theme")
+        cards = queue.get_by_role("listitem")
+        expand = queue.get_by_role("button", name="Show 3 more follow-ups")
+        for width in (390, 1440):
+            page.set_viewport_size({"width": width, "height": 900})
+            for theme in ("dark", "light"):
+                with self.subTest(width=width, theme=theme):
+                    if page.locator("html").get_attribute("data-theme") != theme:
+                        toggle_theme.click()
+                    expect(page.locator("html")).to_have_attribute("data-theme", theme)
+                    expect(cards).to_have_count(3)
+                    expand.focus()
+                    page.keyboard.press("Enter")
+                    expect(cards).to_have_count(6)
+                    expect(queue.get_by_role("button", name="Show fewer follow-ups")).to_have_attribute("aria-expanded", "true")
+                    acknowledgement = queue.get_by_role("button", name=re.compile(r"HKTDC.*Organizer nudge due"))
+                    expect(acknowledgement).to_contain_text("Last exchange · Automatic acknowledgement · 20 Nov 2026")
+                    expect(acknowledgement).to_contain_text("22:01:26 UTC")
+                    expect(acknowledgement).not_to_contain_text("1a1f5d493ba2a84d")
+                    notes = cards.first.locator(".outreach-follow-up-notes")
+                    expect(notes).to_have_css("-webkit-line-clamp", "2")
+                    self.assertLessEqual(queue.evaluate("(el) => el.scrollWidth"), queue.evaluate("(el) => el.clientWidth"))
+                    self.assertLessEqual(page.locator("html").evaluate("(el) => el.scrollWidth"), width)
+                    page.keyboard.press("Enter")
+                    expect(expand).to_be_focused()
+                    expect(cards).to_have_count(3)
+
+        japan = queue.get_by_role("button", name="Japan Expo Thailand 2027 Your reply is due")
+        japan.focus()
+        page.keyboard.press("Enter")
+        page.wait_for_url("**/event/jet-2027")
+        outreach = page.get_by_role("region", name="Outreach", exact=True)
+        action = outreach.get_by_label("Next action")
+        expect(action.locator("option:checked")).to_have_text("Your reply is due")
+        expect(outreach.get_by_label("Quoted price")).to_have_value("")
+        page.set_viewport_size({"width": 390, "height": 844})
+        self.assertGreater(outreach.get_by_label("Response date").bounding_box()["width"], 230)
+        page.keyboard.press("Escape")
+        expect(japan).to_be_focused()
+
+    def test_outreach_loads_an_older_backup_and_can_clear_the_last_due_action(self):
+        page = self.page
+        legacy_backup = (DIST.parent / "tests" / "fixtures" / "outreach-backup-v1.json").read_text()
+        page.add_init_script(f"""
+            if (!localStorage.getItem("tcg-pipeline-v1")) {{
+                localStorage.setItem("tcg-pipeline-v1", {dumps(legacy_backup)});
+            }}
+        """)
+        page.clock.set_fixed_time(datetime.fromisoformat("2026-11-21T00:00:00+00:00"))
+        page.goto(ORIGIN)
+        queue = page.get_by_role("region", name="Outreach follow-ups")
+        queue.get_by_role("button", name="Japan Expo Thailand 2027 Your reply is due").click()
+        outreach = page.get_by_role("region", name="Outreach", exact=True)
+        expect(outreach.get_by_label("Outreach notes")).to_have_value("Local note to keep.")
+        expect(outreach.get_by_label("Message reference")).to_have_value("1a1f365362759e5c")
+        outreach.get_by_label("Next action").select_option(label="No follow-up")
+        outreach.get_by_role("button", name="Save outreach").click()
+        expect(outreach.get_by_role("status")).to_have_text("Saved on this device")
+        page.get_by_role("button", name="Back to events", exact=False).click()
+        expect(queue).to_have_count(0)
+        expect(page.locator("#workspace-title")).to_be_focused()
+
+    def test_later_quote_clears_the_reply_and_focuses_the_next_follow_up(self):
+        page = self.page
+        page.clock.set_fixed_time(datetime.fromisoformat("2026-11-24T00:00:00+00:00"))
+        page.goto(ORIGIN)
+        queue = page.get_by_role("region", name="Outreach follow-ups")
+        queue.get_by_role("button", name="Japan Expo Thailand 2027 Your reply is due").click()
+        outreach = page.get_by_role("region", name="Outreach", exact=True)
+        outreach.get_by_label("Follow-up due date").fill("2026-11-24")
+        outreach.get_by_role("button", name="Save outreach").click()
+        expect(outreach.get_by_role("status")).to_have_text("Saved on this device")
+        outreach.get_by_label("Outreach status").select_option("quoted")
+        expect(outreach.get_by_label("Response date")).to_have_value("2026-11-24")
+        expect(outreach.get_by_label("Next action")).to_have_value("")
+        expect(outreach.get_by_label("Follow-up due date")).to_have_value("")
+        outreach.get_by_label("Response date").fill("2026-11-23")
+        outreach.get_by_label("Quoted price").fill("THB 9,000")
+        outreach.get_by_label("Outreach notes").fill("Test reply with a table quote.")
+        outreach.get_by_label("Message reference").fill("test-reply")
+        outreach.get_by_role("button", name="Save outreach").click()
+        expect(outreach.get_by_role("status")).to_have_text("Saved on this device")
+        page.get_by_role("button", name="Back to events", exact=False).click()
+        expect(queue.get_by_role("button", name=re.compile(r"Comifuro.*Organizer nudge due"))).to_be_focused()
+        expect(queue.get_by_text("Japan Expo Thailand 2027")).to_have_count(0)
+        page.goto(f"{ORIGIN}/event/jet-2027")
+        page.reload()
+        expect(outreach.get_by_label("Outreach status")).to_have_value("quoted")
+        expect(outreach.get_by_label("Response date")).to_have_value("2026-11-23")
+        expect(outreach.get_by_label("Quoted price")).to_have_value("THB 9,000")
+        expect(outreach.get_by_label("Outreach notes")).to_have_value("Test reply with a table quote.")
+        expect(outreach.get_by_label("Message reference")).to_have_value("test-reply")
+
+    def test_hktdc_reply_preserves_the_acknowledgement(self):
+        page = self.page
+        page.clock.set_fixed_time(datetime.fromisoformat("2026-11-24T00:00:00+00:00"))
+        page.goto(f"{ORIGIN}/event/hktdc")
+        outreach = page.get_by_role("region", name="Outreach", exact=True)
+        ack = outreach.get_by_text("2026-11-20", exact=True)
+        expect(ack).to_be_visible()
+        outreach.get_by_label("Outreach status").select_option("replied")
+        outreach.get_by_role("button", name="Save outreach").click()
+        expect(outreach.get_by_role("status")).to_have_text("Saved on this device")
+        page.reload()
+        expect(outreach.get_by_label("Outreach status")).to_have_value("replied")
+        expect(ack).to_be_visible()
+
+    def test_outreach_focus_moves_when_the_visible_queue_changes(self):
+        page = self.page
+        page.clock.set_fixed_time(datetime.fromisoformat("2026-11-24T00:00:00+00:00"))
+        page.goto(ORIGIN)
+        queue = page.get_by_role("region", name="Outreach follow-ups")
+        queue.get_by_role("button", name=re.compile(r"Comifuro.*Organizer nudge due")).focus()
+        page.clock.set_fixed_time(datetime.fromisoformat("2026-11-21T00:00:00+00:00"))
+        page.evaluate("document.dispatchEvent(new Event('visibilitychange'))")
+        expect(queue.get_by_role("button", name="Japan Expo Thailand 2027 Your reply is due")).to_be_focused()
+        page.clock.set_fixed_time(datetime.fromisoformat("2026-11-18T00:00:00+00:00"))
+        page.evaluate("document.dispatchEvent(new Event('visibilitychange'))")
+        expect(queue).to_have_count(0)
+        expect(page.locator("#workspace-title")).to_be_focused()
 
     def test_home_base_updates_priority_across_views_and_survives_reload(self):
         page = self.page

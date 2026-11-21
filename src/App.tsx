@@ -12,6 +12,7 @@ import { EmptyState } from "./components/EmptyState";
 import { EventExports } from "./components/EventExports";
 import { TopPicks } from "./components/TopPicks";
 import { UpcomingMilestones } from "./components/UpcomingMilestones";
+import { OutreachFollowUps } from "./components/OutreachFollowUps";
 import { Pipeline } from "./components/Pipeline";
 import { BackupControls } from "./components/BackupControls";
 import { stages, emptyEntry, saveValue } from "./storage";
@@ -51,7 +52,7 @@ import { useFilters, stored } from "./hooks/useFilters";
 import { CountryFilter } from "./components/CountryFilter";
 import { CountryFlag } from "./components/EventIdentity";
 import { useToday } from "./hooks/useToday";
-import { mergeMilestones, mergeOutreach, normalizeEvents } from "./data";
+import { mergeMilestones, mergeOutreach, normalizeEvents, reconcileOutreachOverlay } from "./data";
 import meta from "../data/meta.json";
 import type { Event } from "./model";
 import { emptyFilters } from "./model";
@@ -110,7 +111,7 @@ export default function App() {
     () => shippedEvents.map((event) => ({
       ...event,
       ...(Object.hasOwn(outreach, event.id) && {
-        outreach: mergeOutreach(event.outreach, outreach[event.id]),
+        outreach: mergeOutreach(event.outreach, reconcileOutreachOverlay(event.outreach, outreach[event.id])),
       }),
       ...(Object.hasOwn(milestones, event.id) && {
         vendor_milestones: mergeMilestones(event.vendor_milestones, milestones[event.id]),
@@ -184,10 +185,10 @@ export default function App() {
   const [filterOpen, setFilterOpen] = useState(listContext?.filterOpen ?? false);
   const [groupByStage, setGroupByStage] = useState(listContext?.groupByStage ?? false);
   const { search, from, to } = filters;
-  const open = useCallback((event: Event, occurrence?: string) => {
+  const open = useCallback((event: Event, occurrence?: string, focusFallback?: () => HTMLElement | null) => {
     openEvent(event.id, occurrence, {
       view, month, filterOpen, groupByStage, sessionFilters: { search, from, to },
-    });
+    }, focusFallback);
   }, [openEvent, view, month, filterOpen, groupByStage, search, from, to]);
   const [theme, setTheme] = useState(
     () =>
@@ -533,6 +534,8 @@ export default function App() {
             ))}
           </nav>
           <UpcomingMilestones events={allEvents} open={open} focusFallback={workspaceHeading} />
+          <OutreachFollowUps events={allEvents} today={today} focusFallback={workspaceHeading}
+            open={(event, returnFocus) => open(event, undefined, returnFocus)} />
           <div className="toolbar">
             <label className="search">
               <Search size={18} />
@@ -1166,7 +1169,7 @@ export default function App() {
                 onStage={(stage) => update(selected.id, "stage", stage)}
                 onNote={(note) => update(selected.id, "note", note)}
                 knownOutreach={sharedSelection?.outreach}
-                onOutreach={(patch) => updateOutreach(selected.id, patch)}
+                onOutreach={(patch) => updateOutreach(selected.id, patch, sharedSelection?.outreach)}
                 sharedMilestones={sharedSelection?.vendor_milestones}
                 localMilestones={Object.hasOwn(milestones, selected.id) ? milestones[selected.id] : undefined}
                 onMilestone={(milestone) => updateMilestone(selected.id, milestone)}

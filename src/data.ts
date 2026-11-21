@@ -3,10 +3,12 @@ import {
   milestoneTypes,
   outreachContactTypes,
   outreachMethods,
+  outreachNextActions,
   outreachStatuses,
   type Event,
   type Outreach,
   type OutreachPatch,
+  type OutreachStatus,
   type MilestoneType,
   type VendorMilestone,
 } from "./model.ts";
@@ -144,6 +146,9 @@ const outreachFields: Record<keyof Outreach, (value: unknown) => boolean> = {
   contact_type: nullable(oneOf(outreachContactTypes)),
   contacted_at: nullable(validDate),
   response_at: nullable(validDate),
+  acknowledgement_at: nullable(validDate),
+  next_action: nullable(oneOf(outreachNextActions)),
+  follow_up_due_at: nullable(validDate),
   message_ref: nullable(isText),
   quoted_price: nullable(isText),
   notes: isText,
@@ -171,6 +176,51 @@ export function mergeOutreach(base?: Outreach | null, patch?: OutreachPatch): Ou
   const outreach = { ...emptyOutreach, ...base, ...patch };
   if (outreach.status === "not_contacted") outreach.method = null;
   return outreach;
+}
+
+export const outreachExchangeFields = [
+  "status", "contacted_at", "response_at", "acknowledgement_at", "message_ref",
+  "next_action", "follow_up_due_at",
+] as const;
+
+export function hasOutreachResponse(status: OutreachStatus) {
+  return status === "replied" || status === "quoted" || status === "declined";
+}
+
+export function recordOutreachExchange(base: Outreach | null | undefined, patch: OutreachPatch): Outreach {
+  return mergeOutreach(base, { next_action: null, follow_up_due_at: null, ...patch });
+}
+
+export function reconcileOutreachOverlay(shared: Outreach | null | undefined, saved?: OutreachPatch): OutreachPatch {
+  if (!shared || !saved) return saved ?? {};
+  const sharedHasResponse = hasOutreachResponse(shared.status);
+  const sharedDate = sharedHasResponse ? shared.response_at : shared.acknowledgement_at;
+  if (!sharedDate) return saved;
+
+  const savedAwaitingReply = saved.status === "contacted" || saved.status === "not_contacted";
+  const savedHasResponse = saved.status ? hasOutreachResponse(saved.status) : Boolean(saved.response_at);
+  const savedContact = saved.contacted_at ?? "";
+  const savedAck = saved.acknowledgement_at ?? "";
+  const savedDate = (!savedAwaitingReply && saved.response_at) || (savedAck > savedContact ? savedAck : savedContact);
+  const savedSentReference = !saved.status && !saved.response_at && savedDate === sharedDate &&
+    saved.message_ref && saved.message_ref !== shared.message_ref;
+  // An unanswered enquiry precedes a verified human reply on the same planner date.
+  const sharedIsNewer = ((sharedHasResponse || !savedHasResponse) && savedDate && savedDate < sharedDate) ||
+    (sharedHasResponse && (savedAwaitingReply || savedSentReference) && savedDate <= sharedDate);
+  if (!sharedIsNewer) {
+    // Older versions of the editor cleared this field when switching to a human reply.
+    if (shared.acknowledgement_at && saved.acknowledgement_at === null &&
+        hasOutreachResponse(saved.status ?? shared.status)) {
+      return { ...saved, acknowledgement_at: shared.acknowledgement_at };
+    }
+    return saved;
+  }
+
+  const edits = { ...saved };
+  for (const field of outreachExchangeFields) delete edits[field];
+  if (!shared.acknowledgement_at && saved.acknowledgement_at)
+    edits.acknowledgement_at = saved.acknowledgement_at;
+  return edits;
 }
 
 export function normalizeEvents(value: unknown): Event[] {

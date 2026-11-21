@@ -18,9 +18,11 @@ export interface EventSource {
 export const outreachStatuses = ["not_contacted", "contacted", "replied", "quoted", "declined"] as const;
 export const outreachMethods = ["email", "form", "instagram_dm", "other"] as const;
 export const outreachContactTypes = ["email", "form", "DM", "none"] as const;
+export const outreachNextActions = ["reply_to_organizer"] as const;
 export type OutreachStatus = (typeof outreachStatuses)[number];
 export type OutreachMethod = (typeof outreachMethods)[number];
 export type OutreachContactType = (typeof outreachContactTypes)[number];
+export type OutreachNextAction = (typeof outreachNextActions)[number];
 
 export interface Outreach {
   status: OutreachStatus;
@@ -29,6 +31,9 @@ export interface Outreach {
   contact_type: OutreachContactType | null;
   contacted_at: string | null;
   response_at: string | null;
+  acknowledgement_at?: string | null;
+  next_action?: OutreachNextAction | null;
+  follow_up_due_at?: string | null;
   message_ref: string | null;
   quoted_price: string | null;
   notes: string;

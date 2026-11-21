@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
+import shipped from "../data/events.json";
+import log from "../data/outreach-log.json";
+import contacts from "../data/outreach-contacts.json";
+import type { Event } from "../src/model.ts";
 import { mergeOutreach, normalizeEvents } from "../src/data.ts";
+import { dueOutreach } from "../src/outreach.ts";
 import { seedOutreach } from "./outreach-seed.ts";
 
 const route = "https://example.com/vendor-form";
@@ -25,6 +30,21 @@ const events = normalizeEvents([
 ]);
 
 describe("outreach seed", () => {
+  it("recreates the shipped outreach from the actual log and produces identical output on a rerun", () => {
+    const published = shipped as Event[];
+    const withoutOutreach = published.map(({ outreach: _outreach, ...event }) => event);
+    const seeded = seedOutreach(withoutOutreach, contacts.events, log);
+    expect(seeded).toEqual(published);
+    expect(JSON.stringify(seedOutreach(seeded, contacts.events, log))).toBe(JSON.stringify(seeded));
+    expect(Object.fromEntries(seeded.filter(({ id }) => ["zubculture", "mefcc-2027", "color18", "jet-2027"].includes(id))
+      .map(({ id, outreach }) => [id, [outreach?.status, outreach?.response_at, outreach?.message_ref]]))).toEqual({
+      zubculture: ["replied", "2026-11-21", "1a1fbc207bf5a3d7"],
+      "mefcc-2027": ["quoted", "2026-11-19", "1a1f36f00771f806"],
+      color18: ["replied", "2026-11-20", "1a1f71da66fca555"],
+      "jet-2027": ["replied", "2026-11-19", "1a1f365362759e5c"],
+    });
+  });
+
   it("is idempotent, preserves event fields and adds research to every matched ID", () => {
     const result = seedOutreach(events, research, emailLog);
     expect(seedOutreach(result, research, emailLog)).toEqual(result);
@@ -58,6 +78,29 @@ describe("outreach seed", () => {
       published_booth_price: "$100", quoted_price: "$85", notes: "End table available",
     });
     expect(seedOutreach(result, research, [...emailLog, ...formUpdates])).toEqual(result);
+  });
+
+  it("closes Japan Expo's earlier reply task when a quote arrives and preserves HKTDC's acknowledgement", () => {
+    const priorLog = log.map((row) => row.id === "jet-2027" && row.status === "replied"
+      ? { ...row, follow_up_due_at: "2026-11-25" } : row);
+    const published = shipped as Event[];
+    const prior = seedOutreach(published, contacts.events, priorLog);
+    expect(prior.find(({ id }) => id === "jet-2027")?.outreach)
+      .toMatchObject({ next_action: "reply_to_organizer", follow_up_due_at: "2026-11-25" });
+    const amended = [...priorLog,
+      { id: "jet-2027", status: "quoted", response_at: "2026-11-26", message_ref: "later-quote", quoted_price: "THB 9,000" },
+      { id: "hktdc", status: "replied", response_at: "2026-11-26", message_ref: "human-reply" },
+    ];
+    const result = seedOutreach(prior, contacts.events, amended);
+    const japan = result.find(({ id }) => id === "jet-2027")!;
+    expect(japan.outreach).toMatchObject({
+      status: "quoted", next_action: null, follow_up_due_at: null, message_ref: "later-quote",
+    });
+    expect(dueOutreach([japan], "2026-11-26")).toEqual([]);
+    expect(result.find(({ id }) => id === "hktdc")?.outreach).toMatchObject({
+      status: "replied", acknowledgement_at: "2026-11-20", response_at: "2026-11-26", message_ref: "human-reply",
+    });
+    expect(JSON.stringify(seedOutreach(result, contacts.events, amended))).toBe(JSON.stringify(result));
   });
 
   it("applies corrected research to an event awaiting outreach", () => {

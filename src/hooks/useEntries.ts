@@ -14,8 +14,8 @@ import {
   type MilestoneEdits,
   type OutreachPatches,
 } from "../storage";
-import type { OutreachPatch, VendorMilestone } from "../model";
-import { mergeMilestones } from "../data";
+import type { Outreach, OutreachPatch, VendorMilestone } from "../model";
+import { mergeMilestones, reconcileOutreachOverlay } from "../data";
 import { download } from "../utils";
 
 export function useEntries() {
@@ -71,13 +71,13 @@ export function useEntries() {
     },
     [],
   );
-  const updateOutreach = useCallback((id: string, patch: OutreachPatch) => {
+  const updateOutreach = useCallback((id: string, patch: OutreachPatch, shared?: Outreach | null) => {
     setSaved(false);
     setState((current) => ({
       ...current,
       outreach: {
         ...current.outreach,
-        [id]: { ...current.outreach[id], ...patch },
+        [id]: { ...reconcileOutreachOverlay(shared, current.outreach[id]), ...patch },
       },
     }));
   }, []);

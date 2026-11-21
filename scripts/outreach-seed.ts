@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { readFile, rename, rm, writeFile } from "node:fs/promises";
-import { mergeOutreach, normalizeEvents, normalizeOutreachPatch } from "../src/data.ts";
+import { mergeOutreach, normalizeEvents, normalizeOutreachPatch, recordOutreachExchange } from "../src/data.ts";
 import type { Event, Outreach } from "../src/model.ts";
 
 export function seedOutreach(events: Event[], research: unknown, log: unknown): Event[] {
@@ -36,7 +36,7 @@ export function seedOutreach(events: Event[], research: unknown, log: unknown): 
     const patch = normalizeOutreachPatch(row, true);
     if (!patch.status || patch.status === "not_contacted")
       throw new Error(`Expected an outreach result for ${row.id}.`);
-    seeded.set(row.id, mergeOutreach(seeded.get(row.id) ?? existing.get(row.id), patch));
+    seeded.set(row.id, recordOutreachExchange(seeded.get(row.id) ?? existing.get(row.id), patch));
   }
   return events.map((event) => {
     const outreach = seeded.get(event.id);

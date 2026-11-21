@@ -3189,11 +3189,15 @@ input[type="checkbox"]:indeterminate::after { content: ""; width: 10px; height: 
   gap: 10px;
   margin-top: 14px;
 }
+@media (max-width: 480px) {
+  .outreach-form { grid-template-columns: minmax(0, 1fr); }
+}
 .outreach-form label { display: grid; align-content: start; gap: 4px; font-size: 13px; font-weight: 700; }
 .outreach-form :is(input, select, textarea) { width: 100%; min-width: 0; }
 .outreach-form textarea { resize: vertical; }
 .outreach-form :is(input, select, textarea):disabled { opacity: .65; }
 .outreach-wide { grid-column: 1 / -1; }
+.outreach-due-help { color: var(--muted); font-size: 13px; }
 .outreach-actions { display: flex; align-items: center; gap: 10px; min-height: 46px; }
 .outreach-actions .button {
   flex: none;
@@ -3230,26 +3234,27 @@ input[type="checkbox"]:indeterminate::after { content: ""; width: 10px; height: 
 .country-filter .count { background: var(--accent); color: var(--on-accent); border-radius: 99px; padding: 0 6px; font-size: 11px; }
 
 /* Vendor booking milestones */
-.upcoming-milestones {
+.upcoming-milestones,
+.outreach-follow-ups {
   margin: 12px 0;
 }
-.upcoming-milestones > h3 {
+:is(.upcoming-milestones, .outreach-follow-ups) > h3 {
   display: flex;
   align-items: center;
   gap: 8px;
   margin: 0 0 8px;
   font: 750 16px var(--font-text);
 }
-.upcoming-milestones > h3 svg {
+:is(.upcoming-milestones, .outreach-follow-ups) > h3 svg {
   flex: none;
   color: var(--accent);
 }
-.upcoming-milestones ul {
+:is(.upcoming-milestones, .outreach-follow-ups) > ul {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr));
   gap: 8px;
 }
-.upcoming-milestones li {
+:is(.upcoming-milestones, .outreach-follow-ups) > ul > li {
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -3257,7 +3262,7 @@ input[type="checkbox"]:indeterminate::after { content: ""; width: 10px; height: 
   border-radius: 10px;
   background: color-mix(in srgb, var(--score-1-bg) 38%, var(--surface));
 }
-.milestone-card {
+:is(.milestone-card, .outreach-follow-up-card) {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-content: start;
@@ -3273,27 +3278,30 @@ input[type="checkbox"]:indeterminate::after { content: ""; width: 10px; height: 
   text-align: left;
   overflow-wrap: anywhere;
 }
-.milestone-card:hover {
+:is(.milestone-card, .outreach-follow-up-card):hover {
   background: color-mix(in srgb, var(--score-1-bg) 68%, var(--surface));
 }
 .upcoming-milestones .milestone-export {
   align-self: flex-start;
   margin: 0 12px 8px;
 }
-.milestone-toggle {
+.milestone-toggle,
+.outreach-follow-up-toggle {
   margin-top: 8px;
 }
-.milestone-card strong {
+:is(.milestone-card, .outreach-follow-up-card) strong {
   font-size: 15px;
   line-height: 1.25;
 }
-.milestone-arrow {
+.milestone-arrow,
+.outreach-follow-up-arrow {
   color: var(--accent);
 }
 .milestone-card > :is(.milestone-label, .milestone-time, .milestone-countdown, .milestone-notes) {
   grid-column: 1 / -1;
 }
-.milestone-label {
+.milestone-label,
+.outreach-follow-up-action {
   color: var(--score-1-fg);
   font-size: 14px;
   font-weight: 750;
@@ -3322,6 +3330,30 @@ input[type="checkbox"]:indeterminate::after { content: ""; width: 10px; height: 
   color: var(--muted);
   font-size: 13px;
   line-height: 1.4;
+}
+.outreach-follow-ups li:only-child { max-width: 620px; }
+.outreach-follow-up-card { padding-bottom: 10px; border-radius: 9px; }
+.outreach-follow-up-card > :is(.outreach-follow-up-action, .outreach-follow-up-exchange) {
+  grid-column: 1 / -1;
+}
+.outreach-follow-up-action {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.outreach-follow-up-action svg { flex: none; }
+.outreach-follow-up-exchange {
+  display: grid;
+  gap: 3px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.outreach-follow-up-notes {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 .booking-milestones {
   display: grid;

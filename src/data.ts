@@ -1,5 +1,10 @@
 import {
   emptyOutreach,
+  budgetCategories,
+  type BudgetAmount,
+  type BudgetDefaults,
+  type CustomBudgetCost,
+  type TripBudget,
   milestoneTypes,
   outreachContactTypes,
   outreachMethods,
@@ -18,6 +23,7 @@ import {
   type VendorPricingPatch,
 } from "./model.ts";
 import { milestoneInstantInRange } from "./milestones.ts";
+import { findHomeBase } from "./homeBase.ts";
 const nullableStrings = [
   "games_note",
   "date_note",
@@ -169,6 +175,53 @@ export function mergeVendorPricing(base: VendorPricingPatch = {}, incoming: Vend
     ...(incoming.vendor_options && { vendor_options: merge(base.vendor_options, incoming.vendor_options) }),
     ...(incoming.vendor_documents && { vendor_documents: merge(base.vendor_documents, incoming.vendor_documents) }),
   };
+}
+
+export function normalizeBudgetAmount(value: unknown): BudgetAmount {
+  if (!record(value) || !amount(value.amount) || !isText(value.currency) || !/^[A-Z]{3}$/.test(value.currency))
+    throw new Error("Enter a nonnegative amount and a three-letter currency code.");
+  return { amount: value.amount, currency: value.currency };
+}
+
+export function normalizeBudgetDefaults(value: unknown): BudgetDefaults {
+  if (!record(value)) throw new Error("Expected an object with trip budget defaults.");
+  const defaults: BudgetDefaults = {};
+  for (const key of ["lodging", "meals"] as const)
+    if (value[key] !== undefined) defaults[key] = normalizeBudgetAmount(value[key]);
+  return defaults;
+}
+
+export function normalizeTripBudget(value: unknown): TripBudget {
+  if (!record(value)) throw new Error("Expected a trip budget object.");
+  const budget: TripBudget = {};
+  if (value.costs !== undefined) {
+    if (!record(value.costs)) throw new Error("Expected an object with trip costs.");
+    const costs: TripBudget["costs"] = {};
+    for (const key of budgetCategories)
+      if (value.costs[key] !== undefined) costs[key] = normalizeBudgetAmount(value.costs[key]);
+    budget.costs = costs;
+  }
+  const travelBase = findHomeBase(value.travelHomeBase);
+  if (budget.costs?.travel && travelBase) budget.travelHomeBase = travelBase.id;
+  if (value.custom !== undefined) {
+    if (!Array.isArray(value.custom)) throw new Error("Expected a list of custom costs.");
+    const seen = new Set<string>();
+    budget.custom = value.custom.map((line: unknown): CustomBudgetCost => {
+      if (!record(line) || !isText(line.id) || !recordId.test(line.id) || seen.has(line.id) ||
+          !isText(line.label) || !line.label.trim())
+        throw new Error("Custom costs need a name and a unique ID.");
+      seen.add(line.id);
+      return { id: line.id, label: line.label.trim(), ...normalizeBudgetAmount(line) };
+    });
+  }
+  if (value.walkAway !== undefined) budget.walkAway = normalizeBudgetAmount(value.walkAway);
+  for (const key of ["nights", "mealDays"] as const) {
+    const count = value[key];
+    if (count === undefined) continue;
+    if (!amount(count) || !Number.isSafeInteger(count)) throw new Error("Enter whole nights and meal days.");
+    budget[key] = count;
+  }
+  return budget;
 }
 
 export function milestoneSourceHref(source: string): string | undefined {
@@ -358,6 +411,7 @@ export function normalizeEvents(value: unknown): Event[] {
       e.event_status = v.event_status;
     if (typeof v.scanner_export_id === "string" && v.scanner_export_id)
       e.scanner_export_id = v.scanner_export_id;
+    if (v.scanner_archived === true) e.scanner_archived = true;
     for (const key of nullableStrings)
       e[key] = typeof v[key] === "string" ? v[key] : null;
     if (record(v.outreach)) e.outreach = mergeOutreach(null, normalizeOutreachPatch(v.outreach));
@@ -365,6 +419,13 @@ export function normalizeEvents(value: unknown): Event[] {
     const milestones = normalizeMilestones(v.vendor_milestones);
     if (milestones.length) e.vendor_milestones = milestones;
     Object.assign(e, normalizeVendorPricing(v));
+    if (v.trip_budget !== undefined) {
+      try {
+        e.trip_budget = normalizeTripBudget(v.trip_budget);
+      } catch {
+        // Invalid shared planning data must not prevent other events from loading.
+      }
+    }
     for (const key of nullableNumbers)
       e[key] =
         typeof v[key] === "number" && Number.isFinite(v[key]) ? v[key] : null;
@@ -378,7 +439,7 @@ export function normalizeEvents(value: unknown): Event[] {
     e.end_date =
       validDate(v.end_date) && e.start_date && v.end_date >= e.start_date
         ? v.end_date
-        : e.start_date;
+        : null;
     e.estimated_month =
       typeof v.estimated_month === "string" &&
       /^\d{4}-(0[1-9]|1[0-2])$/.test(v.estimated_month)

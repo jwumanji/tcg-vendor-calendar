@@ -37,6 +37,10 @@ export function Modal({
         close();
       }}
       onKeyDown={(ev) => {
+        if (ev.key === "Escape") {
+          ev.stopPropagation();
+          return;
+        }
         if (ev.key !== "Tab") return;
         const controls = ev.currentTarget.querySelectorAll<HTMLElement>(
           "button:enabled,input:enabled,select:enabled",

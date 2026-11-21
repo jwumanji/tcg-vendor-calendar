@@ -1,11 +1,11 @@
-import { useRef, useState, type FormEvent, type ReactNode, type RefObject } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode, type RefObject } from "react";
 import { ArrowUpRight, Pencil, Plus } from "lucide-react";
 import { normalizeVendorDocument, normalizeVendorOption } from "../data";
 import {
   vendorEligibilities, vendorRateStatuses, type Event, type VendorDocument, type VendorOption, type VendorPricingPatch,
 } from "../model";
 import { prettyDate, safeUrl } from "../utils";
-import { applicableVendorPrice, formatVendorAmount, formatVendorUsd, legacyVendorPrice, optionRateStatus } from "../vendorPricing";
+import { applicableVendorPrice, formatVendorAmount, formatVendorUsd, legacyVendorPrice, missingPriceMessage, optionRateStatus, snapshotCurrencies } from "../vendorPricing";
 import { Modal } from "./Modal";
 
 type Editing = { type: "option"; item?: VendorOption } | { type: "document"; item?: VendorDocument };
@@ -21,34 +21,6 @@ const rateLabels: Record<VendorOption["rate_status"], string> = {
   unavailable: "Rate unavailable",
 };
 const pricingLabels = { quote: "Organizer quote", published: "Published price", listed: "Listed price · estimated USD" };
-const unavailableRateReasons = { expired: "expired rates", past_year: "prior-edition rates", unavailable: "unavailable rates" };
-const reasonList = new Intl.ListFormat("en", { type: "conjunction" });
-
-function missingPriceMessage(event: Event, now: number, legacy: ReturnType<typeof legacyVendorPrice>) {
-  if (event.event_status === "cancelled") return "Event cancelled.";
-  const packages = (event.vendor_options ?? []).filter((option) => option.kind === "package");
-  if (packages.length) {
-    const statuses = packages.map((option) => optionRateStatus(option, now));
-    if (statuses.every((status) => status === "expired")) return "All booth rates have expired.";
-    if (packages.every((option) => option.eligibility === "ineligible"))
-      return "All booth options are ineligible for TCG singles.";
-    if (packages.some((option, i) => option.eligibility === "unclear" && statuses[i] === "current"))
-      return "TCG singles eligibility unclear. Applicable price pending.";
-    if (statuses.every((status) => status === "past_year")) return "Only prior-edition booth rates are on file.";
-    if (statuses.every((status) => status === "unavailable")) return "Booth rates are unavailable.";
-    const reasons = new Set(statuses.map((status) => status === "current"
-      ? "ineligible options"
-      : unavailableRateReasons[status]));
-    return `No applicable booth price. The recorded options include ${reasonList.format(reasons)}.`;
-  }
-  if (legacy?.status === "past_year") return "Only prior-edition booth rates are on file.";
-  if (legacy?.status === "expired") return "The listed booth rate has expired.";
-  if (legacy?.status === "unavailable") return "The listed booth rate is unavailable for this event.";
-  if (event.vendor_documents?.length && !event.vendor_cost && event.outreach?.status === "replied")
-    return "Quote pending";
-  return "No booth price recorded.";
-}
-
 function Source({ source, label }: { source: string; label?: string }) {
   return safeUrl(source) ? <a href={source} target="_blank" rel="noreferrer">{label ?? source}</a> : <span>{source}</span>;
 }
@@ -116,7 +88,7 @@ export function VendorMoney({ event, now, shared, local, onSave, onRemove }: {
             <strong>{formatVendorAmount(price.amount, price.currency)} <span>· {formatVendorUsd(price.usd)}</span></strong>
             <p>{price.basis !== "listed" && <>{price.option.name}{price.option.vat_rate !== undefined && " incl. VAT"} · </>}{pricingLabels[price.basis]}</p>
           </>
-        ) : <p>{missingPriceMessage(event, now, legacy)}</p>}
+        ) : <p>{missingPriceMessage(event, now)}</p>}
       </div>
       {event.vendor_cost && (!options.length || price?.basis === "listed") && (
         <p className="money-reference">
@@ -219,7 +191,11 @@ export function VendorMoney({ event, now, shared, local, onSave, onRemove }: {
 }
 
 function VendorEditor({ editing, close, save }: { editing: Editing; close: () => void; save: (patch: VendorPricingPatch) => void }) {
-  const [error, setError] = useState("");
+  const [error, setError] = useState<{ message: string }>();
+  const saveError = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    if (error) saveError.current?.scrollIntoView({ block: "nearest" });
+  }, [error]);
   const option = editing.type === "option" ? editing.item : undefined;
   const doc = editing.type === "document" ? editing.item : undefined;
   const typeLabel = editing.type === "option" ? "booth option" : "document link";
@@ -243,7 +219,7 @@ function VendorEditor({ editing, close, save }: { editing: Editing; close: () =>
         valid_until: fields.valid_until.trim() || undefined,
       })] });
     } catch (err) {
-      setError((err as Error).message);
+      setError({ message: (err as Error).message });
     }
   }
   return (
@@ -266,13 +242,16 @@ function VendorEditor({ editing, close, save }: { editing: Editing; close: () =>
             <label>Size<input name="size" defaultValue={option?.size} /></label>
             <label className="outreach-wide">Includes<textarea name="includes" rows={2} defaultValue={option?.includes} /></label>
             <label>Original amount<input name="amount" type="number" required min="0" step="0.01" defaultValue={option?.amount} /></label>
-            <label>Currency code<input name="currency" maxLength={3} required defaultValue={option?.currency} placeholder="SGD" /></label>
+            <label>Currency code<input name="currency" maxLength={3} required defaultValue={option?.currency}
+              placeholder="SGD" aria-describedby="vendor-fx-help" /></label>
             <label>VAT to add (%)<input name="vat" type="number" min="0" max="100" step="any"
               defaultValue={option?.vat_rate === undefined ? undefined : option.vat_rate * 100} /></label>
             <label>FX rate (local units per USD)<input name="fx_rate" type="number" min="0" step="any" required defaultValue={option?.fx_rate} /></label>
             <label>FX as of<input name="fx_as_of" type="date" required defaultValue={option?.fx_as_of} /></label>
             <label className="outreach-wide">FX source<input name="fx_source" required defaultValue={option?.fx_source} /></label>
-            <p className="outreach-wide">USD is calculated from the payable amount and dated FX rate.</p>
+            <p className="outreach-wide" id="vendor-fx-help">
+              The option row uses the dated FX rate for USD. Package comparisons and budget totals use the snapshot for {snapshotCurrencies}.
+            </p>
             <label>Kind<select name="kind" defaultValue={option?.kind}>
               <option value="package">Package</option><option value="add_on">Add-on</option>
             </select></label>
@@ -291,7 +270,7 @@ function VendorEditor({ editing, close, save }: { editing: Editing; close: () =>
             <label className="outreach-wide">Notes<textarea name="notes" rows={3} defaultValue={option?.notes} /></label>
           </>
         )}
-        {error && <p className="outreach-wide" role="alert">{error}</p>}
+        {error && <p ref={saveError} className="outreach-wide" role="alert">{error.message}</p>}
         <div className="money-item-actions outreach-wide">
           <button className="button primary" type="submit">Save {typeLabel}</button>
           <button className="button" type="button" onClick={close}>Cancel</button>

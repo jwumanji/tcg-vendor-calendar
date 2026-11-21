@@ -158,7 +158,7 @@ function calendarIdentity(old: Event, next: Event): Partial<Event> {
 
 function hasSharedPlanning(event: Event) {
   return Boolean(event.outreach || event.vendor_milestones?.length ||
-    event.vendor_options?.length || event.vendor_documents?.length);
+    event.vendor_options?.length || event.vendor_documents?.length || event.trip_budget);
 }
 
 function preserveMilestones(previous: Event, next: Event): Partial<Event> {
@@ -167,6 +167,21 @@ function preserveMilestones(previous: Event, next: Event): Partial<Event> {
     vendor_milestones: mergeMilestones(next.vendor_milestones, previous.vendor_milestones),
     vendor_deadline: previous.vendor_deadline ?? next.vendor_deadline,
   };
+}
+
+function refreshVendorPricing(previous: Event, next: Event) {
+  const pricing = mergeVendorPricing(next, previous);
+  const published = new Map(next.vendor_options?.filter((option) => option.basis === "published")
+    .map((option) => [option.id, option]));
+  if (pricing.vendor_options) {
+    pricing.vendor_options = pricing.vendor_options.map((option) => {
+      const update = published.get(option.id);
+      return option.basis === "published" && update
+        ? { ...update, eligibility: option.eligibility, notes: option.notes || update.notes }
+        : option;
+    });
+  }
+  return pricing;
 }
 
 function reconcileScanner(existing: Event[], imported: Event[]) {
@@ -186,9 +201,13 @@ function reconcileScanner(existing: Event[], imported: Event[]) {
   const candidates = imported.map((event, index) => {
     if (matched[index]) return [];
     const near = unmatched.filter((old) => matches(event, old));
-    return near.length ? near : unmatched.filter((old) => scannerReschedule(old, event));
+    const activeNear = near.filter((old) => !old.scanner_archived);
+    if (activeNear.length) return activeNear;
+    const moved = unmatched.filter((old) => !old.scanner_archived && scannerReschedule(old, event));
+    return moved.length ? moved : near;
   });
-  const scanner = imported.map<Event>(({ outreach: _outreach, scanner_export_id: _exportId, ...event }, index) => {
+  const scanner = imported.map<Event>(({ outreach: _outreach, scanner_export_id: _exportId,
+    scanner_archived: _archived, ...event }, index) => {
     const [candidate] = candidates[index];
     // Keep the planner ID so event links, seed log entries and local patches still resolve.
     const previous = matched[index] ?? (
@@ -202,7 +221,8 @@ function reconcileScanner(existing: Event[], imported: Event[]) {
       ...event,
       ...calendarIdentity(previous, event),
       ...preserveMilestones(previous, event),
-      ...mergeVendorPricing(event, previous),
+      ...refreshVendorPricing(previous, event),
+      ...(previous.trip_budget && { trip_budget: previous.trip_budget }),
       ...(previous.id !== event.id && { id: previous.id, scanner_export_id: event.id }),
       ...(previous.outreach !== undefined && { outreach: previous.outreach }),
     };
@@ -226,7 +246,7 @@ export function merge(
     return index === -1 ? Infinity : index;
   };
   const { scanner, old } = imported ? reconcileScanner(existing, imported) : {
-    scanner: existing.filter((e) => !e.source),
+    scanner: existing.filter((e) => !e.source && !e.scanner_archived),
     old: existing.filter((e) => e.source),
   };
   const retained = old.filter(
@@ -276,9 +296,11 @@ export function merge(
           (stored.date_status === "tba" || listing.date_status === "tba" || stored.id === listing.id));
     });
     // A city page may list multiple fully dated stops at the same URL.
-    const exact = rows.filter((stored) => sameSubject(stored, listing) && ranges(stored).some((r) =>
+    const activeRows = rows.filter((stored) => !stored.scanner_archived);
+    const comparable = activeRows.length ? activeRows : rows;
+    const exact = comparable.filter((stored) => sameSubject(stored, listing) && ranges(stored).some((r) =>
       r.start_date === listing.start_date && r.end_date === listing.end_date));
-    return exact.length ? exact : rows;
+    return exact.length ? exact : comparable;
   }
   const claims = new Map(incoming.map((event) => [event, candidates(event)]));
   const known: Record<string, number> = {};
@@ -286,7 +308,7 @@ export function merge(
   const applied: Notice[] = [], unmatched: Notice[] = [];
   const blocked = new Set<Event>();
   for (const notice of notices) {
-    const editions = snapshot.filter((stored) => {
+    const matched = snapshot.filter((stored) => {
       if (notice.unknownOriginal || !sameSubject(stored, notice) || !compatibleKeys(stored, notice)) return false;
       const dates = editionRanges(stored);
       if (notice.originalStart)
@@ -294,6 +316,8 @@ export function merge(
       return keyMatches(stored, notice) || (!!stored.city && !!notice.city && !!stored.country_code &&
         !!notice.country_code && (dates.length > 0 || !!stored.estimated_month));
     });
+    const activeEditions = matched.filter((event) => !event.scanner_archived);
+    const editions = activeEditions.length ? activeEditions : matched;
     if (editions.length !== 1 || incoming.some((card) => card.source!.id === notice.source!.id &&
         (editions.some((stored) => claims.get(card)!.includes(stored)) ||
           (!notice.originalStart && sameSubject(card, notice) && compatibleKeys(card, notice))))) {
@@ -354,7 +378,8 @@ export function merge(
           ...earlier,
           ...update,
           ...preserveMilestones(earlier, event),
-          ...mergeVendorPricing(event, earlier),
+          ...refreshVendorPricing(earlier, event),
+          ...(earlier.trip_budget && { trip_budget: earlier.trip_budget }),
           id: earlier.id,
           logo: event.logo ?? earlier.logo,
           logo_kind: event.logo ? event.logo_kind : earlier.logo_kind,
@@ -368,6 +393,7 @@ export function merge(
           },
         };
         delete retained[i].event_status;
+        delete retained[i].scanner_archived;
       }
     } else {
       // A recurring show can list two different weekends in the same month.
@@ -414,9 +440,9 @@ export function merge(
     };
     retained[i] = updated;
   }
-  // Reconcile rescheduled shows before pruning. Shared planning keeps past events addressable.
+  // Reconcile rescheduled shows before removing past events from the calendar.
   const active = retained.filter((e) =>
-    hasSharedPlanning(e) || !e.end_date || stamp(today) - stamp(e.end_date) <= 30 * day,
+    hasSharedPlanning(e) || (!e.scanner_archived && (!e.end_date || stamp(today) - stamp(e.end_date) <= 30 * day)),
   );
   // Insert finds chronologically within the export sections; preserve the original
   // order of all Scanner records, including its manually positioned TBA entries.
@@ -436,13 +462,21 @@ export function merge(
     );
     ordered.splice(index < 0 ? ordered.length : index, 0, e);
   }
+  // The scanner cannot read browser storage. Keep the last listing for any plans
+  // attached to a removed ID, without putting that listing back in the calendar.
+  const activeIds = new Set(ordered.map((event) => event.id));
+  const activeSourceIds = new Set(active.map((event) => event.id));
+  const archived = new Map<string, Event>();
+  for (const event of [...existing, ...retained]) {
+    if (!activeIds.has(event.id)) archived.set(event.id, { ...event, scanner_archived: true });
+  }
   return {
-    events: ordered,
+    events: [...ordered, ...archived.values()],
     added: ordered.filter((e) => newIds.has(e.id)),
     known,
     applied,
     unmatched,
     ambiguous,
-    removed: existing.filter((e) => e.source).length - active.filter((e) => !newIds.has(e.id)).length,
+    removed: existing.filter((e) => e.source && !e.scanner_archived && !activeSourceIds.has(e.id)).length,
   };
 }

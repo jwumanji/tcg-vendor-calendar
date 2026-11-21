@@ -109,8 +109,38 @@ export interface VendorDocument {
   notes?: string;
 }
 
+export const budgetCategories = ["travel", "lodging", "meals", "localTransport", "freight", "other"] as const;
+export type BudgetCategory = (typeof budgetCategories)[number];
+
+export interface BudgetAmount {
+  amount: number;
+  currency: string;
+}
+
+export interface CustomBudgetCost extends BudgetAmount {
+  id: string;
+  label: string;
+}
+
+export interface TripBudget {
+  costs?: Partial<Record<BudgetCategory, BudgetAmount>>;
+  /** Home base last confirmed for the entered travel amount. */
+  travelHomeBase?: string;
+  custom?: CustomBudgetCost[];
+  walkAway?: BudgetAmount;
+  nights?: number;
+  mealDays?: number;
+}
+
+export interface BudgetDefaults {
+  lodging?: BudgetAmount;
+  meals?: BudgetAmount;
+}
+
 export interface Event {
   id: string;
+  /** Last known listing kept so device-only plans can still be opened. */
+  scanner_archived?: true;
   /** Scanner's ID when a replacement uses an existing planner ID to keep its history. */
   scanner_export_id?: string;
   name: string;
@@ -150,6 +180,7 @@ export interface Event {
   vendor_cost: string | null;
   vendor_options?: VendorOption[];
   vendor_documents?: VendorDocument[];
+  trip_budget?: TripBudget;
   booth_detail: string | null;
   contact: string | null;
   outreach?: Outreach | null;

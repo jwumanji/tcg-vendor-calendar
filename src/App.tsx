@@ -15,7 +15,9 @@ import { UpcomingMilestones, useMilestoneClock } from "./components/UpcomingMile
 import { OutreachFollowUps } from "./components/OutreachFollowUps";
 import { Pipeline } from "./components/Pipeline";
 import { BackupControls } from "./components/BackupControls";
-import { stages, emptyEntry, saveValue } from "./storage";
+import { BudgetDefaultsForm } from "./components/TripBudget";
+import { stages, emptyEntry, hasLocalPlanning, saveValue } from "./storage";
+import { scoreEvent } from "./scoring";
 import {
   lazy,
   Suspense,
@@ -94,6 +96,9 @@ export default function App() {
     outreach,
     milestones,
     vendorPricing,
+    tripBudget,
+    updateTripBudget,
+    updateBudgetDefaults,
     update,
     updateOutreach,
     updateMilestone,
@@ -126,10 +131,8 @@ export default function App() {
   const [show2026, setShow2026] = useState(
     () => stored("tcg-show-2026-v1") === true,
   );
-  const events = useMemo(
-    () => seasonEvents(allEvents, show2026),
-    [allEvents, show2026],
-  );
+  const activeEvents = useMemo(() => allEvents.filter((event) => !event.scanner_archived), [allEvents]);
+  const events = useMemo(() => seasonEvents(activeEvents, show2026), [activeEvents, show2026]);
   const today = useToday();
   const now = useMilestoneClock();
   // The calendar opens on the first month of the season (January 2027).
@@ -140,7 +143,7 @@ export default function App() {
       : SEASON_START.slice(0, 7);
   const { route, openEvent, back, listContext } = useEventRoute();
   const { filters, setFilters, set } = useFilters(setStorageError, listContext?.sessionFilters);
-  const priority = usePriority(allEvents, today, now, setStorageError);
+  const priority = usePriority(activeEvents, today, now, setStorageError);
   const { scores } = priority;
   const [toolsOpen, setToolsOpen] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
@@ -176,7 +179,9 @@ export default function App() {
   );
   const onEventPage = route.page === "event";
   const selected = onEventPage
-    ? events.find((event) => event.id === route.id) ?? allEvents.find((event) => event.id === route.id)
+    ? events.find((event) => event.id === route.id) ?? allEvents.find((event) => event.id === route.id &&
+      (!event.scanner_archived || Object.hasOwn(priority.overrides, event.id) ||
+        hasLocalPlanning(event.id, { entries, outreach, milestones, vendorPricing, tripBudget })))
     : null;
   const sharedSelection = selected && shippedEvents.find((event) => event.id === selected.id);
   const workspaceHeading = useRef<HTMLHeadingElement>(null);
@@ -539,8 +544,8 @@ export default function App() {
               </button>
             ))}
           </nav>
-          <UpcomingMilestones events={allEvents} open={open} focusFallback={workspaceHeading} />
-          <OutreachFollowUps events={allEvents} today={today} focusFallback={workspaceHeading}
+          <UpcomingMilestones events={activeEvents} open={open} focusFallback={workspaceHeading} />
+          <OutreachFollowUps events={activeEvents} today={today} focusFallback={workspaceHeading}
             open={(event, returnFocus) => open(event, undefined, returnFocus)} />
           <div className="toolbar">
             <label className="search">
@@ -1096,7 +1101,8 @@ export default function App() {
                 ))}
               </select>
               <small id="home-base-help">
-                Home base only affects Logistics in Priority. Travel uses qualitative city and country bands.
+                Home base informs Logistics in Priority. The budget uses no travel cost estimate from it.
+                Events in your home city default to 0 lodging nights.
                 If your scores previously used Singapore, the new default changes your Logistics scores.
               </small>
             </div>
@@ -1108,6 +1114,7 @@ export default function App() {
               <SlidersHorizontal size={16} /> Score weights
             </button>
           </section>
+          <BudgetDefaultsForm defaults={tripBudget.defaults} save={updateBudgetDefaults} />
           <section className="tool-exports" aria-label="Event exports">
             <EventExports events={attending} entries={entries} goingOnly />
             <EventExports events={filtered} entries={entries} />
@@ -1125,6 +1132,7 @@ export default function App() {
             outreach={outreach}
             milestones={milestones}
             vendorPricing={vendorPricing}
+            tripBudget={tripBudget}
             ids={allEvents.map((e) => e.id)}
             apply={applyEntries}
             priority={{
@@ -1167,7 +1175,9 @@ export default function App() {
                 now={now}
                 toast={toast}
                 e={selected}
-                score={scores[selected.id]}
+                score={scores[selected.id] ?? scoreEvent(selected, {
+                  today, now, weights: priority.weights, overrides: priority.overrides, homeBase: priority.homeBase,
+                })}
                 setOverride={(value) => priority.setOverride(selected.id, value)}
                 openClash={openEvent}
                 occurrence={route.occurrence}
@@ -1187,6 +1197,10 @@ export default function App() {
                 localVendorPricing={Object.hasOwn(vendorPricing, selected.id) ? vendorPricing[selected.id] : undefined}
                 onVendorPricing={(patch) => updateVendorPricing(selected.id, patch)}
                 onRemoveVendorPricing={(field, id) => resetVendorPricing(selected.id, field, id)}
+                homeBase={priority.homeBase}
+                localBudget={Object.hasOwn(tripBudget.events, selected.id) ? tripBudget.events[selected.id] : undefined}
+                budgetDefaults={tripBudget.defaults}
+                onTripBudget={(value) => updateTripBudget(selected.id, value)}
               />
             </Suspense>
           ) : (

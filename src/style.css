@@ -3521,7 +3521,7 @@ input[type="checkbox"]:indeterminate::after { content: ""; width: 10px; height: 
 .money-document-meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; }
 .money-form p { color: var(--muted); font-size: 13px; }
 .money-editor { margin: auto; }
-.money-form label.money-check { display: flex; align-items: center; gap: 8px; }
+:is(.money-form, .trip-budget-editor) label.money-check { display: flex; align-items: center; gap: 8px; }
 .money-check input[type="checkbox"] { width: 18px; min-height: 0; }
 .detail-body #vendor-editor-title { margin: 0; }
 .detail-body #vendor-editor-title::before { display: none; }
@@ -3546,4 +3546,50 @@ input[type="checkbox"]:indeterminate::after { content: ""; width: 10px; height: 
   .money-table td:last-child { border: 0; padding-bottom: 0; }
   .money-cell-label { display: inline; color: var(--muted); font-weight: 700; }
   .money-amount small, .money-cutoff { grid-column: 2; }
+}
+
+.trip-budget { container-type: inline-size; }
+.detail-body .trip-budget > h2::before { background: var(--accent); }
+.trip-budget-origin { color: var(--muted); margin-bottom: 8px; }
+.trip-budget-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  gap: 4px 14px;
+  padding: 8px 0;
+}
+.trip-budget-row + .trip-budget-row { border-top: 1px solid var(--line); }
+.trip-budget-row :is(dt, dd) { margin: 0; overflow-wrap: anywhere; }
+.trip-budget-row dt { font-weight: 700; }
+.trip-budget-row dd { font-variant-numeric: tabular-nums; }
+.trip-budget-row small, .trip-budget-above { display: block; }
+.trip-budget-row small, .trip-budget-fx, .trip-budget-totals p,
+.trip-budget-editor form p, .trip-budget-defaults p { color: var(--muted); font-size: 13px; }
+.trip-budget-above { color: rgb(var(--warn)); margin-top: 4px; }
+.trip-budget-totals {
+  margin-top: 10px;
+  padding: 4px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.trip-budget-totals p { padding-bottom: 8px; }
+.trip-budget-fx { margin: 9px 0; }
+.trip-budget-inputs {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(70px, .55fr);
+  gap: 8px;
+}
+.trip-budget-defaults { margin-block: 16px; }
+.trip-budget-defaults [role="status"]:empty { margin: 0; }
+.trip-budget-editor fieldset, .trip-budget-defaults fieldset {
+  min-inline-size: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px 10px;
+}
+.trip-budget-editor legend, .trip-budget-defaults legend { padding-inline: 4px; font-size: 14px; font-weight: 700; }
+.trip-budget-editor fieldset :is(p, .trip-budget-inputs + label, .button) { margin-block: 5px; }
+.trip-budget-editor fieldset small { color: var(--muted); font-weight: 400; }
+@container (max-width: 420px) {
+  .trip-budget-row { grid-template-columns: minmax(0, 1fr); }
 }

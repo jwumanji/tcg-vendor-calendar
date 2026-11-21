@@ -13,7 +13,7 @@ import type { Source } from "./types.ts";
 import { dirname, join, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { parseArgs } from "node:util";
-import { normalizeEvents, normalizeVendorPricing, validDate } from "../src/data.ts";
+import { normalizeEvents, normalizeTripBudget, normalizeVendorPricing, validDate } from "../src/data.ts";
 import type { Event } from "../src/model.ts";
 import { localDay, horizon } from "./dates.ts";
 import { createClient } from "./http.ts";
@@ -39,11 +39,13 @@ export function validate(value: unknown): asserts value is Event[] {
   for (const [i, row] of rows.entries()) {
     const raw = (value as Event[])[i];
     normalizeVendorPricing(raw, true);
+    if (raw.trip_budget !== undefined) normalizeTripBudget(raw.trip_budget);
     if (
       !row.name.trim() ||
       !["timeline", "watchlist", "recurring_sg"].includes(raw.section) ||
       !["estimated", "confirmed", "tba"].includes(raw.date_status) ||
       raw.event_status !== row.event_status ||
+      raw.scanner_archived !== row.scanner_archived ||
       (raw.vendor_milestones !== undefined &&
         (!Array.isArray(raw.vendor_milestones) ||
           raw.vendor_milestones.length !== (row.vendor_milestones?.length ?? 0))) ||
@@ -192,7 +194,7 @@ async function main() {
     const original = await readFile("data/events.json", "utf8");
     const events: unknown = JSON.parse(original);
     validate(events);
-    if (imported?.length === 0 && events.some((e) => !e.source))
+    if (imported?.length === 0 && events.some((e) => !e.source && !e.scanner_archived))
       throw Error("Empty Scanner export would replace a nonempty Scanner snapshot");
     return { original, events };
   }
@@ -250,7 +252,7 @@ async function main() {
   for (const e of added)
     console.log(`+ ${e.name} | ${e.date ?? "TBA"} | ${e.city} | ${e.source}`);
   console.log(
-    `${added.length} new, ${merged.removed} removed, ${merged.events.length} total. ${logos.length} changed logos.`,
+    `${added.length} new, ${merged.removed} removed, ${merged.events.filter((e) => !e.scanner_archived).length} active. ${logos.length} changed logos.`,
   );
   if (allFailed) {
     if (!dry) await write("scanner/last-run.json", json(summary));

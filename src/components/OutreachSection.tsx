@@ -195,9 +195,12 @@ export function OutreachSection({
         </label>
         <label className="outreach-wide">
           Quoted price
-          <input value={draft.quoted_price ?? ""}
+          <input value={draft.quoted_price ?? ""} aria-describedby="outreach-price-help"
             onChange={(event) => update({ quoted_price: event.target.value || null })} />
         </label>
+        <p className="outreach-wide outreach-due-help" id="outreach-price-help">
+          Saving this text only updates Outreach. To use a quote in the budget and walk-away comparison, add a booth option in Money and select the organizer quote price type.
+        </p>
         <label className="outreach-wide">
           Outreach notes
           <textarea rows={3} value={draft.notes}

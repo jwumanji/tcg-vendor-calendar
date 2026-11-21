@@ -124,6 +124,7 @@ export function estimateTravel(e: Pick<Event, "city" | "country" | "country_code
     : country || countryByCode.get(code) || code;
   return {
     value,
+    local,
     signal: `Travel from ${homeBaseLabel(homeBase)} to ${destination} (estimated: ${label})`,
   };
 }

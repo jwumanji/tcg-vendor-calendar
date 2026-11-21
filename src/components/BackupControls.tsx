@@ -17,6 +17,8 @@ import {
   importOutreach,
   importMilestoneEdits,
   importVendorPricing,
+  importTripBudget,
+  type BudgetSettings,
   unknownIds,
   type Entries,
   type OutreachPatches,
@@ -30,6 +32,7 @@ export function BackupControls({
   outreach,
   milestones,
   vendorPricing,
+  tripBudget,
   ids,
   apply,
   priority,
@@ -39,17 +42,18 @@ export function BackupControls({
   outreach: OutreachPatches;
   milestones: MilestoneEdits;
   vendorPricing: VendorPricingEdits;
+  tripBudget: BudgetSettings;
   ids: string[];
   priority: PriorityPreferences;
   applyPriority: (value: PriorityPreferences) => void;
-  apply: (entries: Entries, outreach: OutreachPatches, milestones: MilestoneEdits, vendorPricing: VendorPricingEdits) => void;
+  apply: (entries: Entries, outreach: OutreachPatches, milestones: MilestoneEdits, vendorPricing: VendorPricingEdits, tripBudget: BudgetSettings) => void;
 }) {
   const [preview, setPreview] = useState<Backup | null>(null);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
   const [mode, setMode] = useState<"merge" | "replace">("merge");
   const absent = preview
-    ? unknownIds(preview.entries, ids, preview.priority?.overrides, preview.outreach, preview.milestones, preview.vendorPricing)
+    ? unknownIds(preview.entries, ids, preview.priority?.overrides, preview.outreach, preview.milestones, preview.vendorPricing, preview.tripBudget?.events)
     : [];
   const outreachCount = Object.keys(preview?.outreach ?? {}).length;
   const outreachSummary = `${outreachCount} outreach ${outreachCount === 1 ? "patch" : "patches"}`;
@@ -58,6 +62,8 @@ export function BackupControls({
   const pricingCount = Object.values(preview?.vendorPricing ?? {}).reduce(
     (count, patch) => count + (patch.vendor_options?.length ?? 0) + (patch.vendor_documents?.length ?? 0), 0);
   const pricingSummary = `${pricingCount} booth option and document ${pricingCount === 1 ? "edit" : "edits"}`;
+  const budgetCount = Object.keys(preview?.tripBudget?.events ?? {}).length;
+  const budgetSummary = `${budgetCount} trip budget ${budgetCount === 1 ? "edit" : "edits"}`;
   const currentHomeBase = resolveHomeBase(priority.homeBase);
   const importedHomeBaseId = preview?.priority?.homeBase;
   const importedHomeBase = findHomeBase(importedHomeBaseId);
@@ -68,7 +74,7 @@ export function BackupControls({
           <HardDrive size={16} aria-hidden="true" /> Backup &amp; restore
         </span>
         <span>
-          Going choices, stages, notes, outreach edits, booking milestones, booth option and document edits, and score settings are kept in this
+          Going choices, stages, notes, outreach edits, booking milestones, booth option and document edits, trip budgets and defaults, and score settings are kept in this
           browser only. Export a backup before switching devices.
         </span>
       </div>
@@ -77,7 +83,7 @@ export function BackupControls({
           className="button"
           onClick={() =>
             download(
-              JSON.stringify(backup(entries, priority, outreach, milestones, vendorPricing), null, 2),
+              JSON.stringify(backup(entries, priority, outreach, milestones, vendorPricing, tripBudget), null, 2),
               "tcg-pipeline-backup.json",
               "application/json",
             )
@@ -129,6 +135,7 @@ export function BackupControls({
           )}
           {preview.milestones && <p>{milestoneSummary}</p>}
           {preview.vendorPricing && <p>{pricingSummary}</p>}
+          {preview.tripBudget && <p>{budgetSummary}{preview.tripBudget.defaults !== undefined && " · includes trip budget defaults"}</p>}
           <p>
             {absent.length} IDs absent from current data (kept):{" "}
             {absent.slice(0, 20).join(", ") || "none"}
@@ -170,6 +177,11 @@ export function BackupControls({
               ? "Imported booth options and documents take precedence for matching records."
               : "Imported booth options and documents replace your device edits. Shared rates and documents still apply."}</p>
           )}
+          {preview.tripBudget && (
+            <p>{mode === "merge"
+              ? "Imported budgets take precedence for matching events."
+              : "Imported budgets replace the trip budgets and defaults saved on this device."}</p>
+          )}
           {preview.priority && (
             <p>
               Imported score weights will apply to all events.{" "}
@@ -189,12 +201,13 @@ export function BackupControls({
               className="button primary"
               onClick={() => {
                 try {
-                  if (mode === "replace") stashBeforeReplace(entries, priority, outreach, milestones, vendorPricing);
+                  if (mode === "replace") stashBeforeReplace(entries, priority, outreach, milestones, vendorPricing, tripBudget);
                   apply(
                     importEntries(entries, preview.entries, mode),
                     importOutreach(outreach, preview.outreach, mode),
                     importMilestoneEdits(milestones, preview.milestones, mode),
                     importVendorPricing(vendorPricing, preview.vendorPricing, mode),
+                    importTripBudget(tripBudget, preview.tripBudget, mode),
                   );
                   applyPriority(
                     importPriority(priority, preview.priority, mode),
@@ -204,6 +217,7 @@ export function BackupControls({
                     preview.outreach && outreachSummary,
                     preview.milestones && milestoneSummary,
                     preview.vendorPricing && pricingSummary,
+                    preview.tripBudget && budgetSummary,
                   ].filter(Boolean).join(" · ");
                   setStatus(`Imported ${summary} (${mode}).`);
                   setError("");

@@ -13,7 +13,7 @@ import {
   LoaderCircle,
   Download,
 } from "lucide-react";
-import type { Event, VendorMilestone, VendorPricingPatch } from "../model";
+import type { BudgetDefaults, TripBudget as Budget, Event, VendorMilestone, VendorPricingPatch } from "../model";
 import {
   displayDateLabel,
   safeUrl,
@@ -32,6 +32,7 @@ import { OutreachChip } from "./OutreachChip";
 import { OutreachSection } from "./OutreachSection";
 import { BookingMilestones } from "./BookingMilestones";
 import { VendorMoney } from "./VendorMoney";
+import { TripBudget } from "./TripBudget";
 export function Detail({
   e,
   today,
@@ -51,6 +52,10 @@ export function Detail({
   localVendorPricing,
   onVendorPricing,
   onRemoveVendorPricing,
+  homeBase,
+  budgetDefaults,
+  localBudget,
+  onTripBudget,
   saved,
   score,
   setOverride,
@@ -75,6 +80,10 @@ export function Detail({
   localVendorPricing?: VendorPricingPatch;
   onVendorPricing?: (patch: VendorPricingPatch) => void;
   onRemoveVendorPricing?: (field: keyof VendorPricingPatch, id: string) => void;
+  homeBase?: string;
+  budgetDefaults?: BudgetDefaults;
+  localBudget?: Budget;
+  onTripBudget?: (value?: Budget) => void;
   saved: boolean;
   score: ScoreResult;
   setOverride: (value: number | null) => void;
@@ -184,6 +193,8 @@ export function Detail({
         />
         <VendorMoney event={e} now={now} shared={sharedVendorPricing} local={localVendorPricing}
           onSave={onVendorPricing} onRemove={onRemoveVendorPricing} />
+        <TripBudget event={e} now={now} today={today} occurrence={occurrence} homeBase={homeBase}
+          local={localBudget} defaults={budgetDefaults} onSave={onTripBudget} />
         <div className="planning">
           <label htmlFor="detail-stage">PIPELINE STAGE</label>
           <StageBadge stage={entry.stage} />

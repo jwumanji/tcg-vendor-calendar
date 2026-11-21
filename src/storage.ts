@@ -1,7 +1,7 @@
 import { normalizeWeights, type Weights } from "./scoring";
-import { mergeMilestones, mergeVendorPricing, normalizeMilestones, normalizeOutreachPatch, normalizeVendorPricing } from "./data";
+import { mergeMilestones, mergeVendorPricing, normalizeMilestones, normalizeOutreachPatch, normalizeVendorPricing, normalizeTripBudget, normalizeBudgetDefaults } from "./data";
 import { findHomeBase } from "./homeBase";
-import type { OutreachPatch, VendorMilestone, VendorPricingPatch } from "./model";
+import type { BudgetDefaults, OutreachPatch, TripBudget, VendorMilestone, VendorPricingPatch } from "./model";
 
 export const stages = [
   "New",
@@ -25,6 +25,11 @@ export type Entries = Record<string, Entry>;
 export type OutreachPatches = Record<string, OutreachPatch>;
 export type MilestoneEdits = Record<string, VendorMilestone[]>;
 export type VendorPricingEdits = Record<string, VendorPricingPatch>;
+export interface BudgetSettings {
+  events: Record<string, TripBudget>;
+  defaults?: BudgetDefaults;
+}
+
 export const emptyEntry: Entry = {
   going: false,
   goingUpdatedAt: null,
@@ -126,6 +131,7 @@ export interface Backup {
   outreach?: OutreachPatches;
   milestones?: MilestoneEdits;
   vendorPricing?: VendorPricingEdits;
+  tripBudget?: BudgetSettings;
   version: 1;
   exportedAt: string;
   entries: Entries;
@@ -146,6 +152,14 @@ function validateMilestoneEntry(id: string, value: unknown): VendorMilestone[] {
     return normalizeMilestones(value, true);
   } catch (error) {
     throw new Error(`Invalid booking milestone for ${id}. ${(error as Error).message}`);
+  }
+}
+function validateBudgetEntry(id: string, value: unknown): TripBudget {
+  if (!id.trim()) throw new Error("Trip budget event ID must not be empty.");
+  try {
+    return normalizeTripBudget(value);
+  } catch (error) {
+    throw new Error(`Invalid trip budget for ${id}. ${(error as Error).message}`);
   }
 }
 const timestamp = (v: unknown): v is string =>
@@ -219,6 +233,15 @@ export function validateBackup(value: unknown): Backup {
       }
     }));
   }
+  if (value.tripBudget !== undefined) {
+    const tripBudget = value.tripBudget;
+    if (!object(tripBudget) || !object(tripBudget.events))
+      throw new Error("Invalid trip budgets in backup.");
+    result.tripBudget = {
+      events: Object.fromEntries(Object.entries(tripBudget.events).map(([id, budget]) => [id, validateBudgetEntry(id, budget)])),
+      ...(tripBudget.defaults !== undefined && { defaults: normalizeBudgetDefaults(tripBudget.defaults) }),
+    };
+  }
   if (value.priority !== undefined) {
     if (
       !object(value.priority) ||
@@ -243,6 +266,7 @@ export function backup(
   outreach?: OutreachPatches,
   milestones?: MilestoneEdits,
   vendorPricing?: VendorPricingEdits,
+  tripBudget?: BudgetSettings,
 ): Backup {
   return {
     version: 1,
@@ -252,6 +276,7 @@ export function backup(
     ...(outreach && { outreach }),
     ...(milestones && { milestones }),
     ...(vendorPricing && { vendorPricing }),
+    ...(tripBudget && { tripBudget }),
   };
 }
 export function importPriority(
@@ -363,6 +388,16 @@ export function removeVendorPricingEdit(
   return next;
 }
 
+export function importTripBudget(
+  current: BudgetSettings,
+  incoming: BudgetSettings | undefined,
+  mode: "merge" | "replace",
+): BudgetSettings {
+  if (!incoming) return current;
+  if (mode === "replace") return incoming;
+  return { ...current, ...incoming, events: { ...current.events, ...incoming.events } };
+}
+
 export function unknownIds(
   entries: Entries,
   ids: string[],
@@ -370,10 +405,11 @@ export function unknownIds(
   outreach: OutreachPatches = {},
   milestones: MilestoneEdits = {},
   vendorPricing: VendorPricingEdits = {},
+  budgets: BudgetSettings["events"] = {},
 ) {
   const known = new Set(ids);
   return [
-    ...new Set([...Object.keys(entries), ...Object.keys(overrides), ...Object.keys(outreach), ...Object.keys(milestones), ...Object.keys(vendorPricing)]),
+    ...new Set([...Object.keys(entries), ...Object.keys(overrides), ...Object.keys(outreach), ...Object.keys(milestones), ...Object.keys(vendorPricing), ...Object.keys(budgets)]),
   ].filter((id) => !known.has(id));
 }
 export function migrateLegacy(value: unknown): Entries {
@@ -396,11 +432,21 @@ export interface LoadedEntries {
   outreach: OutreachPatches;
   milestones: MilestoneEdits;
   vendorPricing: VendorPricingEdits;
+  tripBudget: BudgetSettings;
   error: string;
   raw: string | null;
   recoveryKey: string | null;
   dropped: number;
 }
+
+export function hasLocalPlanning(
+  id: string,
+  { entries, outreach, milestones, vendorPricing, tripBudget }:
+    Pick<LoadedEntries, "entries" | "outreach" | "milestones" | "vendorPricing" | "tripBudget">,
+) {
+  return [entries, outreach, milestones, vendorPricing, tripBudget.events].some((overlay) => Object.hasOwn(overlay, id));
+}
+
 export function loadEntries(
   storage: Pick<Storage, "getItem"> & Partial<Pick<Storage, "setItem">>,
 ): LoadedEntries {
@@ -410,6 +456,7 @@ export function loadEntries(
     outreach: Object.create(null),
     milestones: Object.create(null),
     vendorPricing: Object.create(null),
+    tripBudget: { events: Object.create(null) },
     error: "",
     raw: null,
     recoveryKey: null,
@@ -427,8 +474,8 @@ export function loadEntries(
     const value: unknown = JSON.parse(raw);
     try {
       const { entries, outreach = result.outreach, milestones = result.milestones,
-        vendorPricing = result.vendorPricing } = validateBackup(value);
-      return { ...result, entries, outreach, milestones, vendorPricing };
+        vendorPricing = result.vendorPricing, tripBudget = result.tripBudget } = validateBackup(value);
+      return { ...result, entries, outreach, milestones, vendorPricing, tripBudget };
     } catch {
       if (object(value) && object(value.entries)) {
         for (const [id, entry] of Object.entries(value.entries)) {
@@ -463,6 +510,25 @@ export function loadEntries(
           result.dropped += records.length - recovered.length;
         }
       }
+      if (object(value) && value.tripBudget !== undefined) {
+        const storedBudget = value.tripBudget;
+        if (object(storedBudget) && object(storedBudget.events)) {
+          for (const [id, budget] of Object.entries(storedBudget.events)) {
+            try {
+              result.tripBudget.events[id] = validateBudgetEntry(id, budget);
+            } catch {
+              result.dropped++;
+            }
+          }
+          if (storedBudget.defaults !== undefined) {
+            try {
+              result.tripBudget.defaults = normalizeBudgetDefaults(storedBudget.defaults);
+            } catch {
+              result.dropped++;
+            }
+          }
+        } else result.dropped++;
+      }
       if (object(value) && object(value.vendorPricing)) {
         for (const [id, patch] of Object.entries(value.vendorPricing)) {
           if (!id.trim() || !object(patch)) {
@@ -493,7 +559,8 @@ export function loadEntries(
     }
   }
   const recovered = Object.keys(result.entries).length + Object.keys(result.outreach).length +
-    Object.keys(result.milestones).length + Object.keys(result.vendorPricing).length;
+    Object.keys(result.milestones).length + Object.keys(result.vendorPricing).length +
+    Object.keys(result.tripBudget.events).length + Number(result.tripBudget.defaults !== undefined);
   result.error = `Saved planner data needs recovery. Recovered ${recovered} saved records. Dropped ${result.dropped} invalid records. Automatic saving is paused. ${result.recoveryKey ? "The original is preserved on this device." : "Export the original before continuing."}`;
   return result;
 }
@@ -503,9 +570,10 @@ export function stashBeforeReplace(
   outreach?: OutreachPatches,
   milestones?: MilestoneEdits,
   vendorPricing?: VendorPricingEdits,
+  tripBudget?: BudgetSettings,
 ): string {
   const key = `${STORAGE_KEY}-before-replace-${Date.now()}`;
-  localStorage.setItem(key, JSON.stringify(backup(entries, priority, outreach, milestones, vendorPricing)));
+  localStorage.setItem(key, JSON.stringify(backup(entries, priority, outreach, milestones, vendorPricing, tripBudget)));
   return key;
 }
 export function saveValue(key: string, value: unknown): string {

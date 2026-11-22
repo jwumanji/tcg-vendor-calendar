@@ -18,7 +18,7 @@ The development and preview URLs are served at `/` (or the configured `VITE_BASE
 
 ## Features
 
-- List opens directly in Rows for fast scanning. Top picks ranks up to 12 upcoming dated events by Priority and includes the tier legend and up to six vendor deadline notices.
+- List opens directly in Rows for fast scanning. Top picks ranks up to 12 upcoming dated events by Priority and includes the tier legend. The workspace shows up to three upcoming vendor milestones at first, with a control to reveal the rest.
 - Month calendar (agenda on mobile), chronological timeline, sortable cards, watchlist, recurring Singapore shows and a nine-stage Pipeline board whose cards show logo, violet edge, dates, location, date status, score rarity, note indicator and a stage picker.
 - Country/game multi-select, market, size, date, status, score and multi-select pipeline filters; free-text search and removable filter chips.
 - Confirmed, estimated and TBA dates have distinct labels and styling. Going calendar downloads identify estimated months as tentative.
@@ -29,11 +29,11 @@ The development and preview URLs are served at `/` (or the configured `VITE_BASE
 
 Filters, theme, notes, stages and the passed-event visibility toggle are stored in this browser’s localStorage. They do not sync between devices. Filtered exports use the complete filtered set across views; a view tab or calendar month does not further narrow the export. Use the date filters to narrow the set. Unknown scores stay visible until a positive minimum score is selected.
 
-Going choices, notes and stages use the versioned `tcg-pipeline-v1` key. Refreshes retain saved IDs absent from the dataset. Older entries and backups migrate New to Not reviewed, Interested to Considering, Pass to Passed, and Paid / attending to Booked. The older `tcg-plans` key also migrates Planning to vend to Considering, Applied to Applied, Accepted to Need to pay, and Skip to Passed. Entries from that key have no recorded timestamps.
+Going choices, notes and stages use the versioned `tcg-pipeline-v1` key. Refreshes retain saved IDs absent from the dataset. Older entries, backups and saved filters migrate New to Not reviewed, Interested to Considering, Pass to Passed, and Paid / attending to Booked. The older `tcg-plans` key also migrates Planning to vend to Considering, Applied to Applied, Accepted to Need to pay, and Skip to Passed. Entries from that key have no recorded timestamps.
 
 Use **Export backup** for a JSON backup before switching devices. Import validates version 1 and previews absent IDs before confirmation. Merge takes the newest Going choice, note and stage independently for each ID, retaining local edits on timestamp ties. Replace discards entries outside the backup. Unknown JSON fields are ignored. Passed and Too expensive are hidden by default. Use the visibility toggle or select those stages in Filters to include them. Pipeline renders every stage column and honors search and filters. Timeline can group by stage. Grid and Rows share stage filters and sort order. CSV includes stage and notes. Storage errors leave edits in memory and display a warning so they can be exported.
 
-Change the pipeline stage in Decide, Grid, Rows or Pipeline. An untouched Not reviewed entry shows a suggested stage based on the event’s outreach and this-edition booth options. Japan Expo Thailand’s organizer proposal suggests Quote received, with booth pricing still pending. Suggestions are recalculated from the available evidence, including outreach and booth options restored from a backup. A saved stage takes precedence.
+Change the pipeline stage in Decide, Grid, Rows or Pipeline. An untouched Not reviewed entry can show a suggestion based on outreach, a this-edition booth quote or an organizer proposal. Published catalogue rates alone leave the entry untouched. Japan Expo Thailand’s organizer proposal suggests Quote received, with booth pricing still pending. Local storage and JSON backups save explicit stage choices and any local evidence. Suggestions are recalculated from that evidence and the current event data. Choose a stage in the picker to save it, including when it matches the suggestion.
 
 ## Views
 

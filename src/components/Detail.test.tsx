@@ -50,6 +50,7 @@ it("puts Decide and the next action before the ordered reference sections", () =
   expect($(".event-facts .going-button")).toHaveLength(1);
   expect($(".event-facts select")).toHaveLength(0);
   expect($(".event-decision #detail-stage").attr("aria-label")).toBe("Pipeline stage for Color Fiesta #18: Bon Appétit");
+  expect($("#detail-stage, .planning .stage-picker")).toHaveLength(1);
   expect($("#detail-stage option[selected]").text()).toBe("Considering");
   expect($(".planning").text()).toContain("Change the pipeline stage in Decide.");
 });
@@ -211,6 +212,9 @@ it.each([
   ["def-gameexpo", "Check official site", "https://www.dubaiesportsfestival.com/en/home", "https://uprizing.ae/the-narrows"],
   ["paperworld", "Ask organizer", "mailto:paperworld@uae.messefrankfurt.com", "https://paperworld-middle-east.ae.messefrankfurt.com/dubai/en/exhibitors/faq.html"],
   ["urban", "Apply", "https://docs.google.com/forms/d/e/1FAIpQLSeulGNKHBEi5UgHtx-IBqt6NyjihmQAyrXSBOYCKF953o62Jg/viewform", "https://urbanops.hk/urban-card-show-2027-01/"],
+  ["scan-suntec-asia-comic-expo-005-202701", "Apply", "https://www.asiacomicsexpo.com/register", "https://www.suntecsingapore.com/visit-events/asia-comic-expo-005"],
+  ["acghk28", "Apply", "https://ani-com.hk/en/exhibitor", "https://acgevent.com/archives/40425"],
+  ["comic-fiesta", "Apply", "https://exhibitor.comicfiesta.org", "https://otabase.net/events/comic-fiesta-2026/"],
   ["comfest-kw", "View reference source", "https://playvault.ae/pages/tcg-event-calendar-2026-gcc", "https://playvault.ae/pages/tcg-event-calendar-2026-gcc"],
   ["bahrain-cs", "View reference source", "https://playvault.ae/pages/tcg-event-calendar-2026-gcc", "https://playvault.ae/pages/tcg-event-calendar-2026-gcc"],
 ])("uses the published route with the matching purpose for %s", (id, label, href, source) => {
@@ -284,6 +288,7 @@ it("keeps the reply and missing price visible for Japan Expo Thailand's proposal
   const $ = render(event("jet-2027"), { entry: { ...emptyEntry, stage: "Quote received" } });
   expect($(".next-step p").text()).toContain("Reply to the organizer");
   expect($(".decision-price").text()).toContain("Current booth price unknown");
+  expect($(".next-step .apply-cta").attr("href")).toBe("https://www.japanexpothailand.com/how-to-exhibit/");
 });
 
 it("puts a budget calculated from Tools defaults in the reference order", () => {

@@ -19,7 +19,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { Event } from "../model";
-import { stages, emptyEntry, type Stage, type Entries } from "../storage";
+import { stages, emptyEntry, type DisplayEntry, type Stage } from "../storage";
 import { vendorApplyAction } from "../eventDecision";
 import { displayDateLabel, games, gameKey, primaryGameKey } from "../utils";
 import { holo } from "../holo";
@@ -68,14 +68,14 @@ export function StageBadge({ stage }: { stage: Stage }) {
   );
 }
 export function StagePicker({
-  stage,
+  entry: { stage, stageSuggested },
   onChange,
   name,
   id,
 }: {
   name: string;
   id?: string;
-  stage: Stage;
+  entry: DisplayEntry;
   onChange: (stage: Stage) => void;
 }) {
   const Icon = stageIcons[stage];
@@ -83,8 +83,10 @@ export function StagePicker({
     <span className="stage-control" data-stage={stage}>
       <Icon className="stage-icon" size={13} strokeWidth={2.4} aria-hidden="true" />
       <select id={id} className="stage-picker" aria-label={`Pipeline stage for ${name}`}
-        value={stage} onChange={(e) => onChange(e.target.value as Stage)}>
-        {stages.map((s) => <option key={s}>{s}</option>)}
+        aria-description={stageSuggested ? `Suggested stage: ${stage}` : undefined}
+        value={stageSuggested ? "" : stage} onChange={(e) => onChange(e.target.value as Stage)}>
+        {stageSuggested && <option value="" disabled hidden>{stage}</option>}
+        {stages.map((s) => <option key={s} value={s}>{s}</option>)}
       </select>
       <ChevronDown className="stage-chevron" size={13} aria-hidden="true" />
     </span>
@@ -105,7 +107,7 @@ export function Pipeline({
   now?: number;
   sort: RowSort;
   events: Event[];
-  entries: Entries;
+  entries: Record<string, DisplayEntry>;
   scores: Record<string, ScoreResult>;
   open: (event: Event) => void;
   setGoing: SetGoing;
@@ -182,7 +184,7 @@ const PipelineCard = memo(function PipelineCard({
   stage: Stage;
   going: boolean;
   hasNote: boolean;
-  entries: Entries;
+  entries: Record<string, DisplayEntry>;
   score: ScoreResult;
   open: (event: Event) => void;
   setGoing: SetGoing;
@@ -236,7 +238,7 @@ const PipelineCard = memo(function PipelineCard({
         <GoingButton e={e} going={going} setGoing={setGoing} />
         <StagePicker
           name={e.name}
-          stage={stage}
+          entry={entries[e.id] || emptyEntry}
           onChange={(s) => change(e, s)}
         />
         {application && <ApplyLink action={application} name={e.name} compact />}

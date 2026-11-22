@@ -248,6 +248,15 @@ it("preserves an explicitly empty option list and proposal when Scanner replaces
   expect(updated).toMatchObject({ vendor_options: [], vendor_documents: japan.vendor_documents, vendor_count: 80 });
 });
 
+it("keeps an application route when refreshing the same listing without vendor details", () => {
+  const source = { ...base.source!, id: "suntec", url: "https://www.suntecsingapore.com/visit-events/card-show" };
+  const previous = find({ source, vendor_application: "https://example.com/apply" });
+  const refresh = find({ source, vendor_application: null });
+  expect(merge([previous], [refresh], today).events[0].vendor_application).toBe(previous.vendor_application);
+  const updated = { ...refresh, vendor_application: "https://example.com/new-application" };
+  expect(merge([previous], [updated], today).events[0].vendor_application).toBe(updated.vendor_application);
+});
+
 it.each([undefined, null, mergeOutreach(null, { notes: "Source default" })])("keeps planner outreach when a scraper update supplies %j", (incomingOutreach) => {
   const outreach = mergeOutreach(null, { status: "replied", method: "email", notes: "Follow up" });
   const previous = find({ outreach });

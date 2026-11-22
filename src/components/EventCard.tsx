@@ -6,7 +6,7 @@ import type { ScoreResult } from "../scoring";
 import { memo } from "react";
 import { CalendarDays } from "lucide-react";
 import type { Event } from "../model";
-import type { Entries, Entry, Stage } from "../storage";
+import type { DisplayEntry, Entries, Stage } from "../storage";
 import { vendorApplyAction } from "../eventDecision";
 import { games, displayDateLabel, gameKey, primaryGameKey } from "../utils";
 import { holo } from "../holo";
@@ -34,7 +34,7 @@ export const EventCard = memo(function EventCard({
   open,
 }: {
   e: Event;
-  entry: Entry;
+  entry: DisplayEntry;
   entries: Entries;
   score: ScoreResult;
   setGoing: SetGoing;
@@ -97,7 +97,7 @@ export const EventCard = memo(function EventCard({
           {entry.note.trim() && <NoteTag />}
         </div>
         <div className="card-actions">
-          <StagePicker name={e.name} stage={entry.stage} onChange={(stage) => setStage(e.id, stage)} />
+          <StagePicker name={e.name} entry={entry} onChange={(stage) => setStage(e.id, stage)} />
           {application && <ApplyLink action={application} name={e.name} compact />}
         </div>
       </div>

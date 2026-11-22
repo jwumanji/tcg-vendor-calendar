@@ -1,6 +1,6 @@
 import { DEFAULT_WEIGHTS, normalizeWeights } from "./scoring";
 import { stored } from "./hooks/useFilters";
-import { mergeOutreach, normalizeEvents } from "./data";
+import { mergeOutreach, mergeVendorPricing, normalizeEvents } from "./data";
 import shippedEvents from "../data/events.json";
 import { resolveHomeBase } from "./homeBase";
 import {
@@ -104,8 +104,16 @@ describe("decision stage suggestions", () => {
 
   it.each(["zubculture", "mefcc-2027", "color18", "jet-2027"])("suggests Quote received for %s", (id) => {
     const stages = withSuggestedStages({}, stageSuggestions(events));
-    expect(stages[id]).toMatchObject({ stage: "Quote received", stageUpdatedAt: null });
+    expect(stages[id]).toMatchObject({ stage: "Quote received", stageUpdatedAt: null, stageSuggested: true });
   });
+
+  it.each(["cardcon3", "urban", "scan-suntec-asia-comic-expo-005-202701", "scan-supanova-supanova-comic-con-gaming-sydney-202706"])(
+    "leaves %s unreviewed when the organizer only published rates", (id) => {
+      const event = events.find((candidate) => candidate.id === id)!;
+      expect(event.vendor_options?.length).toBeGreaterThan(0);
+      expect(stageSuggestions([event])[id]).toBeUndefined();
+    },
+  );
 
   it.each([
     ["contacted", "Contacted"],
@@ -116,17 +124,33 @@ describe("decision stage suggestions", () => {
   ] as const)("suggests a stage for outreach marked %s", (status, stage) => {
     const event = { ...base, outreach: mergeOutreach(null, { status }) };
     const entries = withSuggestedStages({ id: emptyEntry }, stageSuggestions([event]));
-    expect(entries.id).toEqual({ ...emptyEntry, stage });
+    expect(entries.id).toEqual(stage === "Not reviewed" ? emptyEntry : { ...emptyEntry, stage, stageSuggested: true });
   });
 
-  it("recognizes a logged price or this-edition options and disregards past-year options", () => {
+  it("uses logged prices and this-edition package quotes, excluding catalogue prices, add-ons and past-year quotes", () => {
     const replied = { ...base, outreach: mergeOutreach(null, { status: "replied", quoted_price: "VND 300,000" }) };
     const option = colorFiesta.vendor_options![0];
     const itemized = { ...base, vendor_options: [option] };
     const published = { ...base, vendor_options: [{ ...option, basis: "published" as const }] };
+    const addOn = { ...base, vendor_options: [{ ...option, kind: "add_on" as const }] };
     const historical = { ...base, vendor_options: [{ ...option, rate_status: "past_year" as const }] };
-    expect([replied, itemized, published, historical].map((event) => stageSuggestions([event]).id))
-      .toEqual(["Quote received", "Quote received", "Quote received", undefined]);
+    expect([replied, itemized, published, addOn, historical].map((event) => stageSuggestions([event]).id))
+      .toEqual(["Quote received", "Quote received", undefined, undefined, undefined]);
+    const contacted = mergeOutreach(null, { status: "contacted" });
+    expect(stageSuggestions([{ ...published, outreach: contacted }]).id).toBe("Contacted");
+  });
+
+  it("uses a typed proposal in a reply and preserves its type in old document edits", () => {
+    const japan = events.find(({ id }) => id === "jet-2027")!;
+    const { kind, ...oldDoc } = japan.vendor_documents![0];
+    const reply = { ...base, outreach: mergeOutreach(null, { status: "replied" }) };
+    expect(stageSuggestions([{ ...reply, vendor_documents: [oldDoc] }]).id).toBe("Contacted");
+    const proposal = { ...reply, vendor_documents: [{ ...oldDoc, id: "another-doc", kind }] };
+    const edit = { vendor_documents: [{ ...oldDoc, id: "another-doc", label: "Edited proposal label" }] };
+    const restored = validateBackup(backup({}, undefined, undefined, undefined, { id: edit })).vendorPricing!;
+    expect(stageSuggestions([{ ...proposal, ...mergeVendorPricing(proposal, restored.id) }]).id).toBe("Quote received");
+    const reference = { vendor_documents: [{ ...edit.vendor_documents[0], kind: "reference" as const }] };
+    expect(stageSuggestions([{ ...proposal, ...mergeVendorPricing(proposal, reference) }]).id).toBe("Contacted");
   });
 
   it("suggests Passed when the organizer declines after sending a quote", () => {
@@ -139,8 +163,8 @@ describe("decision stage suggestions", () => {
     const contacted = { ...base, outreach: mergeOutreach(null, outreach) };
     const quoted = { ...base, outreach: mergeOutreach(null, { ...outreach, status: "quoted" }) };
     const saved = { id: { ...emptyEntry, note: "Ask about power" } };
-    expect(withSuggestedStages(saved, stageSuggestions([contacted])).id).toEqual({ ...saved.id, stage: "Contacted" });
-    expect(withSuggestedStages(saved, stageSuggestions([quoted])).id).toEqual({ ...saved.id, stage: "Quote received" });
+    expect(withSuggestedStages(saved, stageSuggestions([contacted])).id).toMatchObject({ stage: "Contacted", stageSuggested: true });
+    expect(withSuggestedStages(saved, stageSuggestions([quoted])).id).toMatchObject({ stage: "Quote received", stageSuggested: true });
     expect(saved.id.stage).toBe("Not reviewed");
 
     for (const choice of [
@@ -159,6 +183,19 @@ describe("decision stage suggestions", () => {
     expect(marked.blank.stage).toBe("Considering");
     expect(marked[colorFiesta.id]).toMatchObject({ going: true, stage: "Not reviewed", stageUpdatedAt: null });
     expect(withSuggestedStages(marked, suggestions)[colorFiesta.id].stage).toBe("Quote received");
+  });
+
+  it("restores suggestion eligibility when an automatic Going stage is undone", () => {
+    const now = entry.noteUpdatedAt;
+    const before = { id: emptyEntry, reset: { ...emptyEntry, stageUpdatedAt: "2026-11-15T00:00:00.000Z" } };
+    const ids = ["id", "reset"];
+    const marked = applyGoing(before, ids, true, now);
+    const patch = inverseGoingPatch(before, marked, ids);
+    const undoneAt = "2026-11-16T10:00:01.000Z";
+    const undone = undoGoingPatch(marked, patch, now, undoneAt);
+    const displayed = withSuggestedStages(undone, { id: "Contacted", reset: "Contacted" });
+    expect(displayed.id).toMatchObject({ stage: "Contacted", stageUpdatedAt: null });
+    expect(displayed.reset).toMatchObject({ stage: "Not reviewed", stageUpdatedAt: undoneAt });
   });
 });
 
@@ -553,7 +590,7 @@ it("undoes only changed Going values and stages synced by that action", () => {
     going: false,
     stage: "Not reviewed",
     note: "Edited after marking",
-    stageUpdatedAt: now,
+    stageUpdatedAt: null,
   });
   expect(undone.paid).toEqual({ ...before.paid, goingUpdatedAt: now });
   expect(undone.already).toBe(before.already);

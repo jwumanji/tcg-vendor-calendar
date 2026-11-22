@@ -244,6 +244,10 @@ export function VendorEditor({ editing, close, save }: { editing: Editing; close
             <p className="outreach-wide" id="vendor-file-help">Use a PDF or image already published under <code>vendor-docs/</code>.</p>
             <label>Received date<input name="received_at" required type="date" defaultValue={doc?.received_at} /></label>
             <label>Source<input name="source" required defaultValue={doc?.source} /></label>
+            <label className="outreach-wide">Document type<select name="kind" defaultValue={doc?.kind ?? "reference"}>
+              <option value="reference">Reference document</option>
+              <option value="organizer_proposal">Organizer proposal for this edition</option>
+            </select></label>
             <label className="outreach-wide">Notes<textarea name="notes" rows={2} defaultValue={doc?.notes} /></label>
           </>
         ) : (

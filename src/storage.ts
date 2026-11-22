@@ -35,6 +35,7 @@ export interface Entry {
   stageUpdatedAt: string | null;
 }
 export type Entries = Record<string, Entry>;
+export type DisplayEntry = Entry & { stageSuggested?: true };
 export type OutreachPatches = Record<string, OutreachPatch>;
 export type MilestoneEdits = Record<string, VendorMilestone[]>;
 export type VendorPricingEdits = Record<string, VendorPricingPatch>;
@@ -55,11 +56,11 @@ export const emptyEntry: Entry = {
 function suggestedStage(event: Event): Stage | undefined {
   const outreach = event.outreach;
   if (outreach?.status === "declined") return "Passed";
-  // The organizer's 2027 proposal counts toward this decision stage, with pricing still pending.
-  const japanExpoProposal = event.id === "jet-2027" && outreach?.status === "replied" &&
-    event.vendor_documents?.some(({ id }) => id === "proposal-excerpt");
-  if (outreach?.status === "quoted" || outreach?.quoted_price?.trim() || japanExpoProposal ||
-      event.vendor_options?.some(({ rate_status }) => rate_status !== "past_year"))
+  const organizerProposal = outreach?.status === "replied" &&
+    event.vendor_documents?.some(({ kind }) => kind === "organizer_proposal");
+  if (outreach?.status === "quoted" || outreach?.quoted_price?.trim() || organizerProposal ||
+      event.vendor_options?.some(({ kind, basis, rate_status }) =>
+        kind === "package" && basis === "quote" && rate_status !== "past_year"))
     return "Quote received";
   if (outreach?.status === "contacted" || outreach?.status === "replied") return "Contacted";
 }
@@ -80,12 +81,12 @@ function decisionStage(entry: Entry, suggestion?: Stage): Stage {
 }
 
 /** Suggestions stay derived so new evidence can update an untouched entry. */
-export function withSuggestedStages(entries: Entries, suggestions: StageSuggestions): Entries {
-  const result: Entries = Object.assign(Object.create(null), entries);
+export function withSuggestedStages(entries: Entries, suggestions: StageSuggestions): Record<string, DisplayEntry> {
+  const result: Record<string, DisplayEntry> = Object.assign(Object.create(null), entries);
   for (const [id, suggestion] of Object.entries(suggestions)) {
     const entry = result[id] ?? emptyEntry;
     const stage = decisionStage(entry, suggestion);
-    if (stage !== entry.stage) result[id] = { ...entry, stage };
+    if (stage !== entry.stage) result[id] = { ...entry, stage, stageSuggested: true };
   }
   return result;
 }
@@ -95,7 +96,7 @@ export function applyGoing(
   ids: readonly string[],
   going: boolean,
   now: string,
-  suggestions: StageSuggestions = {},
+  suggestions?: StageSuggestions,
 ): Entries {
   const next: Entries = Object.assign(Object.create(null), entries);
   for (const id of ids) {
@@ -106,7 +107,7 @@ export function applyGoing(
       going,
       goingUpdatedAt: now,
       ...(going &&
-        decisionStage(entry, suggestions[id]) === emptyEntry.stage && {
+        decisionStage(entry, suggestions?.[id]) === emptyEntry.stage && {
           stage: "Considering", stageUpdatedAt: now,
         }),
     };
@@ -116,7 +117,7 @@ export function applyGoing(
 type GoingInverse = {
   id: string;
   going: boolean;
-  syncedStage?: Stage;
+  syncedStage?: Pick<Entry, "stage" | "stageUpdatedAt">;
 };
 export function inverseGoingPatch(
   before: Entries,
@@ -132,7 +133,7 @@ export function inverseGoingPatch(
         id,
         going: previous.going,
         ...(previous.stage !== changed.stage && {
-          syncedStage: previous.stage,
+          syncedStage: { stage: previous.stage, stageUpdatedAt: previous.stageUpdatedAt },
         }),
       });
   }
@@ -155,8 +156,8 @@ export function undoGoingPatch(
       ...(syncedStage &&
         entry.stage === "Considering" &&
         entry.stageUpdatedAt === changedAt && {
-          stage: syncedStage,
-          stageUpdatedAt: now,
+          stage: syncedStage.stage,
+          stageUpdatedAt: syncedStage.stageUpdatedAt === null ? null : now,
         }),
     };
   }

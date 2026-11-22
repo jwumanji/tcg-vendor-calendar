@@ -106,6 +106,7 @@ export interface VendorDocument {
   path: string;
   source: string;
   received_at: string;
+  kind?: "reference" | "organizer_proposal";
   notes?: string;
 }
 

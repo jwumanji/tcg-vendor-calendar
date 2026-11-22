@@ -1208,7 +1208,7 @@
     "previous_editions": null,
     "first_year": null,
     "vendor_booths": null,
-    "vendor_application": null,
+    "vendor_application": "Vendor booth registration: https://www.asiacomicsexpo.com/register",
     "vendor_deadline": null,
     "vendor_cost": null,
     "booth_detail": null,
@@ -1685,7 +1685,7 @@
     "previous_editions_count": 11,
     "first_year": "Not independently confirmed (implied by 12th)",
     "vendor_booths": "Yes, applications open",
-    "vendor_application": "info@gyucreative.com, +66 2 658 0557",
+    "vendor_application": "https://www.japanexpothailand.com/how-to-exhibit/; info@gyucreative.com, +66 2 658 0557",
     "vendor_deadline": null,
     "vendor_cost": null,
     "booth_detail": "Exhibitor applications open; rates not published on the pages checked.",
@@ -1725,6 +1725,7 @@
     "vendor_documents": [
       {
         "id": "proposal-excerpt",
+        "kind": "organizer_proposal",
         "label": "Japan Expo Thailand 2027 proposal excerpt",
         "path": "vendor-docs/japan-expo-thailand-2027-proposal-excerpt.pdf",
         "source": "https://drive.google.com/file/d/1oEur5IwMEvYggiV5lHWpbMK13eTPgtaT/view",

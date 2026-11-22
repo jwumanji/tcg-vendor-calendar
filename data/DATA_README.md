@@ -52,6 +52,8 @@ Unknown values are `null`; nothing is invented.
   - `vendor_deadline`
   - `vendor_milestones` is an optional array of vendor booking dates. Each record has a stable `id` within the event, a `type` (`booking_opens`, `application_closes`, `payment_due`, or `other`), `at`, an IANA organizer `timeZone`, a `label`, a `source` URL or reference, a boolean `verified`, and optional `notes`. Use an ISO datetime with an explicit UTC offset when a time is known. Use `YYYY-MM-DD` for a published date without a time. Keep `vendor_deadline` aligned with the verified booking schedule.
   - `vendor_cost`: text in local currency. A past year's rate is labelled with its year.
+  - For `vendor_options`, use `basis: "quote"` for amounts sent by the organizer in response to outreach, and `"published"` for catalogue rates. This-edition quoted packages can suggest Quote received in the planner.
+  - For `vendor_documents`, use `kind: "organizer_proposal"` for an organizer's proposal for this edition. It can suggest Quote received after a reply, even while price is pending. Reference documents can omit `kind` or use `"reference"`.
   - `booth_detail`, `contact`
 - **Outreach**
   - `outreach` is optional or `null`. An absent record is treated as `not_contacted`.

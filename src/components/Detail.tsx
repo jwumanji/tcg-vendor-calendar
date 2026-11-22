@@ -33,7 +33,7 @@ import {
 import { Logo, Status, Place } from "./EventIdentity";
 import { StagePicker } from "./Pipeline";
 import { ApplyLink } from "./ApplyLink";
-import type { Entry, Stage } from "../storage";
+import type { DisplayEntry, Stage } from "../storage";
 import type { Outreach, OutreachPatch } from "../model";
 import { PriorityChip } from "./PriorityChip";
 import { OutreachSection } from "./OutreachSection";
@@ -120,7 +120,7 @@ export function Detail({
   today: string;
   now?: number;
   occurrence?: string;
-  entry: Entry;
+  entry: DisplayEntry;
   setGoing: SetGoing;
   onStage: (s: Stage) => void;
   onNote: (s: string) => void;
@@ -300,7 +300,7 @@ export function Detail({
         <p className="decision-reason">{decisionReason(e, score)}</p>
         <div className="decision-stage">
           <label htmlFor="detail-stage">Pipeline stage</label>
-          <StagePicker name={e.name} id="detail-stage" stage={entry.stage} onChange={onStage} />
+          <StagePicker name={e.name} id="detail-stage" entry={entry} onChange={onStage} />
         </div>
         {conflicts.length > 0 && (
           <div className="decision-conflicts">

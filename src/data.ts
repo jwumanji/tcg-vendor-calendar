@@ -125,12 +125,15 @@ export function normalizeVendorOption(value: unknown): VendorOption {
 export function normalizeVendorDocument(value: unknown): VendorDocument {
   if (!record(value) || !isText(value.id) || !recordId.test(value.id))
     throw new Error("Vendor document needs a stable ID.");
-  const { id, label, path, source, received_at, notes } = value;
+  const { id, label, path, source, received_at, kind, notes } = value;
   if (!isText(label) || !label.trim() || !isText(source) || !source.trim() || !validDate(received_at))
     throw new Error("Enter a document label, source and received date.");
   if (!isText(path) || !/^vendor-docs\/[a-z0-9][a-z0-9._-]*\.(?:pdf|jpe?g|png|webp)$/i.test(path))
     throw new Error("Enter a PDF or image path under vendor-docs/.");
+  if (kind !== undefined && kind !== "reference" && kind !== "organizer_proposal")
+    throw new Error("Unknown vendor document type.");
   return { id, label: label.trim(), path, source: source.trim(), received_at,
+    ...(kind && { kind }),
     ...(isText(notes) && notes.trim() && { notes: notes.trim() }) };
 }
 
@@ -169,11 +172,16 @@ export function mergeVendorPricing(base: VendorPricingPatch = {}, incoming: Vend
   function merge<T extends { id: string }>(previous: T[] = [], next: T[]) {
     return [...new Map([...previous, ...next].map((row) => [row.id, row])).values()];
   }
+  const documents = incoming.vendor_documents?.map((document) => {
+    // A document edit saved before document types existed inherits the shared type.
+    const kind = base.vendor_documents?.find(({ id }) => id === document.id)?.kind;
+    return kind && !document.kind ? { ...document, kind } : document;
+  });
   return {
     ...(base.vendor_options && { vendor_options: base.vendor_options }),
     ...(base.vendor_documents && { vendor_documents: base.vendor_documents }),
     ...(incoming.vendor_options && { vendor_options: merge(base.vendor_options, incoming.vendor_options) }),
-    ...(incoming.vendor_documents && { vendor_documents: merge(base.vendor_documents, incoming.vendor_documents) }),
+    ...(documents && { vendor_documents: merge(base.vendor_documents, documents) }),
   };
 }
 

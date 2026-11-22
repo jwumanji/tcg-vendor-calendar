@@ -92,7 +92,7 @@ export function vendorTiming(event: Event, now: number) {
 
 function extractRoutes(text?: string | null) {
   if (!text) return [];
-  const links = (text.match(/https?:\/\/[^\s;,()]+|[\w.+-]+@[\w.-]+\.[a-z]{2,}|(?:[\w-]+\.)+(?:com|net|org|asia|vn|sg|hk|au|app|ae|id|my|th|jp|me)(?=\/)[^\s;,()]*/gi) ?? [])
+  const links = (text.match(/https?:\/\/[^\s;,()]+|[\w.+-]+@[\w.-]+\.[a-z]{2,}|(?:[\w-]+\.)+(?:com|net|org|asia|vn|sg|hk|au|app|ae|id|my|th|jp|me)(?=\/|[\s;,()]|$)[^\s;,()]*/gi) ?? [])
     .map((route) => route.replace(/[.!?]+$/, ""))
     .flatMap((label) => {
       const href = outreachContactHref(label) ?? outreachContactHref("https://" + label);
@@ -151,12 +151,12 @@ function applicationRoute(event: Event): VendorRoute | undefined {
       if (/\b(?:faq|why-exhibit)\b/i.test(pathname)) continue;
       const form = hostname === "forms.gle" || hostname === "docs.google.com" && pathname.startsWith("/forms/");
       const interest = /expressions?-of-interest|register(?:-your)?-interest|interest-registration/i.test(pathname);
-      if (interest || form && /\b(?:register interest|expression of interest)\b/i.test(clause))
+      if (interest || form && /\b(?:register (?:your )?interest|expression of interest)\b/i.test(clause))
         return { ...route, purpose: "interest" };
-      if (form || /^(?:exhibitors|booking)\./i.test(hostname) ||
+      if (form || /^(?:exhibitors?|booking)\./i.test(hostname) ||
         /\/(?:apply|applications?|vendor[-_]?applications?|vendorportal|tablereservations|vendors|book-space|pricing)(?:[/.?#-]|$)/i.test(pathname) ||
-        /\/exhibitor-application(?:[/.?#-]|$)/i.test(pathname) ||
-        /\b(?:table booking system|exhibitor application)\b/i.test(clause))
+        /\/exhibitor-application(?:[/.?#-]|$)|\/(?:exhibitor|how-to-exhibit)\/?$/i.test(pathname) ||
+        /\b(?:table booking system|exhibitor application|vendor booth registration)\b/i.test(clause))
         return { ...route, purpose: "application" };
     }
   }

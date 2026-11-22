@@ -112,7 +112,7 @@ class PlannerBrowser(TestCase):
         layout = page.get_by_role("group", name="List layout")
         page.get_by_role("textbox", name="Search events").fill(event)
         rows = page.locator(".event-rows")
-        expect(rows.locator(picker)).to_have_value("Quote received")
+        expect(rows.locator(picker)).to_have_value("Not reviewed")
         expect(rows.locator(link)).to_have_attribute("href", "https://cardcon.asia/pricing")
         expect(self.strip.locator(link)).to_be_visible()
         rows.locator(picker).select_option("Applied")
@@ -137,6 +137,111 @@ class PlannerBrowser(TestCase):
         page.goto(f"{ORIGIN}/event/cardcon3")
         expect(picker).to_have_value("Booked")
         expect(page.get_by_role("button", name="Review booking")).to_be_visible()
+
+    def test_apply_links_have_keyboard_focus_and_open_independently_of_event_cards(self):
+        page = self.page
+        href = "https://cardcon.asia/pricing"
+        page.context.route(href, lambda route: route.fulfill(body="Application route"))
+        page.clock.set_fixed_time(datetime.fromisoformat("2026-11-21T00:00:00+00:00"))
+        page.goto(ORIGIN)
+        event = "Card Con 3 by MyRepublic"
+        page.get_by_role("textbox", name="Search events").fill(event)
+        layout = page.get_by_role("group", name="List layout")
+        for theme in ("dark", "light"):
+            page.evaluate("theme => document.documentElement.dataset.theme = theme", theme)
+            for label, surface in (("Rows", page.locator(".event-rows")), ("Grid", page.locator(".list-cards")),
+                                   (None, self.strip)):
+                with self.subTest(theme=theme, surface=label or "Milestones"):
+                    if label:
+                        layout.get_by_role("button", name=label).click()
+                    link = surface.get_by_role("link", name=f"Apply for {event}")
+                    link.scroll_into_view_if_needed()
+                    contrast = link.evaluate("""node => {
+                        const luminance = (color) => color.match(/\\d+/g).map(channel => {
+                            const s = Number(channel) / 255;
+                            return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+                        }).reduce((total, value, i) => total + value * [0.2126, 0.7152, 0.0722][i], 0);
+                        const { color, backgroundColor } = getComputedStyle(node);
+                        return (luminance(backgroundColor) + 0.05) / (luminance(color) + 0.05);
+                    }""")
+                    self.assertGreaterEqual(contrast, 4.5)
+                    self.assertGreaterEqual(link.bounding_box()["height"], 24)
+                    self.assertGreaterEqual(link.bounding_box()["width"], 24)
+                    with page.expect_popup() as opened:
+                        link.click()
+                    expect(opened.value).to_have_url(href)
+                    opened.value.close()
+                    expect(page).to_have_url(ORIGIN + "/")
+                    page.keyboard.press("Tab")
+                    link.focus()
+                    expect(link).to_have_css("outline-style", "solid")
+                    expect(link).to_have_css("outline-width", "3px")
+                    with page.expect_popup() as opened:
+                        page.keyboard.press("Enter")
+                    expect(opened.value).to_have_url(href)
+                    opened.value.close()
+                    expect(page).to_have_url(ORIGIN + "/")
+        page.locator(".list-cards").get_by_role("button", name=re.compile(f"^{event}")).click()
+        expect(page).to_have_url(f"{ORIGIN}/event/cardcon3")
+
+    def test_suggestions_stay_out_of_backups_until_the_stage_is_chosen(self):
+        page = self.page
+        page.goto(f"{ORIGIN}/event/color18")
+        stage = page.locator("#detail-stage")
+        expect(stage.locator("option:checked")).to_have_text("Quote received")
+        expect(stage).to_have_value("")
+        planning = page.locator(".detail-disclosure").filter(has=page.locator("#event-note"))
+        planning.locator("summary").click()
+        planning.get_by_label("Your notes", exact=True).fill("Check booth layout")
+        expect(planning.locator(".save-status")).to_have_attribute("data-state", "saved")
+        saved = page.evaluate("JSON.parse(localStorage.getItem('tcg-pipeline-v1')).entries.color18")
+        self.assertEqual(saved["stage"], "Not reviewed")
+        self.assertIsNone(saved["stageUpdatedAt"])
+
+        page.get_by_role("button", name="Back to events", exact=False).click()
+        page.get_by_role("button", name="Tools", exact=True).click()
+        with page.expect_download() as download:
+            page.get_by_role("dialog", name="Tools").get_by_role("button", name="Export backup").click()
+        backup = loads(download.value.path().read_text())
+        self.assertEqual(backup["entries"]["color18"], saved)
+
+        page.goto(f"{ORIGIN}/event/color18")
+        expect(stage).to_have_value("")
+        expect(stage).to_have_attribute("aria-description", "Suggested stage: Quote received")
+        stage.focus()
+        page.keyboard.press("q")
+        expect(stage).to_have_value("Quote received")
+        saved = page.evaluate("JSON.parse(localStorage.getItem('tcg-pipeline-v1')).entries.color18")
+        self.assertEqual(saved["stage"], "Quote received")
+        self.assertIsNotNone(saved["stageUpdatedAt"])
+        page.reload()
+        expect(stage).to_have_value("Quote received")
+
+    def test_migrates_saved_stage_filters_and_hides_terminal_stages_by_default(self):
+        page = self.page
+        page.add_init_script("""(() => {
+            const stamp = '2026-11-21T00:00:00.000Z';
+            const entry = stage => ({ stage, stageUpdatedAt: stamp, note: '', noteUpdatedAt: null });
+            localStorage.setItem('tcg-filters', JSON.stringify({stages: ['Pass']}));
+            localStorage.setItem('tcg-pipeline-v1', JSON.stringify({version: 1, exportedAt: stamp,
+                entries: {cardcon3: entry('Pass'), color18: entry('Too expensive')}}));
+        })()""")
+        page.goto(ORIGIN)
+        passed = page.get_by_role("combobox", name="Pipeline stage for Card Con 3 by MyRepublic")
+        costly = page.get_by_role("combobox", name=re.compile(r"^Pipeline stage for Color Fiesta"))
+        expect(passed).to_have_value("Passed")
+        expect(costly).to_have_count(0)
+        self.assertEqual(page.evaluate("JSON.parse(localStorage.getItem('tcg-filters')).stages"), ["Passed"])
+        page.get_by_role("button", name="Remove filter Passed").click()
+        expect(passed).to_have_count(0)
+        expect(costly).to_have_count(0)
+        page.get_by_role("button", name="Grid", exact=True).click()
+        expect(passed).to_have_count(0)
+        expect(costly).to_have_count(0)
+        page.get_by_role("button", name=re.compile(r"^Filters")).click()
+        page.get_by_role("checkbox", name="Show passed / too expensive").check()
+        expect(passed).to_have_value("Passed")
+        expect(costly).to_have_value("Too expensive")
 
     def test_saved_going_conflict_survives_hiding_2026(self):
         page = self.page

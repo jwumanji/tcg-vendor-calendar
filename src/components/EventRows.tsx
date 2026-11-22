@@ -3,7 +3,7 @@ import { Fragment, useMemo, useState, useRef, type KeyboardEvent } from "react";
 import { ArrowDown, ArrowUp, ChevronsUpDown, X, Columns3 } from "lucide-react";
 import type { Event } from "../model";
 import type { ScoreResult } from "../scoring";
-import { emptyEntry, type Entries, type Stage } from "../storage";
+import { emptyEntry, type DisplayEntry, type Stage } from "../storage";
 import { vendorApplyAction } from "../eventDecision";
 import { games, gameKey, upcoming } from "../utils";
 import {
@@ -45,7 +45,7 @@ export function EventRows({
   columns: OptionalColumn[];
   sort: RowSort;
   setSort: (sort: RowSort) => void;
-  entries: Entries;
+  entries: Record<string, DisplayEntry>;
   scores: Record<string, ScoreResult>;
   today: string;
   now?: number;
@@ -360,7 +360,7 @@ export function EventRows({
                       <PriorityChip result={scores[e.id]} />
                     </td>
                     <td role="cell" className="row-stage">
-                      <StagePicker name={e.name} stage={entry.stage} onChange={(stage) => setStage(e.id, stage)} />
+                      <StagePicker name={e.name} entry={entry} onChange={(stage) => setStage(e.id, stage)} />
                     </td>
                     {columns.includes("scanner") && (
                       <td role="cell" className="row-scanner">

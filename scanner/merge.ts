@@ -377,6 +377,7 @@ export function merge(
         retained[i] = {
           ...earlier,
           ...update,
+          ...(keyMatches(earlier, event) && { vendor_application: event.vendor_application ?? earlier.vendor_application }),
           ...preserveMilestones(earlier, event),
           ...refreshVendorPricing(earlier, event),
           ...(earlier.trip_budget && { trip_budget: earlier.trip_budget }),

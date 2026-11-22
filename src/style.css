@@ -3740,3 +3740,11 @@ input[type="checkbox"]:indeterminate::after { content: ""; width: 10px; height: 
 @container (max-width: 420px) {
   .trip-budget-row { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Touch: compact Apply and stage controls reach 44px, and 16px text stops iOS zooming on focus. */
+@media (pointer: coarse) {
+  .button.apply-cta.compact, .row-markers .apply-cta.compact { min-height: 44px; min-width: 44px; display: inline-flex; align-items: center; }
+  .stage-picker, .row-stage .stage-picker { min-height: 44px; font-size: 16px; padding-inline: 28px 26px; }
+  .stage-icon { inset-inline-start: 10px; }
+  .stage-chevron { inset-inline-end: 9px; }
+}

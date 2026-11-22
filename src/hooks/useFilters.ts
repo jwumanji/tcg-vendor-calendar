@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { emptyFilters, type Filters } from "../model";
-import { saveValue, stages } from "../storage";
+import { normalizeStage, saveValue } from "../storage";
 
 export function stored(key: string): unknown {
   try {
@@ -19,9 +19,10 @@ export function normalizeFilters(value: unknown): Filters {
         ...new Set(v[key].filter((s): s is string => typeof s === "string")),
       ];
   if (Array.isArray(v.stages))
-    f.stages = v.stages.filter((s): s is Filters["stages"][number] =>
-      stages.includes(s),
-    );
+    f.stages = [...new Set(v.stages.flatMap((value) => {
+      const stage = normalizeStage(value);
+      return stage ? [stage] : [];
+    }))];
   for (const [key, allowed] of [
     ["priority", ["any", "top", "high"]],
     ["size", ["", "S", "M", "L", "XL"]],

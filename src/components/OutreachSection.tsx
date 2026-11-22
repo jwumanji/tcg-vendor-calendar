@@ -10,8 +10,9 @@ import {
 } from "../model";
 import { followUp, followUpDays, followUpKind, followUpLabels } from "../outreach";
 import { outreachMethodLabels, outreachStatusLabels } from "./OutreachChip";
-import { waitingDays, type vendorRoutes } from "../eventDecision";
+import { isApplyPurpose, routeAction, waitingDays, type vendorRoutes } from "../eventDecision";
 import { prettyDate, safeUrl } from "../utils";
+import { ApplyLink } from "./ApplyLink";
 
 const knownMethods = {
   email: "email",
@@ -223,9 +224,10 @@ export function OutreachSection({
           <summary>Contacts and instructions</summary>
           <ul>
             {listedRoutes.map((route) => (
-              <li key={route.href}><a href={route.href} target={safeUrl(route.href) ? "_blank" : undefined} rel="noreferrer">
-                {route.label}
-              </a></li>
+              <li key={route.href}>
+                {isApplyPurpose(route.purpose) ? <ApplyLink action={routeAction(route)} compact />
+                  : <a href={route.href} target={safeUrl(route.href) ? "_blank" : undefined} rel="noreferrer">{route.label}</a>}
+              </li>
             ))}
             {instructions.map((text) => <li key={text}>{text}</li>)}
           </ul>

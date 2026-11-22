@@ -3,7 +3,8 @@ import { Fragment, useMemo, useState, useRef, type KeyboardEvent } from "react";
 import { ArrowDown, ArrowUp, ChevronsUpDown, X, Columns3 } from "lucide-react";
 import type { Event } from "../model";
 import type { ScoreResult } from "../scoring";
-import { emptyEntry, type Entries } from "../storage";
+import { emptyEntry, type Entries, type Stage } from "../storage";
+import { vendorApplyAction } from "../eventDecision";
 import { games, gameKey, upcoming } from "../utils";
 import {
   ROW_SORT_LABELS,
@@ -18,7 +19,8 @@ import {
 } from "../rows";
 import { Logo, Place, NoteTag, ClashCue, ScheduleBadge } from "./EventIdentity";
 import { GoingButton, type SetGoing } from "./GoingButton";
-import { StageBadge } from "./Pipeline";
+import { StagePicker } from "./Pipeline";
+import { ApplyLink } from "./ApplyLink";
 import { PriorityChip } from "./PriorityChip";
 import { OutreachChip } from "./OutreachChip";
 import { VendorPriceCue } from "./VendorPriceCue";
@@ -36,6 +38,7 @@ export function EventRows({
   now = Date.now(),
   selectMode,
   setGoing,
+  setStage,
   open,
 }: {
   groups: ReadonlyMap<string, Event[]>;
@@ -48,6 +51,7 @@ export function EventRows({
   now?: number;
   selectMode: boolean;
   setGoing: SetGoing;
+  setStage: (id: string, stage: Stage) => void;
   open: (e: Event) => void;
 }) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
@@ -233,6 +237,7 @@ export function EventRows({
                 const past = !upcoming(e, today);
                 const dates = rowDateLabel(e, today);
                 const status = scheduleStatus(e);
+                const application = vendorApplyAction(e, now);
                 return (
                   <tr
                     key={e.id}
@@ -244,7 +249,7 @@ export function EventRows({
                     onKeyDown={(ev) => navigate(ev, e)}
                     onClick={(ev) => {
                       if (
-                        (ev.target as Element).closest("a,button,input,label")
+                        (ev.target as Element).closest("a,button,input,label,.stage-control")
                       )
                         return;
                       ev.currentTarget
@@ -312,6 +317,7 @@ export function EventRows({
                             <ClashCue score={scores[e.id]} entries={entries} />
                             {!showOutreachColumn && <OutreachChip outreach={e.outreach} />}
                             <VendorPriceCue event={e} now={now} />
+                            {application && <ApplyLink action={application} name={e.name} compact />}
                           </div>
                         </div>
                       </div>
@@ -354,9 +360,7 @@ export function EventRows({
                       <PriorityChip result={scores[e.id]} />
                     </td>
                     <td role="cell" className="row-stage">
-                      {entry.stage !== "New" && (
-                        <StageBadge stage={entry.stage} />
-                      )}
+                      <StagePicker name={e.name} stage={entry.stage} onChange={(stage) => setStage(e.id, stage)} />
                     </td>
                     {columns.includes("scanner") && (
                       <td role="cell" className="row-scanner">

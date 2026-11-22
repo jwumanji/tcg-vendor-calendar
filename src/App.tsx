@@ -16,7 +16,7 @@ import { OutreachFollowUps } from "./components/OutreachFollowUps";
 import { Pipeline } from "./components/Pipeline";
 import { BackupControls } from "./components/BackupControls";
 import { BudgetDefaultsForm } from "./components/TripBudget";
-import { stages, emptyEntry, hasLocalPlanning, saveValue } from "./storage";
+import { stages, emptyEntry, hasLocalPlanning, saveValue, stageSuggestions, withSuggestedStages, type Stage } from "./storage";
 import { scoreEvent } from "./scoring";
 import { goingConflicts } from "./eventDecision";
 import {
@@ -93,7 +93,7 @@ const quickCountries = [
 export default function App() {
   const shippedEvents = useMemo(() => normalizeEvents(raw), []);
   const {
-    entries,
+    entries: savedEntries,
     outreach,
     milestones,
     vendorPricing,
@@ -107,7 +107,7 @@ export default function App() {
     updateVendorPricing,
     resetVendorPricing,
     applyEntries,
-    setGoing,
+    setGoing: updateGoing,
     undo,
     undoGoing,
     saved,
@@ -129,6 +129,21 @@ export default function App() {
     })),
     [shippedEvents, outreach, milestones, vendorPricing],
   );
+  const suggestions = useMemo(() => stageSuggestions(allEvents), [allEvents]);
+  const entries = useMemo(() => withSuggestedStages(savedEntries, suggestions), [savedEntries, suggestions]);
+  const setGoing = useCallback((ids: readonly string[], going: boolean) => {
+    updateGoing(ids, going, suggestions);
+  }, [updateGoing, suggestions]);
+  const workspaceHeading = useRef<HTMLHeadingElement>(null);
+  const setStage = useCallback((id: string, stage: Stage) => {
+    const focused = document.activeElement;
+    update(id, "stage", stage);
+    if (focused?.matches(".stage-picker"))
+      requestAnimationFrame(() => {
+        if (!focused.isConnected && document.activeElement === document.body)
+          focusHeading(workspaceHeading.current);
+      });
+  }, [update]);
   const [show2026, setShow2026] = useState(
     () => stored("tcg-show-2026-v1") === true,
   );
@@ -175,17 +190,16 @@ export default function App() {
     (e: Event) =>
       showPassed ||
       filters.stages.includes((entries[e.id] || emptyEntry).stage) ||
-      !["Pass", "Too expensive"].includes((entries[e.id] || emptyEntry).stage),
+      !["Passed", "Too expensive"].includes((entries[e.id] || emptyEntry).stage),
     [showPassed, filters.stages, entries],
   );
   const onEventPage = route.page === "event";
   const selected = onEventPage
     ? events.find((event) => event.id === route.id) ?? allEvents.find((event) => event.id === route.id &&
       (!event.scanner_archived || Object.hasOwn(priority.overrides, event.id) ||
-        hasLocalPlanning(event.id, { entries, outreach, milestones, vendorPricing, tripBudget })))
+        hasLocalPlanning(event.id, { entries: savedEntries, outreach, milestones, vendorPricing, tripBudget })))
     : null;
   const sharedSelection = selected && shippedEvents.find((event) => event.id === selected.id);
-  const workspaceHeading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     document.title = onEventPage
       ? (selected?.name ?? "Event not found") + " – Holo Vault"
@@ -428,6 +442,7 @@ export default function App() {
         score={scores[e.id]}
         entries={entries}
         setGoing={setGoing}
+        setStage={setStage}
         today={today}
         now={now}
         occurrence={occurrence}
@@ -903,13 +918,14 @@ export default function App() {
           ) : view === "Pipeline" ? (
             <Pipeline
               today={today}
+              now={now}
               sort={sort}
               events={sorted}
               scores={scores}
               entries={entries}
               open={open}
               setGoing={setGoing}
-              change={(e, stage) => update(e.id, "stage", stage)}
+              change={(e, stage) => setStage(e.id, stage)}
             />
           ) : view === "Calendar" ? (
             <CalendarView
@@ -917,10 +933,12 @@ export default function App() {
               scores={scores}
               entries={entries}
               setGoing={setGoing}
+              setStage={setStage}
               month={month}
               setMonth={setMonth}
               initialMonth={initialMonth}
               today={today}
+              now={now}
               open={open}
             />
           ) : view === "Timeline" ? (
@@ -996,6 +1014,7 @@ export default function App() {
                     key={String(selectMode)}
                     selectMode={selectMode}
                     setGoing={setGoing}
+                    setStage={setStage}
                     sort={sort}
                     setSort={setSort}
                     entries={entries}
@@ -1129,7 +1148,7 @@ export default function App() {
             Show 2026 events (hidden by default; notes and stages are kept)
           </label>
           <BackupControls
-            entries={entries}
+            entries={savedEntries}
             outreach={outreach}
             milestones={milestones}
             vendorPricing={vendorPricing}
@@ -1190,7 +1209,7 @@ export default function App() {
                 entry={entries[selected.id] || emptyEntry}
                 saved={saved}
                 setGoing={setGoing}
-                onStage={(stage) => update(selected.id, "stage", stage)}
+                onStage={(stage) => setStage(selected.id, stage)}
                 onNote={(note) => update(selected.id, "note", note)}
                 knownOutreach={sharedSelection?.outreach}
                 onOutreach={(patch) => updateOutreach(selected.id, patch, sharedSelection?.outreach)}

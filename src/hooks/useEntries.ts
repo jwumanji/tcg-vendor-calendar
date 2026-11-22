@@ -15,6 +15,7 @@ import {
   type LoadedEntries,
   type MilestoneEdits,
   type OutreachPatches,
+  type StageSuggestions,
   type VendorPricingEdits,
 } from "../storage";
 import type { BudgetDefaults, TripBudget, Outreach, OutreachPatch, VendorMilestone, VendorPricingPatch } from "../model";
@@ -146,10 +147,10 @@ export function useEntries() {
     setSaved(!error);
     setStorageError(error);
   }, [entries, outreach, milestones, vendorPricing, tripBudget, canSave]);
-  const setGoing = useCallback((ids: readonly string[], going: boolean) => {
+  const setGoing = useCallback((ids: readonly string[], going: boolean, suggestions?: StageSuggestions) => {
     const now = new Date().toISOString();
     setState((current) => {
-      const next = applyGoing(current.entries, ids, going, now);
+      const next = applyGoing(current.entries, ids, going, now, suggestions);
       const patch = inverseGoingPatch(current.entries, next, ids);
       return patch.length
         ? { ...current, entries: next, undo: { patch, going, changedAt: now } }

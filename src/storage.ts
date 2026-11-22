@@ -1,18 +1,31 @@
 import { normalizeWeights, type Weights } from "./scoring";
 import { mergeMilestones, mergeVendorPricing, normalizeMilestones, normalizeOutreachPatch, normalizeVendorPricing, normalizeTripBudget, normalizeBudgetDefaults } from "./data";
 import { findHomeBase } from "./homeBase";
-import type { BudgetDefaults, OutreachPatch, TripBudget, VendorMilestone, VendorPricingPatch } from "./model";
+import type { BudgetDefaults, Event, OutreachPatch, TripBudget, VendorMilestone, VendorPricingPatch } from "./model";
 
 export const stages = [
-  "New",
-  "Pass",
-  "Too expensive",
-  "Interested",
+  "Not reviewed",
+  "Considering",
   "Contacted",
+  "Quote received",
+  "Applied",
   "Need to pay",
-  "Paid / attending",
+  "Booked",
+  "Passed",
+  "Too expensive",
 ] as const;
 export type Stage = (typeof stages)[number];
+const renamedStages: Record<string, Stage> = {
+  New: "Not reviewed",
+  Interested: "Considering",
+  Pass: "Passed",
+  "Paid / attending": "Booked",
+};
+export function normalizeStage(value: unknown): Stage | undefined {
+  if (typeof value !== "string") return;
+  if (Object.hasOwn(renamedStages, value)) return renamedStages[value];
+  return stages.find((stage) => stage === value);
+}
 export interface Entry {
   going: boolean;
   goingUpdatedAt: string | null;
@@ -33,16 +46,56 @@ export interface BudgetSettings {
 export const emptyEntry: Entry = {
   going: false,
   goingUpdatedAt: null,
-  stage: "New",
+  stage: "Not reviewed",
   note: "",
   noteUpdatedAt: null,
   stageUpdatedAt: null,
 };
+
+function suggestedStage(event: Event): Stage | undefined {
+  const outreach = event.outreach;
+  if (outreach?.status === "declined") return "Passed";
+  // The organizer's 2027 proposal counts toward this decision stage, with pricing still pending.
+  const japanExpoProposal = event.id === "jet-2027" && outreach?.status === "replied" &&
+    event.vendor_documents?.some(({ id }) => id === "proposal-excerpt");
+  if (outreach?.status === "quoted" || outreach?.quoted_price?.trim() || japanExpoProposal ||
+      event.vendor_options?.some(({ rate_status }) => rate_status !== "past_year"))
+    return "Quote received";
+  if (outreach?.status === "contacted" || outreach?.status === "replied") return "Contacted";
+}
+
+export type StageSuggestions = Partial<Record<string, Stage>>;
+export function stageSuggestions(events: readonly Event[]): StageSuggestions {
+  const suggestions: StageSuggestions = Object.create(null);
+  for (const event of events) {
+    const stage = suggestedStage(event);
+    if (stage) suggestions[event.id] = stage;
+  }
+  return suggestions;
+}
+
+function decisionStage(entry: Entry, suggestion?: Stage): Stage {
+  return entry.stage === emptyEntry.stage && entry.stageUpdatedAt === null && suggestion
+    ? suggestion : entry.stage;
+}
+
+/** Suggestions stay derived so new evidence can update an untouched entry. */
+export function withSuggestedStages(entries: Entries, suggestions: StageSuggestions): Entries {
+  const result: Entries = Object.assign(Object.create(null), entries);
+  for (const [id, suggestion] of Object.entries(suggestions)) {
+    const entry = result[id] ?? emptyEntry;
+    const stage = decisionStage(entry, suggestion);
+    if (stage !== entry.stage) result[id] = { ...entry, stage };
+  }
+  return result;
+}
+
 export function applyGoing(
   entries: Entries,
   ids: readonly string[],
   going: boolean,
   now: string,
+  suggestions: StageSuggestions = {},
 ): Entries {
   const next: Entries = Object.assign(Object.create(null), entries);
   for (const id of ids) {
@@ -53,7 +106,9 @@ export function applyGoing(
       going,
       goingUpdatedAt: now,
       ...(going &&
-        entry.stage === "New" && { stage: "Interested", stageUpdatedAt: now }),
+        decisionStage(entry, suggestions[id]) === emptyEntry.stage && {
+          stage: "Considering", stageUpdatedAt: now,
+        }),
     };
   }
   return next;
@@ -98,7 +153,7 @@ export function undoGoingPatch(
       going,
       goingUpdatedAt: now,
       ...(syncedStage &&
-        entry.stage === "Interested" &&
+        entry.stage === "Considering" &&
         entry.stageUpdatedAt === changedAt && {
           stage: syncedStage,
           stageUpdatedAt: now,
@@ -181,7 +236,8 @@ export function validateBackup(value: unknown): Backup {
   for (const [id, e] of Object.entries(value.entries)) {
     if (!id.trim()) throw new Error("Invalid entry: ID must not be empty.");
     if (!object(e)) throw new Error(`Invalid entry ${id}: expected an object.`);
-    if (!stages.includes(e.stage as Stage))
+    const stage = normalizeStage(e.stage);
+    if (!stage)
       throw new Error(`Invalid entry ${id}: unknown pipeline stage.`);
     if (typeof e.note !== "string")
       throw new Error(`Invalid entry ${id}: note must be text.`);
@@ -200,7 +256,7 @@ export function validateBackup(value: unknown): Backup {
     entries[id] = {
       going: e.going === true,
       goingUpdatedAt: e.goingUpdatedAt ?? null,
-      stage: e.stage as Stage,
+      stage,
       note: e.note,
       noteUpdatedAt: e.noteUpdatedAt,
       stageUpdatedAt: e.stageUpdatedAt,
@@ -414,17 +470,16 @@ export function unknownIds(
 }
 export function migrateLegacy(value: unknown): Entries {
   const result: Entries = Object.create(null);
-  const mapping: Record<string, Stage> = {
-    Interested: "Interested",
-    "Planning to vend": "Interested",
-    Applied: "Contacted",
+  const plans: Record<string, Stage> = {
+    "Planning to vend": "Considering",
     Accepted: "Need to pay",
-    Skip: "Pass",
+    Skip: "Passed",
   };
   if (object(value))
-    for (const [id, plan] of Object.entries(value))
-      if (typeof plan === "string" && Object.hasOwn(mapping, plan))
-        result[id] = { ...emptyEntry, stage: mapping[plan] };
+    for (const [id, plan] of Object.entries(value)) {
+      const stage = typeof plan === "string" && Object.hasOwn(plans, plan) ? plans[plan] : normalizeStage(plan);
+      if (stage) result[id] = { ...emptyEntry, stage };
+    }
   return result;
 }
 export interface LoadedEntries {

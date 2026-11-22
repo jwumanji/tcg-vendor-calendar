@@ -4,7 +4,7 @@ import { emptyOutreach, type Event, type Outreach } from "./model";
 import { followUp } from "./outreach";
 import type { ScoreResult } from "./scoring";
 import type { Entries, Stage } from "./storage";
-import { dateLabel, deadlineDate, goingEvents, ranges, safeUrl } from "./utils";
+import { dateLabel, deadlineDate, goingEvents, ranges, safeUrl, upcoming } from "./utils";
 
 const saigonCalendar = new Intl.DateTimeFormat("en", {
   timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit", day: "2-digit",
@@ -121,7 +121,11 @@ const routeLabels: Record<VendorPurpose, string> = {
 type VendorRoute = { href: string; label: string; purpose: VendorPurpose };
 
 export function routeAction(route: VendorRoute) {
-  return { label: routeLabels[route.purpose], href: route.href };
+  return { label: routeLabels[route.purpose], href: route.href, purpose: route.purpose };
+}
+
+export function isApplyPurpose(purpose?: VendorPurpose) {
+  return purpose === "application" || purpose === "interest";
 }
 
 const sameUrl = (left: string, right: string) => left.replace(/\/$/, "") === right.replace(/\/$/, "");
@@ -186,11 +190,18 @@ export function vendorRoutes(event: Event, shared?: Outreach | null) {
   return { contact, application, alternatives, official, reference };
 }
 
+export function vendorApplyAction(event: Event, now: number,
+  route = applicationRoute(event), timing?: ReturnType<typeof vendorTiming>) {
+  if (route && !event.event_status && upcoming(event, saigonDay(now)) && !(timing ?? vendorTiming(event, now)).closed)
+    return routeAction(route);
+}
+
 type NextVendorAction = {
   sentence: string;
   label?: string;
   href?: string;
-  panel?: "planning" | "schedule" | "outreach" | "outreach-edit";
+  purpose?: VendorPurpose;
+  panel?: "planning" | "schedule" | "money" | "outreach" | "outreach-edit";
 };
 export function nextVendorAction(event: Event, stage: Stage, today: string,
   timing: ReturnType<typeof vendorTiming>, routes: ReturnType<typeof vendorRoutes>, hasPrice: boolean): NextVendorAction {
@@ -199,7 +210,8 @@ export function nextVendorAction(event: Event, stage: Stage, today: string,
   const fallback = routes.official ?? routes.reference;
   const ask = routes.contact ? routeAction(routes.contact)
     : fallback ? routeAction(fallback) : { label: "Add contact route" };
-  const apply = routes.application ? routeAction(routes.application) : ask;
+  const application = upcoming(event, today) ? routes.application : undefined;
+  const apply = application ? routeAction(application) : ask;
   const reviewOutreach: NextVendorAction = {
     label: "Log outreach", panel: "outreach-edit",
     sentence: "Log or review the exchange so Outreach reflects your pipeline stage.",
@@ -207,26 +219,29 @@ export function nextVendorAction(event: Event, stage: Stage, today: string,
   if (event.event_status === "cancelled") return {
     label: "Review planning", panel: "planning", sentence: "Review any reservations you made for the cancelled event.",
   };
-  if (outreach.status === "not_contacted" && (stage === "Contacted" || stage === "Need to pay" || stage === "Paid / attending"))
-    return reviewOutreach;
   if (event.event_status === "postponed") return { ...ask, sentence: "Check with the organizer for the revised schedule." };
-  if (stage === "Pass") return { label: "Review planning", panel: "planning", sentence: "Keep this event on file unless you change your pipeline decision." };
+  if (stage === "Passed") return { label: "Review planning", panel: "planning", sentence: "Keep this event on file unless you change your pipeline decision." };
   if (stage === "Too expensive") return { ...ask, sentence: "Ask about a lower-cost eligible booth if you want to reconsider." };
   if (stage === "Need to pay") return { ...ask, sentence: "Confirm payment instructions with the organizer before paying." };
-  if (stage === "Paid / attending") return { label: "Review booking", panel: "schedule", sentence: "Review your booking before making travel arrangements." };
+  if (stage === "Booked") return { label: "Review booking", panel: "schedule", sentence: "Review your booking before making travel arrangements." };
+  if (stage === "Applied") return { ...ask, sentence: "Check with the organizer for confirmation of your application." };
+  if (outreach.status === "not_contacted" && stage === "Contacted") return reviewOutreach;
   if (reminder?.kind === "reply") return { ...ask, sentence: "Reply to the organizer to continue the booth conversation." };
+  if (outreach.status === "declined") return { label: "Review outreach", panel: "outreach", sentence: "Review the organizer’s decision before making plans." };
+  if (stage === "Quote received" || outreach.status === "quoted" || outreach.quoted_price?.trim())
+    return hasPrice
+      ? { label: "Review booth pricing", panel: "money", sentence: "Review the booth pricing against your budget before confirming." }
+      : { ...ask, sentence: "Confirm the applicable booth price with the organizer before booking." };
   if (outreach.status === "contacted") return reminder && reminder.due <= today
     ? { ...ask, sentence: "Follow up with the organizer for a response." }
     : { label: "Review outreach", panel: "outreach", sentence: "Wait for the organizer’s response." };
-  if (outreach.status === "declined") return { label: "Review outreach", panel: "outreach", sentence: "Review the organizer’s decision before making plans." };
   if (timing.closed) return { ...ask, sentence: routes.contact
     ? "Ask the organizer whether there is a waitlist or another vendor route."
     : "Check for a waitlist or another vendor route now that applications have closed." };
-  if (timing.awaitingOpening && routes.application?.purpose !== "interest")
+  if (timing.awaitingOpening && application?.purpose !== "interest")
     return { ...apply, sentence: "Review the vendor route before booking opens." };
-  if (outreach.status === "quoted") return { ...ask, sentence: "Review the quote against your budget before confirming the booth." };
   if (outreach.status === "replied" && !hasPrice) return { ...ask, sentence: "Confirm the current booth price with the organizer." };
-  if (routes.application) return { ...apply, sentence: routes.application.purpose === "interest"
+  if (application) return { ...apply, sentence: application.purpose === "interest"
     ? "Register interest through the organizer’s published route."
     : "Use the published vendor route to apply for a booth." };
   if (!routes.contact && fallback) return { ...ask, sentence: fallback.purpose === "official"

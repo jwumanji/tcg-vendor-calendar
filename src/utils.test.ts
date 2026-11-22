@@ -171,7 +171,7 @@ describe("pipeline CSV export", () => {
     });
     expect(result).toContain('"Pipeline stage","Notes"');
     expect(result).toContain('"Too expensive","Quoted ""USD 250""\nFollow up"');
-    expect(csv([event])).toContain('"New",""');
+    expect(csv([event])).toContain('"Not reviewed",""');
   });
 });
 

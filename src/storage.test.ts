@@ -1,6 +1,7 @@
 import { DEFAULT_WEIGHTS, normalizeWeights } from "./scoring";
 import { stored } from "./hooks/useFilters";
-import { mergeOutreach } from "./data";
+import { mergeOutreach, normalizeEvents } from "./data";
+import shippedEvents from "../data/events.json";
 import { resolveHomeBase } from "./homeBase";
 import {
   importPriority,
@@ -12,6 +13,8 @@ import {
 import { describe, it, expect, vi } from "vitest";
 import {
   applyGoing,
+  stageSuggestions,
+  withSuggestedStages,
   inverseGoingPatch,
   undoGoingPatch,
   stages,
@@ -30,7 +33,7 @@ import {
 import type { MilestoneEdits, OutreachPatches } from "./storage";
 const entry = {
   ...emptyEntry,
-  stage: "Interested" as const,
+  stage: "Considering" as const,
   note: "Booth: $200\nCall Friday",
   noteUpdatedAt: "2026-11-16T10:00:00.000Z",
 };
@@ -46,6 +49,26 @@ describe("versioned pipeline backup validation", () => {
     ).toEqual(value);
   });
   it.each([
+    ["New", "Not reviewed"],
+    ["Interested", "Considering"],
+    ["Pass", "Passed"],
+    ["Paid / attending", "Booked"],
+    ["Contacted", "Contacted"],
+    ["Need to pay", "Need to pay"],
+    ["Too expensive", "Too expensive"],
+  ])("migrates %s to %s in backups and local storage", (oldStage, stage) => {
+    const storedEntry = { ...entry, stage: oldStage, stageUpdatedAt: entry.noteUpdatedAt };
+    const old = { ...backup({}), entries: { id: storedEntry } };
+    const expected = { ...storedEntry, stage };
+    expect(validateBackup(old).entries.id).toEqual(expected);
+    expect(loadEntries({ getItem: () => JSON.stringify(old) }).entries.id).toEqual(expected);
+    expect(migrateLegacy({ id: oldStage }).id.stage).toBe(stage);
+  });
+  it("rejects unknown stages with the affected entry ID", () => {
+    const future = { ...backup({}), entries: { event: { ...entry, stage: "Future stage" } } };
+    expect(() => validateBackup(future)).toThrow("Invalid entry event: unknown pipeline stage.");
+  });
+  it.each([
     null,
     [],
     {},
@@ -56,7 +79,6 @@ describe("versioned pipeline backup validation", () => {
     expect(() => validateBackup(value)).toThrow();
   });
   it.each([
-    { stage: "Applied" },
     { note: 42 },
     { noteUpdatedAt: "2026-02-30T10:00:00.000Z" },
     { stageUpdatedAt: 0 },
@@ -69,9 +91,74 @@ describe("versioned pipeline backup validation", () => {
   it("handles special object keys as ordinary event IDs", () => {
     const value = JSON.parse(JSON.stringify(backup({})));
     value.entries = JSON.parse(
-      '{"__proto__":{"stage":"New","note":"","noteUpdatedAt":null,"stageUpdatedAt":null}}',
+      '{"__proto__":{"stage":"Not reviewed","note":"","noteUpdatedAt":null,"stageUpdatedAt":null}}',
     );
     expect(Object.keys(validateBackup(value).entries)).toEqual(["__proto__"]);
+  });
+});
+
+describe("decision stage suggestions", () => {
+  const events = normalizeEvents(shippedEvents);
+  const colorFiesta = events.find(({ id }) => id === "color18")!;
+  const base = { ...colorFiesta, id: "id", outreach: null, vendor_options: [], vendor_documents: [] };
+
+  it.each(["zubculture", "mefcc-2027", "color18", "jet-2027"])("suggests Quote received for %s", (id) => {
+    const stages = withSuggestedStages({}, stageSuggestions(events));
+    expect(stages[id]).toMatchObject({ stage: "Quote received", stageUpdatedAt: null });
+  });
+
+  it.each([
+    ["contacted", "Contacted"],
+    ["replied", "Contacted"],
+    ["quoted", "Quote received"],
+    ["declined", "Passed"],
+    ["not_contacted", "Not reviewed"],
+  ] as const)("suggests a stage for outreach marked %s", (status, stage) => {
+    const event = { ...base, outreach: mergeOutreach(null, { status }) };
+    const entries = withSuggestedStages({ id: emptyEntry }, stageSuggestions([event]));
+    expect(entries.id).toEqual({ ...emptyEntry, stage });
+  });
+
+  it("recognizes a logged price or this-edition options and disregards past-year options", () => {
+    const replied = { ...base, outreach: mergeOutreach(null, { status: "replied", quoted_price: "VND 300,000" }) };
+    const option = colorFiesta.vendor_options![0];
+    const itemized = { ...base, vendor_options: [option] };
+    const published = { ...base, vendor_options: [{ ...option, basis: "published" as const }] };
+    const historical = { ...base, vendor_options: [{ ...option, rate_status: "past_year" as const }] };
+    expect([replied, itemized, published, historical].map((event) => stageSuggestions([event]).id))
+      .toEqual(["Quote received", "Quote received", "Quote received", undefined]);
+  });
+
+  it("suggests Passed when the organizer declines after sending a quote", () => {
+    const declined = { ...colorFiesta, outreach: mergeOutreach(colorFiesta.outreach, { status: "declined" }) };
+    expect(stageSuggestions([declined])[declined.id]).toBe("Passed");
+  });
+
+  it("changes untouched suggestions as evidence arrives and keeps explicit entries through a backup", () => {
+    const outreach = { status: "contacted" as const };
+    const contacted = { ...base, outreach: mergeOutreach(null, outreach) };
+    const quoted = { ...base, outreach: mergeOutreach(null, { ...outreach, status: "quoted" }) };
+    const saved = { id: { ...emptyEntry, note: "Ask about power" } };
+    expect(withSuggestedStages(saved, stageSuggestions([contacted])).id).toEqual({ ...saved.id, stage: "Contacted" });
+    expect(withSuggestedStages(saved, stageSuggestions([quoted])).id).toEqual({ ...saved.id, stage: "Quote received" });
+    expect(saved.id.stage).toBe("Not reviewed");
+
+    for (const choice of [
+      { ...saved.id, stage: "Passed" as const },
+      { ...saved.id, stageUpdatedAt: entry.noteUpdatedAt },
+      { ...saved.id, stage: "Booked" as const, stageUpdatedAt: entry.noteUpdatedAt },
+    ]) {
+      const restored = validateBackup(JSON.parse(JSON.stringify(backup({ id: choice })))).entries;
+      expect(withSuggestedStages(restored, stageSuggestions([quoted])).id).toEqual(choice);
+    }
+  });
+
+  it("lets Going advance a Not reviewed stage while preserving a visible suggestion", () => {
+    const suggestions = stageSuggestions([colorFiesta]);
+    const marked = applyGoing({}, ["blank", colorFiesta.id], true, entry.noteUpdatedAt, suggestions);
+    expect(marked.blank.stage).toBe("Considering");
+    expect(marked[colorFiesta.id]).toMatchObject({ going: true, stage: "Not reviewed", stageUpdatedAt: null });
+    expect(withSuggestedStages(marked, suggestions)[colorFiesta.id].stage).toBe("Quote received");
   });
 });
 
@@ -133,11 +220,11 @@ describe("storage and refresh persistence", () => {
       invalid: "bad",
     });
     expect(Object.values(entries).map((e) => e.stage)).toEqual([
-      "Interested",
-      "Interested",
-      "Contacted",
+      "Considering",
+      "Considering",
+      "Applied",
       "Need to pay",
-      "Pass",
+      "Passed",
     ]);
     const getItem = vi.fn((key: string) =>
       key === STORAGE_KEY ? JSON.stringify(backup(entries)) : null,
@@ -150,7 +237,7 @@ describe("storage and refresh persistence", () => {
       loadEntries({
         getItem: (key) => (key === "tcg-plans" ? '{"old":"Skip"}' : null),
       }).entries.old.stage,
-    ).toBe("Pass");
+    ).toBe("Passed");
     expect(
       loadEntries({
         getItem: (key) =>
@@ -240,7 +327,7 @@ describe("recovery and timestamp merge regressions", () => {
     const incoming = {
       id: {
         ...entry,
-        stage: "Pass" as const,
+        stage: "Passed" as const,
         stageUpdatedAt: older,
         note: "new note",
         noteUpdatedAt: newer,
@@ -410,8 +497,8 @@ describe("Going choices", () => {
     const marked = applyGoing({ id: { ...entry, stage } }, ["id"], true, now);
     expect(marked.id).toEqual({
       ...entry,
-      stage: stage === "New" ? "Interested" : stage,
-      stageUpdatedAt: stage === "New" ? now : entry.stageUpdatedAt,
+      stage: stage === "Not reviewed" ? "Considering" : stage,
+      stageUpdatedAt: stage === "Not reviewed" ? now : entry.stageUpdatedAt,
       going: true,
       goingUpdatedAt: now,
     });
@@ -424,12 +511,12 @@ describe("Going choices", () => {
   });
   it("applies a bulk edit and restores the newest Going choice independently", () => {
     const current = {
-      paid: { ...emptyEntry, stage: "Paid / attending" as const },
+      paid: { ...emptyEntry, stage: "Booked" as const },
       other: entry,
     };
     const marked = applyGoing(current, ["new", "paid"], true, now);
-    expect(marked.new.stage).toBe("Interested");
-    expect(marked.paid.stage).toBe("Paid / attending");
+    expect(marked.new.stage).toBe("Considering");
+    expect(marked.paid.stage).toBe("Booked");
     expect(marked.other).toBe(current.other);
     const restored = validateBackup(
       JSON.parse(JSON.stringify(backup(marked))),
@@ -449,7 +536,7 @@ describe("Going choices", () => {
 it("undoes only changed Going values and stages synced by that action", () => {
   const ids = ["new", "paid", "already", "new"];
   const before = {
-    paid: { ...entry, stage: "Paid / attending" as const },
+    paid: { ...entry, stage: "Booked" as const },
     already: { ...entry, going: true },
   };
   const changedAt = "2026-11-17T00:00:00.000Z";
@@ -464,7 +551,7 @@ it("undoes only changed Going values and stages synced by that action", () => {
   const undone = undoGoingPatch(withNote, patch, changedAt, now);
   expect(undone.new).toMatchObject({
     going: false,
-    stage: "New",
+    stage: "Not reviewed",
     note: "Edited after marking",
     stageUpdatedAt: now,
   });
@@ -486,7 +573,7 @@ it("undoes only changed Going values and stages synced by that action", () => {
   );
   expect(restored.new).toMatchObject({
     going: true,
-    stage: "Interested",
+    stage: "Considering",
     stageUpdatedAt: changedAt,
   });
 });

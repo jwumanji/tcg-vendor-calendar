@@ -214,7 +214,7 @@ it("explains missing booth prices and labels eligible add-ons", () => {
 
 it("renders the same applicable price cue in Grid and Rows", () => {
   const score = scoreEvent(zub, { now });
-  const shared = { entries: {}, today: "2026-11-21", now, setGoing: vi.fn(), open: vi.fn() };
+  const shared = { entries: {}, today: "2026-11-21", now, setGoing: vi.fn(), setStage: vi.fn(), open: vi.fn() };
   const grid = load(renderToStaticMarkup(<EventCard e={zub} entry={emptyEntry} score={score} {...shared} />));
   const rows = load(renderToStaticMarkup(<EventRows groups={new Map([["", [zub]]])} columns={[]}
     sort={{ key: "dates", direction: "asc" }} setSort={vi.fn()} scores={{ [zub.id]: score }} selectMode={false} {...shared} />));

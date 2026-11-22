@@ -112,7 +112,7 @@ describe("stored filters", () => {
     expect(
       normalizeFilters({
         countries: ["Singapore", null, "Singapore"],
-        stages: ["Pass", "invalid"],
+        stages: ["Pass", "Passed", "New", "Interested", "Paid / attending", "Quote received", "invalid"],
         score: 200,
         from: "2027-01-01",
         search: "hidden",
@@ -121,7 +121,7 @@ describe("stored filters", () => {
     ).toEqual({
       ...emptyFilters,
       countries: ["Singapore"],
-      stages: ["Pass"],
+      stages: ["Passed", "Not reviewed", "Considering", "Booked", "Quote received"],
       score: 100,
       priority: "top",
     });

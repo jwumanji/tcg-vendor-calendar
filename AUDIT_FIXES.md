@@ -13,7 +13,7 @@ All requested High and Medium findings, and the selected Low findings, are addre
 | M2 | Fixed | Build timeline groups from overlapping occurrences without dropping events merely because their start month precedes the filter. |
 | M3 | Fixed | Explicit month/ISO parsing with UTC construction and validity checks; prefer nearby vendor/application labels over player registration. |
 | M4 | Fixed | Refresh the local day on visibility, focus, and a minute timer; choose the nearest upcoming month with a current-month fallback. |
-| M5 | Fixed | Explicit stage selections override the default hiding of Pass/Too expensive. |
+| M5 | Fixed | Explicit stage selections override the default hiding of Passed/Too expensive. |
 | M6 | Fixed | Search location, country code/UAE alias, fit, audience and games notes; normalize diacritics. |
 | M7 | Fixed | Memoize derived lists and day lookup, memoize event cards, and save local note drafts after 400 ms or on blur/close/backgrounding. Debounce saved announcements. |
 | M8 | Fixed | Stage inputs no longer open details or move focus; Too expensive offers an explicit booth-price prompt. Restore focus to the workspace heading when needed. |

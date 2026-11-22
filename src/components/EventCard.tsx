@@ -6,7 +6,8 @@ import type { ScoreResult } from "../scoring";
 import { memo } from "react";
 import { CalendarDays } from "lucide-react";
 import type { Event } from "../model";
-import type { Entries, Entry } from "../storage";
+import type { Entries, Entry, Stage } from "../storage";
+import { vendorApplyAction } from "../eventDecision";
 import { games, displayDateLabel, gameKey, primaryGameKey } from "../utils";
 import { holo } from "../holo";
 import {
@@ -16,7 +17,8 @@ import {
   Place,
   NoteTag,
 } from "./EventIdentity";
-import { StageBadge } from "./Pipeline";
+import { StagePicker } from "./Pipeline";
+import { ApplyLink } from "./ApplyLink";
 import { VendorPriceCue } from "./VendorPriceCue";
 export const EventCard = memo(function EventCard({
   e,
@@ -24,6 +26,7 @@ export const EventCard = memo(function EventCard({
   entries,
   score,
   setGoing,
+  setStage,
   today,
   now = Date.now(),
   occurrence,
@@ -35,6 +38,7 @@ export const EventCard = memo(function EventCard({
   entries: Entries;
   score: ScoreResult;
   setGoing: SetGoing;
+  setStage: (id: string, stage: Stage) => void;
   today: string;
   now?: number;
   occurrence?: string;
@@ -42,6 +46,7 @@ export const EventCard = memo(function EventCard({
   open: (e: Event, occurrence?: string) => void;
 }) {
   const Title = titleLevel === 4 ? "h4" : "h3";
+  const application = vendorApplyAction(e, now);
   return (
     <article
       className={`event-card holo status-${e.date_status}`}
@@ -89,8 +94,11 @@ export const EventCard = memo(function EventCard({
                 {g}
               </span>
             ))}
-          <StageBadge stage={entry.stage} />
           {entry.note.trim() && <NoteTag />}
+        </div>
+        <div className="card-actions">
+          <StagePicker name={e.name} stage={entry.stage} onChange={(stage) => setStage(e.id, stage)} />
+          {application && <ApplyLink action={application} name={e.name} compact />}
         </div>
       </div>
     </article>

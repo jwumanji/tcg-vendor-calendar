@@ -8,7 +8,10 @@ import {
   Ban,
   BadgeCheck,
   CalendarDays,
+  ChevronDown,
   CircleDollarSign,
+  ClipboardCheck,
+  ClipboardList,
   CreditCard,
   Send,
   Sparkles,
@@ -17,6 +20,7 @@ import {
 } from "lucide-react";
 import type { Event } from "../model";
 import { stages, emptyEntry, type Stage, type Entries } from "../storage";
+import { vendorApplyAction } from "../eventDecision";
 import { displayDateLabel, games, gameKey, primaryGameKey } from "../utils";
 import { holo } from "../holo";
 import {
@@ -26,16 +30,19 @@ import {
   Place,
   NoteTag,
 } from "./EventIdentity";
+import { ApplyLink } from "./ApplyLink";
 
 /** Every stage has an icon as well as a label, so stages never rely on colour alone. */
 const stageIcons: Record<Stage, LucideIcon> = {
-  New: Sparkles,
-  Pass: Ban,
-  "Too expensive": CircleDollarSign,
-  Interested: Star,
+  "Not reviewed": Sparkles,
+  Considering: Star,
   Contacted: Send,
+  "Quote received": ClipboardList,
+  Applied: ClipboardCheck,
   "Need to pay": CreditCard,
-  "Paid / attending": BadgeCheck,
+  Booked: BadgeCheck,
+  Passed: Ban,
+  "Too expensive": CircleDollarSign,
 };
 export function StageBadge({ stage }: { stage: Stage }) {
   const Icon = stageIcons[stage];
@@ -50,11 +57,12 @@ export function StageBadge({ stage }: { stage: Stage }) {
   }, [stage]);
   return (
     <span
-      className={`badge stage stage-${stages.indexOf(stage)}${
+      className={`badge stage${
         bump ? ` bump-${bump % 2 ? "a" : "b"}` : ""
       }`}
+      data-stage={stage}
     >
-      <Icon size={13} strokeWidth={2.4} />
+      <Icon size={13} strokeWidth={2.4} aria-hidden="true" />
       {stage}
     </span>
   );
@@ -70,21 +78,21 @@ export function StagePicker({
   stage: Stage;
   onChange: (stage: Stage) => void;
 }) {
+  const Icon = stageIcons[stage];
   return (
-    <select
-      id={id}
-      aria-label={`Pipeline stage for ${name}`}
-      value={stage}
-      onChange={(e) => onChange(e.target.value as Stage)}
-    >
-      {stages.map((s) => (
-        <option key={s}>{s}</option>
-      ))}
-    </select>
+    <span className="stage-control" data-stage={stage}>
+      <Icon className="stage-icon" size={13} strokeWidth={2.4} aria-hidden="true" />
+      <select id={id} className="stage-picker" aria-label={`Pipeline stage for ${name}`}
+        value={stage} onChange={(e) => onChange(e.target.value as Stage)}>
+        {stages.map((s) => <option key={s}>{s}</option>)}
+      </select>
+      <ChevronDown className="stage-chevron" size={13} aria-hidden="true" />
+    </span>
   );
 }
 export function Pipeline({
   today,
+  now = Date.now(),
   sort,
   events,
   entries,
@@ -94,6 +102,7 @@ export function Pipeline({
   change,
 }: {
   today: string;
+  now?: number;
   sort: RowSort;
   events: Event[];
   entries: Entries;
@@ -105,9 +114,8 @@ export function Pipeline({
   return (
     <>
       <p className="pipeline-explainer">
-        Going = events you plan to attend. Pipeline stage = where each booth
-        application stands. Marking Going sets Interested if the stage is still
-        New.
+        Track your decision and booth booking in the pipeline. Marking Going moves
+        an event from Not reviewed to Considering.
       </p>
       <div className="pipeline">
         {orderedStages(sort).map((stage) => {
@@ -116,7 +124,8 @@ export function Pipeline({
           );
           return (
             <section
-              className={`pipeline-column stage-col-${stages.indexOf(stage)}`}
+              className="pipeline-column"
+              data-stage={stage}
               key={stage}
             >
               <h3>
@@ -128,6 +137,7 @@ export function Pipeline({
               {items.map((e) => (
                 <PipelineCard
                   today={today}
+                  now={now}
                   key={e.id}
                   e={e}
                   entries={entries}
@@ -155,6 +165,7 @@ export function Pipeline({
  */
 const PipelineCard = memo(function PipelineCard({
   today,
+  now,
   e,
   stage,
   going,
@@ -166,6 +177,7 @@ const PipelineCard = memo(function PipelineCard({
   change,
 }: {
   today: string;
+  now: number;
   e: Event;
   stage: Stage;
   going: boolean;
@@ -177,6 +189,7 @@ const PipelineCard = memo(function PipelineCard({
   change: (event: Event, stage: Stage) => void;
 }) {
   const primary = games(e)[0];
+  const application = vendorApplyAction(e, now);
   return (
     <article
       className={`pipeline-card holo status-${e.date_status}`}
@@ -226,6 +239,7 @@ const PipelineCard = memo(function PipelineCard({
           stage={stage}
           onChange={(s) => change(e, s)}
         />
+        {application && <ApplyLink action={application} name={e.name} compact />}
         {stage === "Too expensive" && (
           <button className="text-button" onClick={() => open(e)}>
             Add booth price →

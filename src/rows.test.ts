@@ -33,11 +33,11 @@ const [a, b, c] = finds.map((e, i) => ({
 const entries = {
   a: {
     ...emptyEntry,
-    stage: "Paid / attending" as const,
+    stage: "Booked" as const,
     going: true,
     note: "Ask about booth",
   },
-  b: { ...emptyEntry, stage: "Interested" as const, note: "  " },
+  b: { ...emptyEntry, stage: "Considering" as const, note: "  " },
 };
 const scores = { a: { score: 0 }, b: { score: 95 }, c: { score: 83 } };
 const events = [a, b, c];

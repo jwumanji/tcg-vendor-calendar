@@ -8,7 +8,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import type { Event } from "../model";
-import { emptyEntry, type Entries } from "../storage";
+import { emptyEntry, type Entries, type Stage } from "../storage";
 import {
   ranges,
   visibleRanges,
@@ -32,7 +32,9 @@ export function CalendarView({
   setMonth,
   initialMonth,
   today,
+  now = Date.now(),
   setGoing,
+  setStage,
   open,
 }: {
   filtered: Event[];
@@ -42,7 +44,9 @@ export function CalendarView({
   setMonth: (month: string) => void;
   initialMonth: string;
   today: string;
+  now?: number;
   setGoing: SetGoing;
+  setStage: (id: string, stage: Stage) => void;
   open: (event: Event, occurrence?: string) => void;
 }) {
   function card(e: Event, occurrence?: string) {
@@ -54,8 +58,10 @@ export function CalendarView({
         entries={entries}
         entry={entries[e.id] || emptyEntry}
         today={today}
+        now={now}
         occurrence={occurrence}
         setGoing={setGoing}
+        setStage={setStage}
         open={open}
       />
     );

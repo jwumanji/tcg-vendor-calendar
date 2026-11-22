@@ -2,7 +2,9 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObje
 import { ArrowUpRight, CalendarClock } from "lucide-react";
 import type { Event, VendorMilestone } from "../model";
 import { milestoneCountdown, milestoneTimes, upcomingMilestones } from "../milestones";
+import { vendorApplyAction } from "../eventDecision";
 import { MilestoneExport } from "./EventExports";
+import { ApplyLink } from "./ApplyLink";
 
 const cardLimit = 3;
 
@@ -64,19 +66,26 @@ export function UpcomingMilestones({ events, open, focusFallback }: {
         <CalendarClock size={17} aria-hidden="true" /> Upcoming vendor deadlines &amp; openings
       </h3>
       <ul id="upcoming-milestones-list" ref={list}>
-        {visible.map(({ event, milestone }) => (
-          <li key={JSON.stringify([event.id, milestone.id])} ref={trackFocus}>
-            <button className="milestone-card" onClick={() => open(event)}>
-              <strong>{event.name}</strong>
-              <ArrowUpRight className="milestone-arrow" size={16} aria-hidden="true" />
-              <span className="milestone-label">{milestone.label}</span>
-              <MilestoneTimes milestone={milestone} />
-              <span className="milestone-countdown">{milestoneCountdown(event, milestone, now)}</span>
-              {milestone.notes && <span className="milestone-notes">{milestone.notes}</span>}
-            </button>
-            <MilestoneExport event={event} milestone={milestone} />
-          </li>
-        ))}
+        {visible.map(({ event, milestone }) => {
+          const application = (milestone.type === "application_closes" || milestone.type === "booking_opens") &&
+            vendorApplyAction(event, now);
+          return (
+            <li key={JSON.stringify([event.id, milestone.id])} ref={trackFocus}>
+              <button className="milestone-card" onClick={() => open(event)}>
+                <strong>{event.name}</strong>
+                <ArrowUpRight className="milestone-arrow" size={16} aria-hidden="true" />
+                <span className="milestone-label">{milestone.label}</span>
+                <MilestoneTimes milestone={milestone} />
+                <span className="milestone-countdown">{milestoneCountdown(event, milestone, now)}</span>
+                {milestone.notes && <span className="milestone-notes">{milestone.notes}</span>}
+              </button>
+              <div className="upcoming-milestone-actions">
+                {application && <ApplyLink action={application} name={event.name} compact />}
+                <MilestoneExport event={event} milestone={milestone} />
+              </div>
+            </li>
+          );
+        })}
       </ul>
       {extra > 0 && (
         <button className="button milestone-toggle" ref={trackFocus} aria-expanded={expanded}

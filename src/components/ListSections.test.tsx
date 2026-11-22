@@ -8,7 +8,7 @@ import { defaultRowSort, groupSortedRows, orderTimelineGroups, sortRows, type Op
 import { scoreEvents } from "../scoring";
 import { emptyFilters } from "../model";
 import { ics, matches, matchingEvent, timelineGroups } from "../utils";
-import { emptyEntry } from "../storage";
+import { emptyEntry, stages, type Entries } from "../storage";
 import { Detail } from "./Detail";
 import { EventCard } from "./EventCard";
 import { EventRows } from "./EventRows";
@@ -24,7 +24,7 @@ const [harbour, kowloon, pasar] = normalizeEvents(fixtures);
 const event = { ...harbour, vendor_score: 51 };
 const events = [event, kowloon, pasar, { ...pasar, id: "estimate", estimated_month: "2027-01" }];
 const scores = Object.fromEntries(scoreEvents(events, { today }).map((score) => [score.id, score]));
-const shared = { entries: {}, open: vi.fn(), setGoing: vi.fn() };
+const shared = { entries: {}, open: vi.fn(), setGoing: vi.fn(), setStage: vi.fn() };
 const milestoneActions = { onSave: vi.fn(), onRemove: vi.fn() };
 const booking = {
   id: "general-booking", type: "booking_opens" as const, at: "2026-12-01T00:00+08:00",
@@ -37,7 +37,7 @@ it("renders a keyboard-accessible reminder list ordered by booking time", () => 
   try {
     const $ = load(renderToStaticMarkup(<UpcomingMilestones open={shared.open} events={[
       { ...kowloon, vendor_milestones: [{ ...booking, at: "2026-12-01T12:00+08:00" }] },
-      { ...event, vendor_milestones: [booking] },
+      { ...event, vendor_application: "https://example.com/apply", vendor_milestones: [{ ...booking, type: "application_closes" }] },
       { ...pasar, event_status: "cancelled", vendor_milestones: [booking] },
     ]} />));
     expect($(".milestone-card strong").map((_, el) => $(el).text()).get()).toEqual([event.name, kowloon.name]);
@@ -48,6 +48,9 @@ it("renders a keyboard-accessible reminder list ordered by booking time", () => 
     ]);
     expect($(".milestone-countdown").first().text()).toBe("in 9 days");
     expect($(".upcoming-milestones .milestone-export")).toHaveLength(2);
+    expect($(".upcoming-milestones .apply-cta").attr("href")).toBe("https://example.com/apply");
+    expect($(".upcoming-milestones .apply-cta").attr("aria-label")).toBe(`Apply for ${event.name}`);
+    expect($(".milestone-card .apply-cta")).toHaveLength(0);
   } finally {
     clock.mockRestore();
   }
@@ -92,23 +95,42 @@ it("labels postponed bookings as on hold and removes their calendar action and v
   expect($("body").text()).not.toContain("Old booking notice");
 });
 
-function layouts(sort: RowSort, columns: OptionalColumn[] = [], list = events, results = scores) {
-  const sorted = sortRows(list, sort, {}, results, today);
+function layouts(sort: RowSort, columns: OptionalColumn[] = [], list = events, results = scores, entries: Entries = {}) {
+  const sorted = sortRows(list, sort, entries, results, today);
   const groups = groupSortedRows(sorted, sort.key, today);
   const grid = (
     <CardSections groups={groups} sortKey={sort.key}>
       {(e, titleLevel) => (
-        <EventCard key={e.id} e={e} entry={emptyEntry} score={results[e.id]}
-          today={today} titleLevel={titleLevel} {...shared} />
+        <EventCard key={e.id} e={e} entry={entries[e.id] || emptyEntry} score={results[e.id]}
+          today={today} now={Date.parse(today)} titleLevel={titleLevel} {...shared} entries={entries} />
       )}
     </CardSections>
   );
   const rows = (
     <EventRows groups={groups} sort={sort} setSort={vi.fn()} columns={columns}
-      today={today} scores={results} selectMode={false} {...shared} />
+      today={today} now={Date.parse(today)} scores={results} selectMode={false} {...shared} entries={entries} />
   );
   return { grid: load(renderToStaticMarkup(grid)), rows: load(renderToStaticMarkup(rows)) };
 }
+
+it("renders matching stage controls and vendor actions on Grid and Rows", () => {
+  const list = [
+    { ...event, vendor_application: "https://example.com/apply" },
+    { ...kowloon, vendor_application: "https://example.com/register-interest" },
+    { ...pasar, vendor_application: "https://example.com/apply", vendor_booths: "Applications closed" },
+  ];
+  const entries = { [kowloon.id]: { ...emptyEntry, stage: "Quote received" as const } };
+  const { grid, rows } = layouts({ key: "stage", direction: "desc" }, [], list, scores, entries);
+  for (const $ of [grid, rows]) {
+    expect($(".stage-picker option[selected]").map((_, el) => $(el).text()).get())
+      .toEqual(["Quote received", "Not reviewed", "Not reviewed"]);
+    const picker = $(".stage-picker").first();
+    expect(picker.attr("aria-label")).toBe(`Pipeline stage for ${kowloon.name}`);
+    expect(picker.find("option").map((_, el) => $(el).text()).get()).toEqual([...stages]);
+    expect($(".apply-cta").map((_, el) => [$(el).text(), $(el).attr("href")]).get())
+      .toEqual(["Register interest", "https://example.com/register-interest", "Apply", "https://example.com/apply"]);
+  }
+});
 
 describe("Grid and Rows sections", () => {
   it.each<[RowSort, string[]]>([
@@ -222,8 +244,8 @@ it("labels the event outreach section, editor, research links and prices indepen
     "Response date", "Next action", "Follow-up due date", "Message reference", "Quoted price", "Outreach notes",
   ]);
   expect(section.find("button").text()).toBe("Save outreach");
-  expect($(".decision-stage").text()).toBe("Pipeline · New");
-  expect($("label[for=detail-stage]").text()).toBe("PIPELINE STAGE");
+  expect($(".decision-stage option[selected]").text()).toBe("Not reviewed");
+  expect($("label[for=detail-stage]").text()).toBe("Pipeline stage");
 });
 
 it("keeps the scanner value in the event page priority breakdown", () => {
@@ -320,7 +342,7 @@ it("orders Rows, Pipeline columns and Timeline stage groups by the same descendi
   expect(pipeline(".pcard-title button").map((_, el) => pipeline(el).contents().first().text()).get())
     .toEqual([kowloon.name, event.name]);
   const timeline = orderTimelineGroups(timelineGroups(sorted, emptyFilters, entries, true), true, sort);
-  expect(timeline.map(([stage]) => stage)).toEqual(["Contacted", "New"]);
+  expect(timeline.map(([stage]) => stage)).toEqual(["Contacted", "Not reviewed"]);
 });
 
 it.each([

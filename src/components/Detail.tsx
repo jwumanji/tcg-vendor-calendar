@@ -2,7 +2,7 @@ import { GoingButton, type SetGoing } from "./GoingButton";
 import { PriorityDetail } from "./PriorityDetail";
 import { FindBadges, FindDetails } from "./FindSource";
 import type { ScoreResult } from "../scoring";
-import { decisionReason, nextVendorAction, routeAction, saigonDay, vendorRoutes, vendorTiming, type goingConflicts } from "../eventDecision";
+import { decisionReason, isApplyPurpose, nextVendorAction, routeAction, saigonDay, vendorApplyAction, vendorRoutes, vendorTiming, type goingConflicts } from "../eventDecision";
 import { homeBaseLabel, resolveHomeBase } from "../homeBase";
 import { applicableVendorPrice, formatVendorAmount, legacyVendorPrice } from "../vendorPricing";
 import { eventPath } from "../route";
@@ -32,6 +32,7 @@ import {
 } from "../utils";
 import { Logo, Status, Place } from "./EventIdentity";
 import { StagePicker } from "./Pipeline";
+import { ApplyLink } from "./ApplyLink";
 import type { Entry, Stage } from "../storage";
 import type { Outreach, OutreachPatch } from "../model";
 import { PriorityChip } from "./PriorityChip";
@@ -192,6 +193,7 @@ export function Detail({
   const [loggingQuote, setLoggingQuote] = useState(false);
   const priceFact = useRef<HTMLDivElement>(null);
   const outreachPanel = useRef<HTMLDetailsElement>(null);
+  const moneyPanel = useRef<HTMLDetailsElement>(null);
   const outreachEditor = useRef<HTMLDetailsElement>(null);
   const planningPanel = useRef<HTMLDetailsElement>(null);
   const schedulePanel = useRef<HTMLDetailsElement>(null);
@@ -219,6 +221,8 @@ export function Detail({
   const priceOption = price && price.basis !== "listed" ? price.option : undefined;
   const priceUnit = priceOption?.includes.match(/\b(?:both days|per (?:day|table|booth)|for all \d+ days)\b/i)?.[0];
   const action = nextVendorAction(e, entry.stage, outreachDay, timing, routes, !!price);
+  const canApply = isApplyPurpose(action.purpose);
+  const application = !canApply && routes.application && vendorApplyAction(e, now, routes.application, timing);
   const contactAction = routes.contact && routeAction(routes.contact);
   const priceAmount = price && formatVendorAmount(price.amount, price.currency);
   const date = occurrence || displayDateLabel(e, today);
@@ -294,6 +298,10 @@ export function Detail({
           </div>
         </div>
         <p className="decision-reason">{decisionReason(e, score)}</p>
+        <div className="decision-stage">
+          <label htmlFor="detail-stage">Pipeline stage</label>
+          <StagePicker name={e.name} id="detail-stage" stage={entry.stage} onChange={onStage} />
+        </div>
         {conflicts.length > 0 && (
           <div className="decision-conflicts">
             <strong>Overlaps with events marked Going</strong>
@@ -311,16 +319,17 @@ export function Detail({
           <p>{action.sentence}</p>
           {!routes.contact && !routes.application && !action.panel && <small>No contact route found</small>}
           <div className="next-step-actions">
-            {action.label && (action.href ? <ActionLink href={action.href} primary>{action.label}</ActionLink>
+            {action.label && (action.href ? canApply
+              ? <ApplyLink action={{ href: action.href, label: action.label }} />
+              : <ActionLink href={action.href} primary>{action.label}</ActionLink>
               : <button className="button primary" onClick={() => {
                 if (action.panel === "planning") revealPanel(planningPanel.current);
                 else if (action.panel === "schedule") revealPanel(schedulePanel.current ?? planningPanel.current);
+                else if (action.panel === "money") revealPanel(moneyPanel.current);
                 else if (action.panel === "outreach") revealOutreach();
                 else revealOutreach(action.panel === "outreach-edit" ? "exchange" : "contact");
               }}>{action.label}</button>)}
-            <button type="button" className="text-button decision-stage" onClick={() => revealPanel(planningPanel.current)}>
-              <span>Pipeline · <strong>{entry.stage}</strong></span>
-            </button>
+            {application && <ApplyLink action={application} />}
           </div>
         </section>
         <dl className="decision-facts">
@@ -372,7 +381,8 @@ export function Detail({
             routes={routes} editor={outreachEditor} eventContacts={[e.contact, e.vendor_application]}
             onSave={onOutreach} saved={saved} />
         </DetailDisclosure>
-        {hasMoney && <DetailDisclosure label="Money" hint={priceAmount || "Rates and booth documents"} defaultOpen={desktop || moneyHasPricesOrDocs}>{money}</DetailDisclosure>}
+        {hasMoney && <DetailDisclosure label="Money" hint={priceAmount || "Rates and booth documents"}
+          disclosureRef={moneyPanel} defaultOpen={desktop || moneyHasPricesOrDocs}>{money}</DetailDisclosure>}
         {hasBudget && <DetailDisclosure label="Budget / break-even" hint={budgetHint} defaultOpen={desktop || budgetHasCosts}>{trip}</DetailDisclosure>}
         {hasSchedule && (
           <DetailDisclosure label="When and where" hint={date} disclosureRef={schedulePanel} defaultOpen={desktop || Boolean(e.vendor_milestones?.length)}>
@@ -399,15 +409,9 @@ export function Detail({
             {milestones}
           </DetailDisclosure>
         )}
-        <DetailDisclosure label="Your planning" hint={entry.stage} disclosureRef={planningPanel} defaultOpen={desktop || !!entry.note.trim() || entry.stage !== "New"}>
+        <DetailDisclosure label="Your planning" hint={entry.stage} disclosureRef={planningPanel} defaultOpen={desktop || !!entry.note.trim()}>
           <div className="planning">
-          <label htmlFor="detail-stage">PIPELINE STAGE</label>
-          <StagePicker
-            name={e.name}
-            id="detail-stage"
-            stage={entry.stage}
-            onChange={onStage}
-          />
+          <small>Change the pipeline stage in Decide.</small>
           <label htmlFor="event-note">Your notes</label>
           <textarea
             id="event-note"

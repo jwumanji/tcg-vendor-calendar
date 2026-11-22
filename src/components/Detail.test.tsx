@@ -38,18 +38,20 @@ function render(e: Event, props: Partial<React.ComponentProps<typeof Detail>> = 
 }
 
 it("puts Decide and the next action before the ordered reference sections", () => {
-  const $ = render(event("color18"), { entry: { ...emptyEntry, stage: "Interested" } });
+  const $ = render(event("color18"), { entry: { ...emptyEntry, stage: "Considering" } });
   expect($(".event-decision > h2").text()).toBe("Decide");
-  expect($(".decision-reason + .next-step + .decision-facts")).toHaveLength(1);
+  expect($(".decision-reason + .decision-stage + .next-step + .decision-facts")).toHaveLength(1);
   expect($(".event-information > details > summary .detail-summary-label").map((_, el) => $(el).text()).get()).toEqual([
     "Outreach", "Money", "Budget / break-even", "When and where", "Your planning", "About", "Score breakdown", "Sources",
   ]);
   expect($(".event-information > details[open] > summary .detail-summary-label").map((_, el) => $(el).text()).get()).toEqual([
-    "Outreach", "Money", "Budget / break-even", "Your planning",
+    "Outreach", "Money", "Budget / break-even",
   ]);
   expect($(".event-facts .going-button")).toHaveLength(1);
   expect($(".event-facts select")).toHaveLength(0);
-  expect($(".event-information #detail-stage")).toHaveLength(1);
+  expect($(".event-decision #detail-stage").attr("aria-label")).toBe("Pipeline stage for Color Fiesta #18: Bon Appétit");
+  expect($("#detail-stage option[selected]").text()).toBe("Considering");
+  expect($(".planning").text()).toContain("Change the pipeline stage in Decide.");
 });
 
 it("leads a sparse find with missing facts and keeps editors reachable without empty reference panels", () => {
@@ -86,9 +88,10 @@ it.each([
   ["Official site only", { website: "https://example.com/" }, "Check official site", "https://example.com/"],
 ] as const)("labels the primary button for %s", (_, overrides, label, href) => {
   const $ = render({ ...sparse, ...overrides });
-  expect($(".next-step .primary")).toHaveLength(1);
-  expect($(".next-step .primary").text()).toBe(label);
-  expect($(".next-step .primary").attr("href")).toBe(href);
+  const selector = label === "Apply" || label === "Register interest" ? ".apply-cta" : ".primary";
+  expect($(".next-step a.button")).toHaveLength(1);
+  expect($(".next-step " + selector).text()).toBe(label);
+  expect($(".next-step " + selector).attr("href")).toBe(href);
 });
 
 it("shows apply-by with a countdown only when a clear closing milestone has been recorded", () => {
@@ -110,7 +113,7 @@ it("keeps Card Con FCFS and the closed priority window distinct from a deadline"
   expect($(".decision-facts").text()).toContain("returning-exhibitor priority window has closed");
   expect($(".decision-facts").text()).not.toContain("Apply by");
   expect($(".decision-countdown").text()).toBe("in 8 days");
-  expect($(".next-step .primary").text()).toBe("Apply");
+  expect($(".next-step .apply-cta").text()).toBe("Apply");
 });
 
 it.each([
@@ -193,8 +196,8 @@ it("counts waits on the Saigon calendar and retains pipeline and no-reply instru
   const base = { ...sparse, contact: "noreply@example.com; vendor@example.com",
     outreach: { ...emptyOutreach, status: "contacted" as const, method: "email" as const,
       contacted_at: today, notes: "Do not auto-reply to the acknowledgement." } };
-  const $ = render(base, { entry: { ...emptyEntry, stage: "Interested" } });
-  expect($(".decision-stage").text()).toBe("Pipeline · Interested");
+  const $ = render(base, { entry: { ...emptyEntry, stage: "Considering" } });
+  expect($(".decision-stage option[selected]").text()).toBe("Considering");
   expect($(".outreach-summary").text()).toContain("ContactedEmail");
   expect($(".outreach-summary").text()).toContain("Waiting 1 day");
   expect($(".outreach-section").text()).toContain("Do not auto-reply");
@@ -212,8 +215,10 @@ it.each([
   ["bahrain-cs", "View reference source", "https://playvault.ae/pages/tcg-event-calendar-2026-gcc", "https://playvault.ae/pages/tcg-event-calendar-2026-gcc"],
 ])("uses the published route with the matching purpose for %s", (id, label, href, source) => {
   const $ = render(event(id));
-  expect($(".next-step .primary").text()).toBe(label);
-  expect($(".next-step .primary").attr("href")).toBe(href);
+  const action = $(".next-step a.button");
+  expect(action.text()).toBe(label);
+  expect(action.attr("href")).toBe(href);
+  expect(action.hasClass("apply-cta")).toBe(label === "Apply");
   expect($(`.source-links a[href="${source}"]`)).toHaveLength(1);
   if (id === "comfest-kw" || id === "bahrain-cs") {
     expect($(".next-step a")).toHaveLength(1);
@@ -236,10 +241,11 @@ it("uses the verified general close for FCFS and keeps the returning window sepa
   const milestones = [...e.vendor_milestones!, returning, close];
   const adjusted = { ...e, vendor_milestones: milestones };
   const open = render(adjusted, { now: Date.parse("2026-12-09T14:00:00Z") });
-  expect(open(".next-step .primary").text()).toBe("Apply");
+  expect(open(".next-step .apply-cta").text()).toBe("Apply");
   expect(open(".decision-facts").text()).toContain("Apply by");
   const closed = render(adjusted, { now: Date.parse("2026-12-09T17:00:00Z") });
   expect(closed(".next-step .primary").text()).toBe("Ask organizer");
+  expect(closed(".next-step .apply-cta")).toHaveLength(0);
   expect(closed(".next-step").text()).toContain("waitlist");
   expect(closed(".decision-facts").text()).toContain("Applications closed");
 });
@@ -251,16 +257,34 @@ it("summarizes the selected listed rate and retains the original price text in M
   expect($(".vendor-money").text()).toContain(vendor_cost);
 });
 
-it.each(["Contacted", "Need to pay", "Paid / attending"] as const)(
-  "prompts for an outreach log when the manually set stage is %s", (stage) => {
-    const $ = render({ ...sparse, contact: "sales@example.com" }, { entry: { ...emptyEntry, stage } });
-    expect($(".next-step .primary").text()).toBe("Log outreach");
-    expect($(".event-decision").text()).not.toContain("Ask organizer");
-    expect($("button.decision-stage").text()).toBe(`Pipeline · ${stage}`);
-    expect($(".detail-summary-hint").first().text()).toBe("Not contacted");
-    expect($(".outreach-summary").text()).toBe("Not contacted");
-  },
-);
+it.each([
+  ["Contacted", "Log outreach", "Log or review the exchange"],
+  ["Applied", "Ask organizer", "confirmation of your application"],
+  ["Need to pay", "Ask organizer", "Confirm payment instructions"],
+  ["Booked", "Review booking", "Review your booking before making travel arrangements"],
+  ["Passed", "Review planning", "Keep this event on file"],
+  ["Too expensive", "Ask organizer", "lower-cost eligible booth"],
+] as const)("uses the next action for %s without a recorded exchange", (stage, label, sentence) => {
+  const $ = render({ ...sparse, contact: "sales@example.com" }, { entry: { ...emptyEntry, stage } });
+  expect($(".next-step .primary").text()).toBe(label);
+  expect($(".next-step p").text()).toContain(sentence);
+  expect($("#detail-stage option[selected]").text()).toBe(stage);
+  expect($(".outreach-summary").text()).toBe("Not contacted");
+});
+
+it("keeps Apply available beside the quote review when the organizer has an open route", () => {
+  const $ = render(event("urban"), { entry: { ...emptyEntry, stage: "Quote received" } });
+  expect($(".next-step .primary").text()).toBe("Review booth pricing");
+  expect($(".next-step .apply-cta").text()).toBe("Apply");
+  expect($(".outreach-research .apply-cta").attr("href")).toBe($(".next-step .apply-cta").attr("href"));
+  expect($(".going-button").hasClass("apply-cta")).toBe(false);
+});
+
+it("keeps the reply and missing price visible for Japan Expo Thailand's proposal", () => {
+  const $ = render(event("jet-2027"), { entry: { ...emptyEntry, stage: "Quote received" } });
+  expect($(".next-step p").text()).toContain("Reply to the organizer");
+  expect($(".decision-price").text()).toContain("Current booth price unknown");
+});
 
 it("puts a budget calculated from Tools defaults in the reference order", () => {
   const $ = render({ ...sparse, date_status: "confirmed", start_date: "2027-01-06", end_date: "2027-01-07" },

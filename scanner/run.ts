@@ -49,8 +49,9 @@ export function validate(value: unknown): asserts value is Event[] {
         (!Array.isArray(raw.vendor_milestones) ||
           raw.vendor_milestones.length !== (row.vendor_milestones?.length ?? 0))) ||
       (raw.original_start_date !== undefined && !validDate(raw.original_start_date)) ||
-      (Array.isArray(raw.occurrences) && raw.occurrences.some((r) =>
-        r?.original_start_date !== undefined && !validDate(r.original_start_date))) ||
+      (raw.occurrences != null && (!Array.isArray(raw.occurrences) ||
+        raw.occurrences.length !== row.occurrences?.length ||
+        raw.occurrences.some((r) => r.original_start_date !== undefined && !validDate(r.original_start_date)))) ||
       (raw.date_status === "confirmed" &&
         (!validDate(raw.start_date) ||
           !validDate(raw.end_date) ||
@@ -229,6 +230,7 @@ async function main() {
     import: importReport,
   };
   console.table(rows);
+  for (const warning of warnings) console.warn(`Warning from ${warning.source}: ${warning.message}`);
   for (const notice of merged.unmatched)
     console.warn(`Unmatched notice from ${notice.source!.id}: ${notice.name} (${notice.date_note})`);
   for (const e of added)

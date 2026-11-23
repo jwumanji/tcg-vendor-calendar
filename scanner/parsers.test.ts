@@ -77,7 +77,7 @@ it("reads the Singapore Card Show homepage hero and vendor link", async () => {
     end_date: "2026-12-13",
     venue: "Singapore Expo · Hall 4A & 4B",
     visitors: 30000,
-    vendor_count: null,
+    vendor_count: 600,
     vendor_application: "https://forms.gle/example",
     previous_editions_count: 1,
   }]);

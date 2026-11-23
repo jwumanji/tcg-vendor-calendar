@@ -105,6 +105,7 @@ day=$(TZ=Asia/Ho_Chi_Minh date +%F)
 revision=$start_revision
 result='deployment skipped'
 changed=$(git -C "$work" diff --cached --name-only -- data public/logos)
+count=$(node -p "require(process.argv[1]).new_count" "$work/$report")
 if "$push" && [[ -n "$changed" ]]; then
   # Commit only the tested index in the isolated checkout. Fast-forwarding the
   # live branch lets Git check for conflicting worktree edits before checkout.
@@ -153,5 +154,4 @@ if "$push"; then
 else
   echo "Local data refreshed; --no-push skips publication"
 fi
-count=$(node -p "require('./scanner/last-run.json').new_count")
 echo "Weekly refresh finished on $day with $count new finds; $result."

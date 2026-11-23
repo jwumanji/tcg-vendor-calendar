@@ -46,7 +46,8 @@ beforeEach(() => {
       fs.unlinkSync("public/logos/example.webp");
       fs.writeFileSync("public/logos/new.webp", "partial");
     }
-    fs.writeFileSync("data/events.json", "generated");
+    if (!fs.existsSync(process.env.TEST_DIR + "/no-data-change"))
+      fs.writeFileSync("data/events.json", "generated");
     fs.writeFileSync("scanner/last-run.json", JSON.stringify({new_count:0, time: Date.now()}));
     if (fs.existsSync(process.env.TEST_DIR + "/fail-scan")) process.exit(1);
   `);
@@ -155,6 +156,15 @@ it("applies tested output locally without staging it in no-push mode", () => {
   expect(git("diff", "--cached", "--name-only")).toBe("");
   expect(git("rev-parse", "HEAD")).toBe(head);
   expect(git("rev-parse", "origin/main")).toBe(head);
+});
+
+it("reports the isolated run even when a local report edit prevents copying it back", () => {
+  writeFileSync(join(dir, "no-data-change"), "");
+  writeFileSync(join(repo, "scanner/last-run.json"), "local report edit");
+  const result = refresh("--no-push");
+  expect(result.status, result.stderr).toBe(0);
+  expect(result.stdout).toContain("with 0 new finds");
+  expect(readFileSync(join(repo, "scanner/last-run.json"), "utf8")).toBe("local report edit");
 });
 
 it.each(["staged", "late"])("preserves a %s report edit across fast-forward publication", (when) => {

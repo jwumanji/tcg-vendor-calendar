@@ -8,7 +8,8 @@ export function parse(html: string): RawFind[] {
   const hero = $("h1:has(> .name):has(> .date)").first();
   const heroName = clean(hero.children(".name").text());
   if (/^Singapore Card Show\b/i.test(heroName)) {
-    const past = $("#past .show:not([aria-current]) .when").toArray().map((el) => clean($(el).text())).filter(Boolean);
+    const past = [...new Set($("#past .show:not([aria-current='page']) .when").toArray()
+      .map((el) => clean($(el).text())).filter(Boolean))];
     const stats = $(".stk").toArray().map((el) => clean($(el).text()));
     const visitors = stats.find((line) => /visitors expected$/i.test(line));
     const booths = stats.find((line) => /vendor booths$/i.test(line));
@@ -22,6 +23,7 @@ export function parse(html: string): RawFind[] {
       city: "Singapore",
       event_type: "Card show",
       visitors: visitors ? parseInt(visitors.replaceAll(",", ""), 10) || null : null,
+      vendor_count: booths ? parseInt(booths.replaceAll(",", ""), 10) || null : null,
       expected_size: [visitors, booths].filter(Boolean).join(", ") || null,
       previous_editions: past.length ? "Past editions listed: " + past.join(", ") : null,
       previous_editions_count: past.length || null,

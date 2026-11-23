@@ -31,8 +31,10 @@ const aliases: Record<string, string> = {
   RM: "MYR",
   RP: "IDR",
 };
+const multiEventRate = /\bbundle\b.*\b(?:both events combined|multiple events)\b/i;
+
 export function parseBoothCost(text?: string | null) {
-  if (!text || /sponsorship packages/i.test(text)) return null;
+  if (!text || /sponsorship packages/i.test(text) || multiEventRate.test(text)) return null;
   // Read the first base price from older vendor_cost text. The caller checks applicability.
   const price =
     /\b(HK\$|US\$|S\$|SGD|HKD|MYR|THB|IDR|USD|AED|AUD|CNY|SAR|PHP|VND|QAR|KWD|BHD|RM|Rp\.?)\s*(\d[\d,]*(?:\.\d+)?)/gi;
@@ -80,7 +82,8 @@ export function legacyVendorPrice(event: Event) {
     (cost.quoteYear !== null && cost.quoteYear < year) ||
     /\b(?:prior|past|previous|last)[ -](?:edition|year)|historical rate/i.test(cost.note) ? "past_year"
       : /\bexpired\b|early[ -]bird (?:has )?(?:ended|closed)/i.test(cost.note) ? "expired"
-        : /\bunverified\b|\bunconfirmed\b|not (?:verified|(?:a )?confirmed|published|for resale)|agent price|\bineligible\b|does not apply|(?:artists?|creators?) only/i.test(cost.note) ? "unavailable"
+        : (cost.quoteYear !== null && cost.quoteYear > year) ||
+          /\bunverified\b|\bunconfirmed\b|not (?:verified|(?:a )?confirmed|published|for resale)|agent price|\bineligible\b|does not apply|(?:artists?|creators?) only/i.test(cost.note) ? "unavailable"
           : "current";
   return { ...cost, status };
 }
@@ -166,6 +169,7 @@ export function missingPriceMessage(event: Event, now: number) {
   if (legacy?.status === "past_year") return "Only prior-edition booth rates are on file.";
   if (legacy?.status === "expired") return "The listed booth rate has expired.";
   if (legacy?.status === "unavailable") return "The listed booth rate is unavailable for this event.";
+  if (multiEventRate.test(event.vendor_cost ?? "")) return "Only a multi-event bundle price is listed.";
   if (event.outreach?.status === "contacted" ||
       (event.outreach?.status === "replied" && !event.outreach.quoted_price &&
         (event.vendor_documents?.length || /\bquote pending\b/i.test(event.outreach.notes))))

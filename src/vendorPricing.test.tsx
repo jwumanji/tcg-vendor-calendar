@@ -10,7 +10,7 @@ import { VendorPriceCue } from "./components/VendorPriceCue";
 import { mergeVendorPricing, normalizeEvents } from "./data";
 import { scoreEvent } from "./scoring";
 import { backup, emptyEntry, importVendorPricing, loadEntries, removeVendorPricingEdit, unknownIds, validateBackup } from "./storage";
-import { applicableVendorPrice, legacyVendorPrice, optionRateStatus, parseBoothCost } from "./vendorPricing";
+import { applicableVendorPrice, legacyVendorPrice, missingPriceMessage, optionRateStatus, parseBoothCost } from "./vendorPricing";
 
 const events = normalizeEvents(raw);
 const event = (id: string) => events.find((row) => row.id === id)!;
@@ -47,6 +47,16 @@ it("leaves prior-edition and expired legacy rates outside the applicable price",
   expect(legacyVendorPrice(dubai)).toMatchObject({ status: "past_year", quoteYear: 2026 });
   expect(applicableVendorPrice(dubai, now)).toBeNull();
   expect(applicableVendorPrice({ ...dubai, vendor_cost: "Expired early-bird rate: AED 500" }, now)).toBeNull();
+  expect(applicableVendorPrice({ ...dubai, vendor_cost: "AED 500 (2028)" }, now)).toBeNull();
+});
+
+it("keeps a multi-weekend bundle as reference pricing outside the single-event estimate", () => {
+  const event = { ...zub, vendor_options: [],
+    vendor_cost: "Jan + Apr bundle: S$330 standard table, S$600 L-shaped table (both events combined; organizer Instagram, 12 Nov 2026)" };
+  expect(applicableVendorPrice(event, now)).toBeNull();
+  expect(missingPriceMessage(event, now)).toBe("Only a multi-event bundle price is listed.");
+  const $ = load(renderToStaticMarkup(<VendorPriceCue event={event} now={now} />));
+  expect($(".vendor-price-cue").length).toBe(0);
 });
 
 it("keeps TCG Con Arabia's shipped December 2026 price out of 2027 commercial scoring", () => {

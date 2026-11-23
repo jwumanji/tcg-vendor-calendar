@@ -100,21 +100,42 @@ export function matches(a: Event, b: Event) {
   return sameLocation(a, b) && nearby(a, b) && similarTitles(a, b);
 }
 
+const editionNumber = (event: Event) => fold(event.name).replace(/\b20\d\d\b/g, "")
+  .match(/\b\d+(?=\b|(?:st|nd|rd|th)\b)/g)?.map(Number).join(" ");
+const namedYear = (event: Event) => event.name.match(/\b20\d\d\b/g)?.join(" ");
+const scheduleYear = (event: Event) => (event.start_date ?? event.estimated_month)?.slice(0, 4);
+
+function compatibleEditions(a: Event, b: Event) {
+  const aNumber = editionNumber(a), bNumber = editionNumber(b);
+  const aYear = namedYear(a), bYear = namedYear(b);
+  return (!aNumber || !bNumber || aNumber === bNumber) && (!aYear || !bYear || aYear === bYear);
+}
+
+function importMatch(a: Event, b: Event) {
+  if (!sameLocation(a, b) || !compatibleEditions(a, b) || !similarTitles(a, b)) return false;
+  if (nearby(a, b) || (historicalRanges(a).length > 0 &&
+    nearby({ ...a, occurrences: historicalRanges(a), estimated_month: null }, b))) return true;
+  if (a.date_status !== "tba" && b.date_status !== "tba") return false;
+  // An undated watch can be relisted without a year suffix, but a dated
+  // edition needs corroboration to avoid consuming a generic series watch.
+  const aYear = namedYear(a) ?? scheduleYear(a), bYear = namedYear(b) ?? scheduleYear(b);
+  return tokens(a.name).size > 0 && slug(a.name.replace(/\b20\d\d\b/g, "")) ===
+    slug(b.name.replace(/\b20\d\d\b/g, "")) &&
+    (a.date_status === "tba" && b.date_status === "tba" || !!aYear && aYear === bYear);
+}
+
 function scannerReschedule(old: Event, next: Event) {
-  if (!city(old) || city(old) !== city(next) || !sameLocation(old, next)) return false;
+  if (!city(old) || city(old) !== city(next) || !sameLocation(old, next) || !compatibleEditions(old, next)) return false;
   if ([old, next].some((event) => event.section === "recurring_sg" || event.occurrences?.length)) return false;
-  const edition = (event: Event) => event.name.match(/\b\d+\b/g)?.join(" ");
-  const previousEdition = edition(old), nextEdition = edition(next);
-  if (previousEdition && nextEdition && previousEdition !== nextEdition) return false;
-  const oldStart = old.start_date ?? (old.estimated_month && old.estimated_month + "-15");
-  const nextStart = next.start_date ?? (next.estimated_month && next.estimated_month + "-15");
-  const movedWithinSeason = oldStart && nextStart && Math.abs(stamp(oldStart) - stamp(nextStart)) <= 90 * day;
-  if (similarTitles(old, next) && (movedWithinSeason || (previousEdition && previousEdition === nextEdition))) return true;
-  // Dedicated listing links can corroborate a larger move or a rewritten title.
+  const sameNumber = editionNumber(old) && editionNumber(old) === editionNumber(next);
+  const retainedYear = namedYear(old) && namedYear(old) === namedYear(next) && scheduleYear(old) !== scheduleYear(next);
+  if (similarTitles(old, next) && (sameNumber || retainedYear)) return true;
+  // A shared dated listing can corroborate a move even with a rewritten title.
   return [old.website, ...(old.source_urls ?? [])].some((link) => {
     if (!link || !URL.canParse(link)) return false;
     const url = new URL(link);
-    return /\b20\d\d\b/.test(url.pathname) && (next.website === link || next.source_urls?.includes(link));
+    return /(?:^|[/_-])20\d\d(?:$|[./_-])/.test(url.pathname) &&
+      (next.website === link || next.source_urls?.includes(link));
   });
 }
 
@@ -192,45 +213,54 @@ export interface ImportRow {
 
 function reconcileScanner(existing: Event[], imported: Event[]) {
   const byId = new Map(existing.map((event) => [event.id, event]));
-  const byExportId = new Map(
-    existing.flatMap((event) => event.scanner_export_id
-      ? [[event.scanner_export_id, event] as const]
-      : []),
-  );
-  const importedIds = new Set(imported.map((event) => event.id));
-  const matched = imported.map((event) => {
-    const alias = byExportId.get(event.id);
-    return byId.get(event.id) ?? (alias && !importedIds.has(alias.id) ? alias : undefined);
-  });
-  const used = new Set(matched.filter(Boolean));
-  const unmatched = existing.filter((event) => !used.has(event));
-  const candidates = imported.map((event, index) => {
-    if (matched[index]) return [];
-    const near = unmatched.filter((old) => matches(event, old));
+  const claims = imported.map((event) => {
+    const direct = byId.get(event.id);
+    if (direct) return { event, priority: 0, candidates: [direct] };
+    const aliases = existing.filter((old) => old.scanner_export_id === event.id);
+    if (aliases.length) return { event, priority: 1, candidates: aliases };
+    const near = existing.filter((old) => importMatch(old, event));
     const activeNear = near.filter((old) => !old.scanner_archived);
-    if (activeNear.length) return activeNear;
-    const moved = unmatched.filter((old) => !old.scanner_archived &&
+    const exact = activeNear.filter((old) => ranges(old).some((range) =>
+      ranges(event).some((other) => sameRange(range, other))));
+    if (exact.length) return { event, priority: 2, candidates: exact };
+    if (activeNear.length) return { event, priority: 3, candidates: activeNear };
+    if (near.length) return { event, priority: 4, candidates: near };
+    const moved = existing.filter((old) => !old.scanner_archived &&
       (!old.source || hasSharedPlanning(old)) && scannerReschedule(old, event));
-    return moved.length ? moved : near;
+    return { event, priority: 5, candidates: moved };
   });
   const matchedRows = new Map<Event, Event>();
   const added: Event[] = [];
   const conflicts: ImportConflict[] = [];
   let fieldsFilled = 0;
-  const rows = imported.map<ImportRow>((incoming, index) => {
-    const [candidate] = candidates[index];
-    // Keep the planner ID so event links, seed log entries and local patches still resolve.
-    const previous = matched[index] ?? (
-      candidates[index].length === 1 &&
-      !candidates.some((rows, other) => other !== index && rows.includes(candidate))
-        ? candidate : undefined
-    );
+  const rows: ImportRow[] = [];
+  const selected = new Map<Event, Event>();
+  for (const { event, candidates } of [...claims].sort((a, b) => a.priority - b.priority)) {
+    if (candidates.length === 1 && !selected.has(candidates[0])) selected.set(candidates[0], event);
+  }
+  for (const { event: incoming, candidates } of claims) {
+    const [previous] = candidates;
+    const duplicate = previous
+      ? selected.get(previous) !== incoming && previous
+      : added.find((event) => importMatch(event, incoming));
+    if (candidates.length > 1) {
+      conflicts.push({ event_id: previous.id, export_id: incoming.id, field: "id",
+        curated: candidates.map((event) => event.id), incoming: incoming.id, reason: "ambiguous event match" });
+      continue;
+    }
+    if (duplicate) {
+      conflicts.push({ event_id: duplicate.id, export_id: incoming.id, field: "id",
+        curated: duplicate.id, incoming: incoming.id, reason: "duplicate export listing" });
+      continue;
+    }
     const { scanner_export_id: _exportId, scanner_archived: _archived,
       source: _source, is_new_find: _newFind, ...fields } = incoming;
     if (!previous) {
       added.push(fields);
-      return { event: fields, incoming };
+      rows.push({ event: fields, incoming });
+      continue;
     }
+    // Keep the planner ID so event links, seed log entries and local patches still resolve.
     const event = { ...previous };
     // An export match takes ownership from the live scraper while keeping its planner data.
     if (previous.source) {
@@ -272,8 +302,8 @@ function reconcileScanner(existing: Event[], imported: Event[]) {
     const updated = { ...event, ...Object.fromEntries(fills) };
     fieldsFilled += fills.length;
     matchedRows.set(previous, updated);
-    return { event: updated, previous, incoming };
-  });
+    rows.push({ event: updated, previous, incoming });
+  }
   return {
     scanner: [...existing.flatMap((event) => {
       const matched = matchedRows.get(event);
@@ -302,7 +332,7 @@ export function merge(
     old: existing.filter((e) => e.source),
   };
   const retained = old.filter(
-    (e) => hasSharedPlanning(e) || !scanner.some((s) => s.id === e.id || matches(s, e)),
+    (e) => hasSharedPlanning(e) || !scanner.some((s) => s.id === e.id || importMatch(e, s)),
   );
   function samePlace(a: Event, b: Event) {
     return (!a.city || !b.city || fold(a.city) === fold(b.city)) &&
@@ -328,7 +358,7 @@ export function merge(
     // The Singapore Card Show can change its title while keeping the same
     // dates and booking form. Match the title separately in the caller.
     return a.source!.id === "sg-card-show" && b.source!.id === "sg-card-show" &&
-      a.vendor_application === b.vendor_application && !!a.start_date &&
+      !!a.vendor_application && a.vendor_application === b.vendor_application && !!a.start_date &&
       a.start_date === b.start_date && a.end_date === b.end_date;
   }
   function announced(stored: Event, listing: Event) {
@@ -404,7 +434,7 @@ export function merge(
     a.id.localeCompare(b.id));
   for (const event of orderedIncoming) {
     const owner = event.source!.id;
-    const scannerMatch = scanner.some((s) => s.id === event.id || matches(s, event));
+    const scannerMatch = scanner.some((s) => s.id === event.id || importMatch(s, event));
     const rows = claims.get(event)!;
     if (rows.length > 1 || rows.some((row) => incoming.some((other) => other !== event &&
         other.source!.id === owner && claims.get(other)!.includes(row)))) {
@@ -442,6 +472,7 @@ export function merge(
           logo: event.logo ?? earlier.logo,
           logo_kind: event.logo ? event.logo_kind : earlier.logo_kind,
           description: event.description ?? earlier.description,
+          vendor_score: earlier.vendor_score ?? event.vendor_score,
           verification: earlier.verification === "verified" ? "verified" : event.verification,
           source: {
             ...earlier.source!,
@@ -523,7 +554,6 @@ export function merge(
   // The scanner cannot read browser storage. Keep the last listing for any plans
   // attached to a removed ID, without putting that listing back in the calendar.
   const activeIds = new Set(ordered.map((event) => event.id));
-  const activeSourceIds = new Set(active.map((event) => event.id));
   const archived = new Map<string, Event>();
   for (const event of [...existing, ...retained]) {
     if (!activeIds.has(event.id)) archived.set(event.id, { ...event, scanner_archived: true });
@@ -536,6 +566,6 @@ export function merge(
     applied,
     unmatched,
     ambiguous,
-    removed: existing.filter((e) => e.source && !e.scanner_archived && !activeSourceIds.has(e.id)).length,
+    removed: existing.filter((e) => e.source && !e.scanner_archived && !activeIds.has(e.id)).length,
   };
 }

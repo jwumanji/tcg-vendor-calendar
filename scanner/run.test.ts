@@ -81,6 +81,7 @@ it("records import conflicts and scraper warnings, fills a logo, and performs re
     const args = ["--import-scanner", join(dir, "export/events.json")];
     const first = run(args, false, outreach.notes);
     expect(first.status, first.stderr).toBe(0);
+    expect(first.stderr).toContain("Warning from sg-card-show: Missing event name in public HTML");
     const report = JSON.parse(read("scanner/last-run.json"));
     expect(
       report.sources.filter((s: { status: string }) => s.status === "FAILED"),
@@ -178,6 +179,7 @@ it("rejects tiny and placeholder art and only installs valid logos when curated 
       create: { width: 512, height: 512, channels: 3, background: "#caff47" },
     }).webp().toBuffer();
     writeFileSync(logo("protected.webp"), curated);
+    writeFileSync(logo("existing-tiny.webp"), tiny);
     const exports = [
       event("protected-same-path", "protected.webp"),
       event("protected-new-path", "unused.webp"),
@@ -187,6 +189,7 @@ it("rejects tiny and placeholder art and only installs valid logos when curated 
       event("new-tiny", "small.webp"),
       event("new-placeholder", "generic-placeholder.webp"),
       event("new-blank", "flat.webp"),
+      event("local-collision", "existing-tiny.webp"),
     ];
     put("export/events.json", exports);
     for (const item of exports) {
@@ -198,26 +201,29 @@ it("rejects tiny and placeholder art and only installs valid logos when curated 
     const result = spawnSync(process.execPath, ["--import", stub, entry, "--import-scanner", "export/events.json"],
       { cwd: dir, encoding: "utf8" });
     expect(result.status, result.stderr).toBe(0);
-    expect(result.stdout).toContain("Scanner import: 4 added");
+    expect(result.stdout).toContain("Scanner import: 5 added");
     expect(readFileSync(logo("protected.webp"))).toEqual(curated);
-    for (const name of ["restore.webp", "restored-reference.webp", "good.webp"])
+    expect(readFileSync(logo("existing-tiny.webp"))).toEqual(tiny);
+    for (const name of ["restore.webp", "good.webp"])
       expect(readFileSync(logo(name))).toEqual(larger);
-    for (const name of ["unused.webp", "small.webp", "generic-placeholder.webp", "flat.webp"])
+    for (const name of ["unused.webp", "restored-reference.webp", "small.webp", "generic-placeholder.webp", "flat.webp"])
       expect(existsSync(logo(name))).toBe(false);
     const output = JSON.parse(readFileSync(join(dir, "data/events.json"), "utf8")) as Event[];
     expect(output.map(({ logo }) => logo)).toEqual([
       "logos/protected.webp", "logos/protected.webp", "logos/restore.webp",
-      "logos/restored-reference.webp", "logos/good.webp", null, null, null,
+      "logos/missing.webp", "logos/good.webp", null, null, null, null,
     ]);
-    expect(output.slice(-3).every(({ logo_kind }) => logo_kind === null)).toBe(true);
+    expect(output.slice(-4).every(({ logo_kind }) => logo_kind === null)).toBe(true);
     const report = JSON.parse(readFileSync(join(dir, "scanner/last-run.json"), "utf8"));
-    expect(report.import).toMatchObject({ new_count: 4, logos_added: 3, logos_rejected: 5 });
+    expect(report.import).toMatchObject({ new_count: 5, logos_added: 2, logos_rejected: 7 });
     expect(report.import.logo_rejections).toEqual([
       expect.objectContaining({ event_id: "protected-same-path", reason: "existing logo file kept" }),
       expect.objectContaining({ event_id: "protected-new-path", reason: expect.stringContaining("curated logo kept") }),
+      expect.objectContaining({ event_id: "restore-reference", reason: "existing curated logo kept (logos/missing.webp)" }),
       expect.objectContaining({ event_id: "new-tiny", reason: expect.stringContaining("64px") }),
       expect.objectContaining({ event_id: "new-placeholder", reason: "placeholder filename" }),
       expect.objectContaining({ event_id: "new-blank", reason: "blank or single-colour image" }),
+      expect.objectContaining({ event_id: "local-collision", reason: expect.stringContaining("existing logo file kept but unusable") }),
     ]);
   } finally {
     rmSync(dir, { recursive: true, force: true });

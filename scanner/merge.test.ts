@@ -215,7 +215,7 @@ it("adds an unmatched record and keeps an omitted record and curated contact on 
   });
   const previous = scanner({ outreach, vendor_cost: "Old cost", contact: "old@example.com" });
   const imported = scanner({ vendor_cost: "New cost", contact: "new@example.com" });
-  const foreign = scanner({ id: "different", outreach });
+  const foreign = scanner({ id: "different", name: "Collectors Weekend", outreach });
   const missing = scanner({ id: "removed", name: "Other tracked event", outreach });
   const { events, scannerImport } = merge([previous, missing], [], today, [imported, foreign]);
   expect(events).toEqual([
@@ -329,9 +329,11 @@ it("keeps seeded finds after their dates pass, including when a Scanner row repl
   expect(merge([promoted], [], today, [imported]).events).toEqual([promoted]);
   const rescheduled = { ...imported, start_date: "2027-02-01", end_date: "2027-02-02" };
   expect(merge([promoted], [], today, [rescheduled]).events).toEqual([promoted]);
-  expect(merge([promoted], [], today, [imported, { ...imported, id: saved.id }]).events).toEqual([
-    promoted, imported,
-  ]);
+  const duplicated = merge([promoted], [], today, [imported, { ...imported, id: saved.id }]);
+  expect(duplicated.events).toEqual([promoted]);
+  expect(duplicated.scannerImport?.conflicts).toContainEqual(expect.objectContaining({
+    event_id: saved.id, export_id: imported.id, field: "id", reason: "duplicate export listing",
+  }));
 });
 
 it("retains the original calendar UID when an import matches a rescheduled scraper find", () => {
@@ -346,10 +348,49 @@ it("retains the original calendar UID when an import matches a rescheduled scrap
 
 it("never assigns saved outreach to an ambiguous Scanner replacement", () => {
   const saved = find({ outreach: mergeOutreach(null, { notes: "Keep this note" }) });
-  const exportRows = [scanner(), scanner({ id: "second" })];
-  const { events } = merge([saved], [], today, exportRows);
-  expect(events).toHaveLength(3);
-  expect(events.filter((event) => event.outreach)).toEqual([saved]);
+  const another = find({ id: "other-city", city: "Other city" });
+  const { events, scannerImport } = merge([saved, another], [], today, [scanner({ city: null })]);
+  expect(events).toEqual([another, saved]);
+  expect(scannerImport?.added).toEqual([]);
+  expect(scannerImport?.conflicts).toContainEqual(expect.objectContaining({
+    curated: [saved.id, another.id], reason: "ambiguous event match",
+  }));
+});
+
+it("deduplicates renamed export rows while retaining separate weekends and editions", () => {
+  const january = scanner({ id: "january", name: "NEXUS Tradeshow (Suntec edition)",
+    start_date: "2027-01-23", end_date: "2027-01-24" });
+  const march = { ...january, id: "march", name: "NEXUS Tradeshow (Suntec, March edition)",
+    start_date: "2027-03-27", end_date: "2027-03-28" };
+  const duplicate = { ...march, id: "other-slug", name: "NEXUS Tradeshow 2027" };
+  const { events, scannerImport } = merge([january], [], today, [march, duplicate]);
+  expect(events).toEqual([january, march]);
+  expect(scannerImport?.conflicts).toContainEqual(expect.objectContaining({
+    event_id: march.id, export_id: duplicate.id, reason: "duplicate export listing",
+  }));
+  expect(merge(events, [], today, [duplicate, march]).events).toEqual(events);
+
+  const third = scanner({ name: "Card Con #3" });
+  const fourth = scanner({ id: "fourth", name: "Card Con #4" });
+  expect(merge([third], [], today, [fourth]).events).toEqual([third, fourth]);
+});
+
+it("deduplicates undated watch listings with a renamed ID while keeping distinct calendar years and locations", () => {
+  const watch = scanner({ name: "Kyo Cards Con 2027", date_status: "tba",
+    start_date: null, end_date: null, section: "watchlist" });
+  const alias = { ...watch, id: "alias", name: "Kyo Cards Con" };
+  const otherYear = { ...watch, id: "other-year", name: "Kyo Cards Con 2028" };
+  const otherCity = { ...alias, id: "other-city", city: "Other city" };
+  const { events, scannerImport } = merge([watch], [], today, [alias, otherYear, otherCity]);
+  expect(events).toMatchObject([{ id: watch.id, scanner_export_id: alias.id }, otherYear, otherCity]);
+  expect(scannerImport?.added).toEqual([otherYear, otherCity]);
+});
+
+it("rejects an invalid recurring range before it can be silently dropped", () => {
+  expect(() => validate([scanner({ occurrences: [
+    { start_date: "2026-12-12", end_date: "2026-12-13" },
+    { start_date: "2027-02-30", end_date: "2027-03-01" },
+  ] })])).toThrow(/Invalid event output/);
 });
 it("retains unlisted finds through day 30 after the end, including confirmed multi-day shows", () => {
   expect(merge([base], [], "2027-01-12").events).toEqual([base]);

@@ -46,40 +46,47 @@ export function WeeklyDigest({
       className="digest-dialog" returnFocus={returnFocus}>
       <div className="digest-content">
         <section aria-labelledby="digest-review-title">
-          <div className="digest-section-head">
-            <h3 id="digest-review-title">Since last review</h3>
-            <button type="button" className="button" onClick={markReviewed}>Mark reviewed</button>
-          </div>
+          <h3 id="digest-review-title">Since last review</h3>
           <div className="digest-review-status" role="status">
             {review.error && <p>{review.error}</p>}
             {review.checkpoint ? (
               <p>Last reviewed <time dateTime={review.checkpoint.reviewedAt}>
                 {reviewDate.format(new Date(review.checkpoint.reviewedAt))}
               </time> Saigon · Data from {prettyDate(review.checkpoint.snapshotDate)}</p>
-            ) : <p>Mark reviewed to use the {prettyDate(snapshotDate)} data as your baseline on this device.</p>}
+            ) : (
+              <>
+                <p><strong>No baseline yet.</strong> Mark reviewed to start tracking changes from today.</p>
+                <p>Current data from {prettyDate(snapshotDate)}. Your review is saved on this device.</p>
+              </>
+            )}
             {review.checkpoint && !changes.length && <p>No published changes since your last review.</p>}
           </div>
           {changes.length > 0 && (
             <ul className="digest-list" aria-label="Changed events">
-              {changes.map(({ id, name, listing, fields }) => (
+              {changes.map(({ id, name, summary, fields }) => (
                 <li key={id} className="digest-item">
                   <h4>{eventLink(id, name)}</h4>
-                  {listing && <p className="digest-listing">{listing}</p>}
-                  <dl className="digest-changes">
-                    {fields.map(({ key, label, previous, current }) => (
-                      <div key={key} className="digest-change">
-                        <dt>{label}</dt>
-                        <dd>
-                          <div><strong>Previous</strong><ChangeValue lines={previous} /></div>
-                          <div><strong>Current</strong><ChangeValue lines={current} /></div>
-                        </dd>
-                      </div>
-                    ))}
-                  </dl>
+                  {summary && <p className="digest-listing">{summary}</p>}
+                  {fields.length > 0 && (
+                    <dl className="digest-changes">
+                      {fields.map(({ key, label, previous, current }) => (
+                        <div key={key} className="digest-change">
+                          <dt>{label}</dt>
+                          <dd>
+                            <div><strong>Previous</strong><ChangeValue lines={previous} /></div>
+                            <div><strong>Current</strong><ChangeValue lines={current} /></div>
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                  )}
                 </li>
               ))}
             </ul>
           )}
+          <div className="digest-review-action">
+            <button type="button" className="button" onClick={markReviewed}>Mark reviewed</button>
+          </div>
         </section>
         <section aria-labelledby="digest-week-title">
           <h3 id="digest-week-title">Next 7 days</h3>
@@ -116,24 +123,6 @@ export function WeeklyDigest({
               </ul>
             </div>
           ))}
-          {actions.sourceChecks.length > 0 && (
-            <details className="digest-sources">
-              <summary>Vendor notices to check ({actions.sourceChecks.length})</summary>
-              <ul className="digest-list">
-                {actions.sourceChecks.map(({ event, id, label, detail, href }) => (
-                  <li className="digest-item digest-deadline" key={JSON.stringify([event.id, id])}>
-                    <div>
-                      <h4>{eventLink(event.id, event.name)}</h4>
-                      <p>{label}</p>
-                      {detail && <p className="digest-note">{detail}</p>}
-                    </div>
-                    {href && <a className="button" href={href}
-                      target="_blank" rel="noreferrer" aria-label={`Check source for ${event.name}: ${label}`}>Check source</a>}
-                  </li>
-                ))}
-              </ul>
-            </details>
-          )}
         </section>
         <section aria-labelledby="digest-follow-up-title">
           <h3 id="digest-follow-up-title">Due and overdue follow-ups</h3>
@@ -149,6 +138,27 @@ export function WeeklyDigest({
             </ul>
           )}
         </section>
+        {actions.sourceChecks.length > 0 && (
+          <details className="digest-sources">
+            <summary>Vendor notices to check ({actions.sourceChecks.length})</summary>
+            <ul className="digest-source-list">
+              {actions.sourceChecks.map(({ event, id, detail, href }) => (
+                <li className="digest-source" key={JSON.stringify([event.id, id])}>
+                  <h4>{eventLink(event.id, event.name)}</h4>
+                  {href && <a className="digest-source-link" href={href}
+                    target="_blank" rel="noreferrer" aria-label={`Check source for ${event.name}`}>Check source</a>}
+                  <details className="digest-source-notice">
+                    <summary>
+                      <span className="digest-source-preview">{detail}</span>
+                      <span className="digest-source-hide">Hide notice</span>
+                    </summary>
+                    <p>{detail}</p>
+                  </details>
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
       </div>
     </Modal>
   );

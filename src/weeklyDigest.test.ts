@@ -83,13 +83,36 @@ describe("published changes", () => {
     const before = review([event("one", { venue: "Hall A", vendor_cost: "SGD 300" })]);
     const changed = event("one", { start_date: "2027-01-16", venue: "Hall B", vendor_cost: "SGD 350" });
     expect(digestChanges(before, snapshot([changed]))).toEqual([{
-      id: "one", name: "one", listing: undefined, fields: [
+      id: "one", name: "one", summary: undefined, fields: [
         { key: "dates", label: "Event dates", previous: ["9 Jan 2027"], current: ["16 Jan 2027"] },
         { key: "venue", label: "Venue", previous: ["Hall A"], current: ["Hall B"] },
         { key: "vendor_cost", label: "Vendor cost", previous: ["SGD 300"], current: ["SGD 350"] },
       ],
     }]);
     expect(digestChanges(before, snapshot([changed], "2026-11-25"))).toHaveLength(1);
+  });
+
+  it.each(["11/12/2026 - 13/12/2026", "12/11/2026 – 12/13/2026", "2026-12-11 / 2026-12-13"])(
+    "ignores the numeric date note %s when it restates the published dates",
+    (date_note) => {
+      const first = event("one", { start_date: "2026-12-11", end_date: "2026-12-13", date_note });
+      const next = event("one", { start_date: "2026-12-18", end_date: "2026-12-20", date_note: "18/12/2026 - 20/12/2026" });
+      const storage = memoryStorage();
+      saveDigestCheckpoint(snapshot([first]), storage);
+      const { checkpoint } = loadDigestCheckpoint(storage);
+      expect(digestChanges(checkpoint, snapshot([next]))[0].fields).toEqual([
+        { key: "dates", label: "Event dates", previous: ["11–13 Dec 2026"], current: ["18–20 Dec 2026"] },
+      ]);
+    },
+  );
+
+  it("keeps date notes with extra information or a range that disagrees with the published dates", () => {
+    const first = event("one", { start_date: "2026-12-11", end_date: "2026-12-13",
+      date_note: "11/12/2026 - 13/12/2026, doors at 10:00" });
+    const next = { ...first, date_note: "11/12/2026 - 12/12/2026" };
+    expect(digestChanges(review([first]), snapshot([next]))[0].fields).toEqual([
+      { key: "date-note", label: "Date note", previous: [first.date_note], current: [next.date_note] },
+    ]);
   });
 
   it("ignores record and nested list order, metadata date bumps and equivalent timed values", () => {
@@ -140,9 +163,9 @@ describe("published changes", () => {
       event("postpone", { event_status: "postponed", date_status: "estimated", estimated_month: "2027-04" }), event("relist"),
     ]);
     const changes = digestChanges(previous, current);
-    expect(changes.map(({ id, listing }) => [id, listing])).toEqual([
-      ["add", "Added"], ["archive", "Archived"], ["cancel", undefined], ["postpone", undefined],
-      ["relist", "Relisted"], ["remove", "Removed from the data"],
+    expect(changes.map(({ id, summary }) => [id, summary])).toEqual([
+      ["add", "New event · 9 Jan 2027"], ["archive", "Archived"], ["cancel", undefined], ["postpone", undefined],
+      ["relist", "Relisted · 9 Jan 2027"], ["remove", "Removed from the data · 9 Jan 2027"],
     ]);
     expect(changes[1].fields).toEqual([
       { key: "listing", label: "Listing", previous: ["Active listing"], current: ["Archived listing"] },
@@ -154,17 +177,30 @@ describe("published changes", () => {
       { key: "status", label: "Event status", previous: [], current: ["Postponed"] },
       { key: "month", label: "Estimated month", previous: [], current: ["April 2027"] },
     ]));
-    expect(changes[5].fields.flatMap(({ current }) => current)).toEqual([]);
+    for (const index of [0, 4, 5]) expect(changes[index].fields).toEqual([]);
   });
 
   it("reports a newly shipped archived listing as an addition with its archived state", () => {
     const archived = event("archive", { scanner_archived: true, date_status: "tba", start_date: null });
     const [change] = digestChanges(review([]), snapshot([archived]));
-    expect(change.listing).toBe("Added");
-    expect(change.fields).toEqual([
-      { key: "listing", label: "Listing", previous: [], current: ["Archived listing"] },
-      { key: "date-status", label: "Date status", previous: [], current: ["To be announced"] },
-    ]);
+    expect(change.summary).toBe("New event · To be announced · Archived listing");
+    expect(change.fields).toEqual([]);
+  });
+
+  it("summarizes listing changes with known dates and location while keeping meaningful edits on a relisted event", () => {
+    const show = event("show", { start_date: "2026-12-11", end_date: "2026-12-13",
+      city: "Wan Chai", country: "Hong Kong", venue: "Hall B" });
+    expect(digestChanges(review([]), snapshot([show]))[0]).toMatchObject({
+      summary: "New event · 11–13 Dec 2026 · Wan Chai, Hong Kong", fields: [],
+    });
+    expect(digestChanges(review([show]), snapshot([]))[0]).toMatchObject({
+      summary: "Removed from the data · 11–13 Dec 2026 · Wan Chai, Hong Kong", fields: [],
+    });
+    const archived: Event = { ...show, scanner_archived: true, venue: "Hall A" };
+    expect(digestChanges(review([archived]), snapshot([show]))[0]).toMatchObject({
+      summary: "Relisted · 11–13 Dec 2026 · Wan Chai, Hong Kong",
+      fields: [{ key: "venue", label: "Venue", previous: ["Hall A"], current: ["Hall B"] }],
+    });
   });
 
   it("includes published terms and local-currency price changes while excluding quotes, FX and correspondence", () => {
@@ -291,6 +327,20 @@ describe("live weekly actions", () => {
     expect(sourceChecks.map(({ event, detail, href }) => [event.id, detail, href])).toEqual([
       ["multiple-terms", notice, shared.website],
       ["postponed", "Vendor applications are on hold", shared.website],
+    ]);
+  });
+
+  it("filters standalone placeholder notices and retains notices with published context", () => {
+    const website = "https://example.com/vendors";
+    const context = "Not published for 2027. Official copy says limited partnership slots.";
+    const { sourceChecks } = digestActions([
+      event("uncaptured", { website, vendor_deadline: "Not captured" }),
+      event("unpublished", { website, vendor_deadline: "Not published for 2027." }),
+      event("edition", { website, vendor_deadline: "Not published for a 2027 edition" }),
+      event("has-context", { website, vendor_deadline: context }),
+    ], now);
+    expect(sourceChecks.map(({ event, detail, href }) => [event.id, detail, href])).toEqual([
+      ["has-context", context, website],
     ]);
   });
 

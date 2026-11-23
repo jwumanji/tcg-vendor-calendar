@@ -652,6 +652,10 @@ export default function App() {
           <BrandLockup />
         </a>
         <div className="header-right">
+          <button type="button" className="button digest-trigger" ref={digestTrigger}
+            aria-haspopup="dialog" aria-label="Weekly digest" onClick={() => setDigestOpen(true)}>
+            <CalendarDays size={17} aria-hidden="true" /> <span>Weekly digest</span>
+          </button>
           <button
             className="icon-button"
             aria-label="Toggle light and dark theme"
@@ -759,12 +763,6 @@ export default function App() {
               <OutreachFollowUps events={activeEvents} today={today} focusFallback={workspaceHeading}
                 bannerExpanded={followUpsExpanded} toggle={() => applyListPreferences({ followUpsExpanded: !followUpsExpanded })}
                 open={(event, returnFocus) => open(event, undefined, returnFocus)} />
-              <div className="digest-launch">
-                <button type="button" className="button" ref={digestTrigger} aria-haspopup="dialog"
-                  onClick={() => setDigestOpen(true)}>
-                  <CalendarDays size={17} aria-hidden="true" /> Weekly digest
-                </button>
-              </div>
             </>
           )}
           {filters.going && (

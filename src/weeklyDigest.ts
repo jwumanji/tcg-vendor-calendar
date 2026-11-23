@@ -219,12 +219,44 @@ export function saveDigestCheckpoint(snapshot: DigestSnapshot, storage?: Pick<St
 }
 
 type Change = { key: string; label: string; previous: string[]; current: string[] };
-type DigestChange = { id: string; name: string; listing?: string; fields: Change[] };
+type DigestChange = { id: string; name: string; summary?: string; fields: Change[] };
 
 const dateStatusLabel = { confirmed: "Confirmed", estimated: "Estimated", tba: "To be announced" };
 const eventStatusLabel = { cancelled: "Cancelled", postponed: "Postponed" };
-const listingLabel = (event?: PublishedEvent) =>
-  event && (event.archived ? "Archived listing" : "Active listing");
+const listingLabel = (event: PublishedEvent) => event.archived ? "Archived listing" : "Active listing";
+const status = (event: PublishedEvent) => event.eventStatus && eventStatusLabel[event.eventStatus];
+const month = (event: PublishedEvent) => event.estimatedMonth && monthLabel(event.estimatedMonth);
+const location = (event: PublishedEvent) => [event.city, event.country].filter(Boolean).join(", ") || null;
+const rangeLabel = (range: EventDateRange) => formatDateRange(range.start_date, range.end_date);
+
+function listingSummary(listing: string, event: PublishedEvent) {
+  const [first, second] = event.dates;
+  const estimate = event.dateStatus === "estimated" && month(event);
+  const dates = estimate ? `${estimate} (estimated)`
+    : second ? `${event.dates.length} published occurrences`
+    : first ? rangeLabel(first)
+    : event.dateStatus !== "confirmed" ? dateStatusLabel[event.dateStatus] : null;
+  return [listing, dates, location(event) ?? first?.venue ?? event.venue, status(event),
+    event.archived && listingLabel(event)].filter(Boolean).join(" · ");
+}
+
+const numericDate = String.raw`(?:\d{4}-\d{2}-\d{2}|\d{1,2}[./-]\d{1,2}[./-]\d{4})`;
+const numericDateNote = new RegExp(`^(${numericDate})(?:\\s*(?:[-–—/]|\\bto\\b)\\s*(${numericDate}))?$`, "i");
+
+function dateNote({ dateNote, dates }: PublishedEvent) {
+  if (!dateNote || !dates.length) return dateNote;
+  const match = dateNote.match(numericDateNote);
+  if (!match) return dateNote;
+  const [, start, end = start] = match;
+  function matchesDate(text: string, iso: string, monthFirst: boolean) {
+    if (text === iso) return true;
+    const [first, second, year] = text.split(/[./-]/).map(Number);
+    const [isoYear, isoMonth, isoDay] = iso.split("-").map(Number);
+    return year === isoYear && first === (monthFirst ? isoMonth : isoDay) && second === (monthFirst ? isoDay : isoMonth);
+  }
+  return dates.some(({ start_date, end_date }) => [false, true].some((monthFirst) =>
+    matchesDate(start, start_date, monthFirst) && matchesDate(end, end_date, monthFirst))) ? null : dateNote;
+}
 
 function datesByRange(dates: EventDateRange[]) {
   const byRange = new Map<string, EventDateRange[]>();
@@ -242,55 +274,50 @@ function occurrenceVenues(dates: EventDateRange[], fallback?: string | null) {
   return [...new Set(venues)].sort((a, b) => a.localeCompare(b));
 }
 
-function collectChanges(previous?: PublishedEvent, current?: PublishedEvent): Change[] {
+function collectChanges(previous: PublishedEvent, current: PublishedEvent): Change[] {
   const fields: Change[] = [];
   const lines = (value?: string | string[] | null) => typeof value === "string" ? [value] : value ?? [];
   const compare = (key: string, label: string, before?: string | string[] | null, after?: string | string[] | null) => {
     const previous = lines(before), current = lines(after);
     if (JSON.stringify(previous) !== JSON.stringify(current)) fields.push({ key, label, previous, current });
   };
-  const rangeLabel = (range: EventDateRange) => formatDateRange(range.start_date, range.end_date);
-  const schedule = (event?: PublishedEvent) => event && dateStatusLabel[event.dateStatus];
-  const status = (event?: PublishedEvent) => event?.eventStatus && eventStatusLabel[event.eventStatus];
-  const month = (event?: PublishedEvent) => event?.estimatedMonth && monthLabel(event.estimatedMonth);
-  const location = (event?: PublishedEvent) => [event?.city, event?.country].filter(Boolean).join(", ") || null;
-
-  compare("listing", "Listing", listingLabel(previous), listingLabel(current));
+  if (!previous.archived && current.archived)
+    compare("listing", "Listing", listingLabel(previous), listingLabel(current));
   compare("status", "Event status", status(previous), status(current));
-  compare("date-status", "Date status", schedule(previous), schedule(current));
-  const oldDates = previous?.dates ?? [], newDates = current?.dates ?? [];
+  compare("date-status", "Date status", dateStatusLabel[previous.dateStatus], dateStatusLabel[current.dateStatus]);
+  const oldDates = previous.dates, newDates = current.dates;
   const oldRanges = datesByRange(oldDates), newRanges = datesByRange(newDates);
-  const recurring = previous?.recurring || current?.recurring;
+  const recurring = previous.recurring || current.recurring;
   const removedDates = oldDates.filter((range) => !newRanges.has(occurrenceKey(range)));
   const addedDates = newDates.filter((range) => !oldRanges.has(occurrenceKey(range)));
   const datesWithVenue = (range: EventDateRange) => [rangeLabel(range), range.venue].filter(Boolean).join(" · ");
   compare("dates", recurring ? "Recurring dates" : "Event dates",
     [...new Set(removedDates.map(datesWithVenue))], [...new Set(addedDates.map(datesWithVenue))]);
   compare("month", "Estimated month", month(previous), month(current));
-  compare("date-note", "Date note", previous?.dateNote, current?.dateNote);
+  compare("date-note", "Date note", dateNote(previous), dateNote(current));
   compare("location", "City and country", location(previous), location(current));
-  compare("venue", "Venue", previous?.venue, current?.venue);
+  compare("venue", "Venue", previous.venue, current.venue);
   for (const [key, oldOccurrences] of oldRanges) {
     const newOccurrences = newRanges.get(key);
     if (!newOccurrences || ![...oldOccurrences, ...newOccurrences].some(({ venue }) => venue)) continue;
     compare(`venue-${key}`, `Venue for ${rangeLabel(oldOccurrences[0])}`,
-      occurrenceVenues(oldOccurrences, previous?.venue), occurrenceVenues(newOccurrences, current?.venue));
+      occurrenceVenues(oldOccurrences, previous.venue), occurrenceVenues(newOccurrences, current.venue));
   }
-  for (const key of termKeys) compare(key, termLabels[key], previous?.terms[key], current?.terms[key]);
+  for (const key of termKeys) compare(key, termLabels[key], previous.terms[key], current.terms[key]);
 
   function compareRecords(group: string, label: string, oldRecords: VendorTerms[] = [], newRecords: VendorTerms[] = []) {
     const before = new Map(oldRecords.map(({ id, lines }) => [id, lines]));
     const after = new Map(newRecords.map(({ id, lines }) => [id, lines]));
     for (const id of new Set([...before.keys(), ...after.keys()])) compare(`${group}-${id}`, label, before.get(id), after.get(id));
   }
-  const milestoneRecords = (event?: PublishedEvent) => event?.milestones.map((m) => ({
+  const milestoneRecords = (event: PublishedEvent) => event.milestones.map((m) => ({
     id: m.id,
     lines: [m.label, ...milestoneTimes(m, true), `${milestoneTypeLabels[m.type]} · ${m.timeZone}`,
       ...(m.verified ? [] : ["Unverified date"]), ...(m.notes ? [m.notes] : []), `Source · ${m.source}`],
   }));
   compareRecords("milestone", "Booking milestone", milestoneRecords(previous), milestoneRecords(current));
-  compareRecords("price", "Published booth option", previous?.prices, current?.prices);
-  compareRecords("document", "Public vendor document", previous?.documents, current?.documents);
+  compareRecords("price", "Published booth option", previous.prices, current.prices);
+  compareRecords("document", "Public vendor document", previous.documents, current.documents);
   return fields;
 }
 
@@ -300,13 +327,15 @@ export function digestChanges(previous: DigestCheckpoint | null, current: Digest
   return [...ids].flatMap((id) => {
     const before = Object.hasOwn(previous.eventsById, id) ? previous.eventsById[id] : undefined;
     const after = Object.hasOwn(current.eventsById, id) ? current.eventsById[id] : undefined;
+    if (!before && after) return [{ id, name: after.name, summary: listingSummary("New event", after), fields: [] }];
+    if (!after && before) return [{ id, name: before.name, summary: listingSummary("Removed from the data", before), fields: [] }];
+    if (!before || !after) return [];
+
+    const summary = before.archived && !after.archived ? listingSummary("Relisted", after)
+      : !before.archived && after.archived ? "Archived" : undefined;
     const fields = collectChanges(before, after);
-    if (!fields.length) return [];
-    const listing = !after ? "Removed from the data"
-      : !before ? "Added"
-      : after.archived && !before.archived ? "Archived"
-      : before.archived && !after.archived ? "Relisted" : undefined;
-    return [{ id, name: (after ?? before!).name, listing, fields }];
+    if (!summary && !fields.length) return [];
+    return [{ id, name: after.name, summary, fields }];
   }).sort((a, b) => a.name.localeCompare(b.name) || byId(a, b));
 }
 
@@ -314,11 +343,12 @@ type OutreachReminder = ReturnType<typeof outreachReminders>[number];
 type WeekAction =
   | { day: string; event: Event; milestone: VendorMilestone; kind: "milestone" }
   | { day: string; event: Event; reminder: OutreachReminder; kind: "outreach" };
-type SourceCheck = { event: Event; id: string; label: string; detail?: string; href?: string };
+type SourceCheck = { event: Event; id: string; detail: string; href?: string };
 
 function uncheckedNotice(event: Event) {
   const notice = vendorNotice(event.vendor_deadline);
-  if (!notice) return;
+  if (!notice || /^not (?:captured|published|announced|available)(?: for (?:a |the )?\d{4}(?: edition)?)?[.!]?$/i.test(notice))
+    return;
   const normalized = notice.toLowerCase();
   // Shared dates alone cannot establish that a milestone covers the notice.
   const covered = event.vendor_milestones?.some((milestone) =>
@@ -346,15 +376,16 @@ export function digestActions(events: readonly Event[], now: number) {
       milestoneSourceHref(routes.reference?.href ?? "") ?? routes.contact?.href);
     for (const milestone of milestones) {
       if (!milestone.verified) {
-        if (checkSources) sourceChecks.push({ event, id: `milestone-${milestone.id}`, label: milestone.label,
-          detail: milestone.notes, href: milestoneSourceHref(milestone.source) ?? source });
+        if (checkSources) sourceChecks.push({ event, id: `milestone-${milestone.id}`,
+          detail: [milestone.label, milestone.notes].filter(Boolean).join(" · "),
+          href: milestoneSourceHref(milestone.source) ?? source });
         continue;
       }
       if (event.event_status) continue;
       const day = milestoneDay(milestone);
       if (day >= today && day <= end) actions.push({ day, event, milestone, kind: "milestone" });
     }
-    if (checkSources && notice) sourceChecks.push({ event, id: "notice", label: "Vendor notice", detail: notice, href: source });
+    if (checkSources && notice) sourceChecks.push({ event, id: "notice", detail: notice, href: source });
   }
   for (const reminder of reminders) {
     if (reminder.due > today && reminder.due <= end)

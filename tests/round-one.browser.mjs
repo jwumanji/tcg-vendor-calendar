@@ -647,7 +647,8 @@ test("keeps the compact tray in reach through deep mobile scrolling and bulk sel
   assert.equal(await compare.isDisabled(), true);
   for (const theme of ["dark", "light"]) {
     await page.waitForFunction(theme => document.documentElement.dataset.theme === theme, theme);
-    const contrast = await compare.evaluate(el => {
+    const contrast = await compare.evaluate(async el => {
+      await Promise.all(el.getAnimations().map(animation => animation.finished));
       const { color, backgroundColor, opacity } = getComputedStyle(el);
       if (opacity !== "1") throw new Error(`Unexpected disabled button opacity ${opacity}`);
       function luminance(rgb) {
@@ -740,4 +741,68 @@ test("shows the same quote and effective stage in comparison and Detail", async 
   await button(page, "← Back to events").click();
   assert.equal(await pinButton(page, "color18").getAttribute("aria-pressed"), "true");
   assert.equal(await pinButton(page, "urban").getAttribute("aria-pressed"), "true");
+});
+
+test("opens the weekly digest from every main tab and restores focus to the header", async t => {
+  for (const options of [desktop, iPhone, ...[320, 366].map(width => ({ ...iPhone, viewport: { width, height: 844 } }))]) {
+    const page = await open(t, options);
+    const launcher = page.locator("header").getByRole("button", { name: "Weekly digest" });
+    const dialog = page.getByRole("dialog", { name: "Weekly digest" });
+    for (const view of ["List", "Top picks", "Calendar", "Timeline", "Watchlist", "Recurring SG", "Pipeline"]) {
+      await page.getByRole("navigation", { name: "Event views" }).getByRole("button", { name: view, exact: true }).click();
+      await launcher.click();
+      assert.match(await dialog.getByRole("status").innerText(), /No baseline yet/);
+      assert.equal(await dialog.evaluate(el => el.scrollWidth), await dialog.evaluate(el => el.clientWidth));
+      await page.keyboard.press("Escape");
+      await dialog.waitFor({ state: "hidden" });
+      assert.equal(await launcher.evaluate(el => document.activeElement === el), true);
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), options.viewport.width);
+    }
+  }
+});
+
+test("reviews listing changes after the summaries and expands compact vendor notices on mobile", async t => {
+  const page = await open(t, iPhone);
+  const launcher = button(page, "Weekly digest");
+  const dialog = page.getByRole("dialog", { name: "Weekly digest" });
+  const markReviewed = dialog.getByRole("button", { name: "Mark reviewed" });
+  const status = dialog.getByRole("status");
+  await launcher.click();
+  await markReviewed.click();
+  await status.getByText("No published changes since your last review.").waitFor();
+  await page.keyboard.press("Escape");
+
+  await page.evaluate(() => {
+    const key = "tcg-weekly-digest-v1";
+    const baseline = JSON.parse(localStorage.getItem(key));
+    delete baseline.eventsById["scan-hkcec-amazing-toy-show-2026-202612"];
+    localStorage.setItem(key, JSON.stringify(baseline));
+  });
+  await page.reload();
+  await launcher.click();
+  const changes = dialog.getByRole("list", { name: "Changed events" });
+  assert.match(await changes.innerText(), /New event · 11–13 Dec 2026 · Wan Chai, Hong Kong/);
+  assert.equal(await changes.locator("dl").count(), 0);
+  assert.equal(await changes.evaluate(el => el.nextElementSibling.querySelector("button").textContent), "Mark reviewed");
+  const titleStyle = await changes.getByRole("heading").evaluate(el => {
+    const { fontSize, lineHeight, marginBottom } = getComputedStyle(el);
+    return { lineHeight: parseFloat(lineHeight) / parseFloat(fontSize), marginBottom: parseFloat(marginBottom) };
+  });
+  assert.ok(titleStyle.lineHeight >= 1.3 && titleStyle.marginBottom >= 4);
+  assert.equal(await changes.getByRole("link").evaluate(el => getComputedStyle(el).textDecorationLine), "none");
+  await markReviewed.click();
+  await status.getByText("No published changes since your last review.").waitFor();
+
+  const sources = dialog.locator(".digest-sources");
+  assert.equal(await sources.evaluate(el => el.previousElementSibling.getAttribute("aria-labelledby")), "digest-follow-up-title");
+  await sources.locator(":scope > summary").click();
+  const notice = sources.locator(".digest-source-notice").filter({ hasText: /Floor-plan booking/ });
+  const summary = notice.locator("summary");
+  assert.equal(await summary.evaluate(el => el.scrollWidth > el.clientWidth && el.clientHeight >= 44), true);
+  await summary.click();
+  assert.match(await notice.locator("p").innerText(), /Floor-plan booking is first come, first served/);
+  const sourceLink = notice.locator("..").getByRole("link", { name: /^Check source/ });
+  assert.equal(await sourceLink.isVisible(), true);
+  assert.ok((await sourceLink.boundingBox()).height >= 44);
+  assert.equal(await dialog.evaluate(el => el.scrollWidth), await dialog.evaluate(el => el.clientWidth));
 });

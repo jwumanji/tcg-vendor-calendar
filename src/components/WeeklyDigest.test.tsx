@@ -20,6 +20,8 @@ const events = normalizeEvents([
     ] },
   { id: "outreach", name: "January Show",
     outreach: mergeOutreach(null, { status: "quoted", next_action: "reply_to_organizer", follow_up_due_at: "2026-11-23" }) },
+  { id: "added", name: "A New Show", date_status: "confirmed", start_date: "2026-12-11", end_date: "2026-12-13",
+    city: "Wan Chai", country: "Hong Kong", vendor_deadline: "Not captured" },
 ]);
 const current = buildDigestSnapshot(events, snapshotDate);
 const previous = buildDigestSnapshot([
@@ -38,14 +40,20 @@ function render(review = { checkpoint: null as typeof checkpoint, error: "" }) {
 it("offers the review baseline, then gives changed values and a link only for live event records", () => {
   const initial = render();
   expect(initial("dialog").attr("aria-labelledby")).toBe("weekly-digest-title");
-  expect(initial(".digest-section-head button").text()).toBe("Mark reviewed");
-  expect(initial(".digest-review-status").text()).toContain("data as your baseline on this device");
+  expect(initial(".digest-review-action button").text()).toBe("Mark reviewed");
+  expect(initial(".digest-review-status").text()).toContain("No baseline yet. Mark reviewed to start tracking changes from today.");
+  expect(initial(".digest-review-status").text()).toContain("Current data from 24 Nov 2026");
 
   const $ = render({ checkpoint, error: "" });
   expect($(".digest-review-status").text()).toContain("Last reviewed");
-  const listing = $(".digest-list[aria-label='Changed events'] > li");
-  expect(listing.first().text()).toContain("Removed from the data");
-  expect(listing.first().find("h4 a")).toHaveLength(0);
+  const changedEvents = $(".digest-list[aria-label='Changed events']");
+  expect(changedEvents.next(".digest-review-action").find("button").text()).toBe("Mark reviewed");
+  const listing = changedEvents.children("li");
+  expect(listing.eq(0).find(".digest-listing").text()).toBe("New event · 11–13 Dec 2026 · Wan Chai, Hong Kong");
+  expect(listing.eq(0).find("h4 a").attr("href")).toBe("/event/added");
+  expect(listing.eq(1).find(".digest-listing").text()).toBe("Removed from the data · To be announced · Postponed");
+  expect(listing.eq(1).find("h4 a")).toHaveLength(0);
+  expect(listing.slice(0, 2).find("dl")).toHaveLength(0);
   expect(listing.last().find("h4 a").attr("href")).toBe("/event/booking");
   expect(listing.last().find("dl").text()).toBe("VenuePreviousHall ACurrentHall B");
 });
@@ -56,10 +64,13 @@ it("renders the organizer date and zone, an Apply link, source checks, and the o
   expect($(".digest-day").first().find(".milestone-time").text()).toContain("29 Nov 2026, 23:30 Saigon");
   expect($(".digest-day").last().find(".milestone-time").text()).toBe("30 Nov 2026 · Hong Kong date");
   expect($(".digest-day .apply-cta").first().attr("href")).toBe("https://example.com/apply");
-  expect($(".digest-sources a.button").attr("href")).toBe("https://example.com/payment");
+  expect($(".digest-source-link").attr("href")).toBe("https://example.com/payment");
+  expect($(".digest-sources > summary").text()).toBe("Vendor notices to check (1)");
+  expect($(".digest-source-preview").text()).toBe("Payment notice");
   expect($(".digest-sources time")).toHaveLength(0);
   const queue = $("section[aria-labelledby='digest-follow-up-title']");
   expect(queue.text()).toContain("January ShowYour reply is due · Overdue23 Nov 2026 · Saigon");
+  expect(queue.next(".digest-sources")).toHaveLength(1);
 });
 
 it("announces a save error while keeping the prior review and its changes visible", () => {

@@ -2,6 +2,9 @@ import { useEventRoute } from "./hooks/useEventRoute";
 import { usePriority } from "./hooks/usePriority";
 import { DEFAULT_HOME_BASE, HOME_BASE_GROUPS } from "./homeBase";
 import { Modal } from "./components/Modal";
+import { FilterContents, statusLabels } from "./components/FilterContents";
+import { FirstRunTip } from "./components/FirstRunTip";
+import { useMediaQuery } from "./hooks/useMediaQuery";
 import { EventRows, RowColumns, RowSortControl } from "./components/EventRows";
 import { normalizeColumns, normalizeListView, loadSort, SORT_STORAGE_KEY, groupSortedRows, orderTimelineGroups, sortRows } from "./rows";
 import { CalendarView } from "./components/CalendarView";
@@ -16,18 +19,18 @@ import { OutreachFollowUps } from "./components/OutreachFollowUps";
 import { Pipeline } from "./components/Pipeline";
 import { BackupControls } from "./components/BackupControls";
 import { BudgetDefaultsForm } from "./components/TripBudget";
-import { stages, emptyEntry, hasLocalPlanning, saveValue, stageSuggestions, withSuggestedStages, type Stage } from "./storage";
+import { emptyEntry, hasLocalPlanning, saveValue, stageSuggestions, withSuggestedStages, LIST_PREFERENCE_KEYS, type ListPreferences, type Stage } from "./storage";
 import { scoreEvent } from "./scoring";
 import { goingConflicts } from "./eventDecision";
 import {
   lazy,
   Suspense,
   useState,
+  useLayoutEffect,
   useEffect,
   useCallback,
   useMemo,
   useRef,
-  type CSSProperties,
 } from "react";
 
 import {
@@ -65,7 +68,6 @@ import {
   countryOptions,
   SEASON_START,
   timelineGroups,
-  gameRules,
   ranges,
   matchingEvent,
   goingEvents,
@@ -89,6 +91,16 @@ const quickCountries = [
   { country: "Hong Kong", code: "HK" },
   { country: "Malaysia", code: "MY" },
 ];
+const viewDescriptions = {
+  List: "Browse and filter all events.",
+  "Top picks": "Find the highest-scoring upcoming events.",
+  Calendar: "Browse events on a monthly calendar.",
+  Timeline: "Browse dates and group events by month or stage.",
+  Watchlist: "Track shows whose dates have yet to be announced.",
+  "Recurring SG": "Browse recurring Singapore shows and their published dates.",
+  Pipeline: "Track decisions and booth bookings by stage.",
+};
+const listPreferenceNames = Object.keys(LIST_PREFERENCE_KEYS) as (keyof ListPreferences)[];
 
 export default function App() {
   const shippedEvents = useMemo(() => normalizeEvents(raw), []);
@@ -101,6 +113,7 @@ export default function App() {
     updateTripBudget,
     updateBudgetDefaults,
     update,
+    updateStage,
     updateOutreach,
     updateMilestone,
     resetMilestone,
@@ -109,7 +122,7 @@ export default function App() {
     applyEntries,
     setGoing: updateGoing,
     undo,
-    undoGoing,
+    undoChange,
     saved,
     storageError,
     setStorageError,
@@ -135,15 +148,18 @@ export default function App() {
     updateGoing(ids, going, suggestions);
   }, [updateGoing, suggestions]);
   const workspaceHeading = useRef<HTMLHeadingElement>(null);
+  const searchInput = useRef<HTMLInputElement>(null);
+  const undoButton = useRef<HTMLButtonElement>(null);
   const setStage = useCallback((id: string, stage: Stage) => {
     const focused = document.activeElement;
-    update(id, "stage", stage);
+    const name = shippedEvents.find((e) => e.id === id)?.name ?? id;
+    updateStage(id, name, stage);
     if (focused?.matches(".stage-picker"))
       requestAnimationFrame(() => {
         if (!focused.isConnected && document.activeElement === document.body)
-          focusHeading(workspaceHeading.current);
+          (undoButton.current ?? workspaceHeading.current)?.focus({ preventScroll: true });
       });
-  }, [update]);
+  }, [shippedEvents, updateStage]);
   const [show2026, setShow2026] = useState(
     () => stored("tcg-show-2026-v1") === true,
   );
@@ -186,13 +202,22 @@ export default function App() {
   const [showPassed, setShowPassed] = useState(
     () => stored("tcg-show-passed-v1") === true,
   );
-  const visible = useCallback(
-    (e: Event) =>
-      showPassed ||
-      filters.stages.includes((entries[e.id] || emptyEntry).stage) ||
-      !["Passed", "Too expensive"].includes((entries[e.id] || emptyEntry).stage),
-    [showPassed, filters.stages, entries],
-  );
+  const [listPreferences, setListPreferences] = useState<ListPreferences>(() => {
+    const preferences: ListPreferences = {};
+    for (const key of listPreferenceNames) {
+      const value = stored(LIST_PREFERENCE_KEYS[key]);
+      if (typeof value === "boolean") preferences[key] = value;
+    }
+    return preferences;
+  });
+  function applyListPreferences(preferences: ListPreferences) {
+    setListPreferences((current) => ({ ...current, ...preferences }));
+    for (const key of listPreferenceNames) {
+      if (preferences[key] === undefined) continue;
+      const error = saveValue(LIST_PREFERENCE_KEYS[key], preferences[key]);
+      if (error) setStorageError(error);
+    }
+  }
   const onEventPage = route.page === "event";
   const selected = onEventPage
     ? events.find((event) => event.id === route.id) ?? allEvents.find((event) => event.id === route.id &&
@@ -206,6 +231,11 @@ export default function App() {
       : defaultTitle;
   }, [onEventPage, selected]);
   const [view, setView] = useState(listContext?.view ?? "List");
+  const compactReminders = useMediaQuery("(max-width: 720px)");
+  const filterSheet = useMediaQuery("(max-width: 640px)");
+  const deadlinesExpanded = listPreferences.deadlinesExpanded ?? !compactReminders;
+  const followUpsExpanded = listPreferences.followUpsExpanded ?? !compactReminders;
+  const showPast = listPreferences.showPast === true;
   const [month, setMonth] = useState(listContext?.month ?? initialMonth);
   const [filterOpen, setFilterOpen] = useState(listContext?.filterOpen ?? false);
   const [groupByStage, setGroupByStage] = useState(listContext?.groupByStage ?? false);
@@ -237,14 +267,41 @@ export default function App() {
     const error = saveValue("tcg-theme", theme);
     if (error) setStorageError(error);
   }, [theme]);
-  const filtered = useMemo(
-    () =>
-      events.flatMap((e) => {
-        const match = visible(e) && matchingEvent(e, filters, entries, scores[e.id].score, today);
+  const timelineFilters = useMemo(() =>
+    view === "Timeline" && !showPast && filters.from < today ? { ...filters, from: today } : filters,
+  [view, showPast, filters, today]);
+  const { filtered, viewEvents, hidden } = useMemo(() => {
+    const inView = (e: Event) => view === "Watchlist" ? e.section === "watchlist"
+      : view === "Recurring SG" ? e.section === "recurring_sg" : true;
+    const matchEvents = (source: Event[], activeFilters: typeof filters) =>
+      source.flatMap((e) => {
+        const match = matchingEvent(e, activeFilters, entries, scores[e.id].score, today);
         return match ? [match] : [];
-      }),
-    [events, filters, entries, visible, scores, today],
-  );
+      });
+    const passesStage = (e: Event) => {
+      const stage = (entries[e.id] || emptyEntry).stage;
+      return filters.stages.includes(stage) || (stage !== "Passed" && stage !== "Too expensive");
+    };
+    const matches = matchEvents(events, timelineFilters);
+    const filtered = showPassed ? matches : matches.filter(passesStage);
+    const viewEvents = filtered.filter(inView);
+    const matchesBeforePastFilter = (source: Event[]) =>
+      matchEvents(source, filters).filter((e) => inView(e) && (showPassed || passesStage(e)));
+    const withoutPastFilter = timelineFilters === filters ? viewEvents : matchesBeforePastFilter(events);
+    const countHidden = (before: Event[], after: Event[]) => {
+      const shown = new Map(after.map((e) => [e.id, ranges(e).length]));
+      return before.filter((e) => (shown.get(e.id) ?? -1) < ranges(e).length).length;
+    };
+    return {
+      filtered,
+      viewEvents,
+      hidden: {
+        passed: showPassed ? 0 : matches.filter(inView).length - viewEvents.length,
+        earlier: show2026 ? 0 : countHidden(matchesBeforePastFilter(activeEvents), withoutPastFilter),
+        past: timelineFilters === filters ? 0 : countHidden(withoutPastFilter, viewEvents),
+      },
+    };
+  }, [activeEvents, events, filters, timelineFilters, entries, scores, today, show2026, showPassed, view]);
   const attending = useMemo(
     () => goingEvents(events, entries),
     [events, entries],
@@ -287,9 +344,9 @@ export default function App() {
               ? `Until ${prettyDate(filters.to)}`
               : k === "priority"
                 ? filters.priority === "top"
-                  ? "Top priority markets"
-                  : "High or top priority markets"
-                : `${k === "size" ? "Size" : "Status"}: ${filters[k]}`,
+                  ? "Key markets · Hong Kong & Singapore"
+                  : "Key markets · Malaysia, Hong Kong & Singapore"
+                : k === "size" ? `Show size · ${filters.size}` : statusLabels[filters.status],
         clear: () => set(k, emptyFilters[k]),
       });
   for (const stage of filters.stages)
@@ -326,13 +383,13 @@ export default function App() {
   if (filters.score)
     chips.push({
       id: "score",
-      label: `Scanner score ≥ ${filters.score}`,
+      label: `Fit score ≥ ${filters.score}`,
       clear: () => set("score", 0),
     });
   if (!filters.tba)
     chips.push({
       id: "tba",
-      label: "TBA excluded",
+      label: "Announced dates only",
       clear: () => set("tba", true),
     });
   const quick = [
@@ -418,20 +475,27 @@ export default function App() {
       {undo && (
         <>
           <span key={undo.changedAt}>
-            {undo.going
+            {undo.kind === "stage" ? `Moved ${undo.name} to ${undo.stage}` : undo.going
               ? `Marked ${undo.patch.length} Going`
               : `Removed ${undo.patch.length} from Going`}
           </span>
           <span aria-hidden="true"> · </span>
-          <button onClick={undoGoing}>Undo</button>
+          <button ref={undoButton} onClick={() => {
+            undoChange();
+            if (undo.kind !== "stage") return;
+            requestAnimationFrame(() => {
+              const id = CSS.escape(undo.patch.id);
+              document.querySelector<HTMLElement>(`main:not([hidden]) [data-event-id="${id}"] .stage-picker`)?.focus();
+            });
+          }}>Undo</button>
         </>
       )}
     </div>
   );
   const showRows = view === "List" && listView === "rows";
   const sorted = useMemo(
-    () => sortRows(filtered, sort, entries, scores, today),
-    [filtered, sort, entries, scores, today],
+    () => sortRows(viewEvents, sort, entries, scores, today),
+    [viewEvents, sort, entries, scores, today],
   );
   function card(e: Event, occurrence?: string, titleLevel?: 3 | 4) {
     return (
@@ -455,37 +519,64 @@ export default function App() {
     () =>
       timelineGroups(
         view === "Timeline" ? sorted : [],
-        filters,
+        timelineFilters,
         entries,
         groupByStage,
         today,
       ),
-    [view, sorted, filters, entries, groupByStage, today],
+    [view, sorted, timelineFilters, entries, groupByStage, today],
   );
   const filterTrigger = useRef<HTMLButtonElement>(null);
   const filterPanel = useRef<HTMLElement>(null);
-  useEffect(() => {
-    if (!filterOpen) return;
+  const focusFilterTrigger = useCallback(() => filterTrigger.current, []);
+  useLayoutEffect(() => {
+    if (!filterOpen || filterSheet || onEventPage) return;
     filterPanel.current?.focus();
     return () => {
-      filterTrigger.current?.focus();
+      filterTrigger.current?.focus({ preventScroll: true });
     };
-  }, [filterOpen]);
-  const visibleList = useMemo(
-    () =>
-      sorted.filter(
-        (e) =>
-          view === "List" ||
-          (view === "Watchlist" && e.section === "watchlist") ||
-          (view === "Recurring SG" && e.section === "recurring_sg"),
-      ),
-    [sorted, view],
-  );
+  }, [filterOpen, filterSheet, onEventPage]);
   const listGroups = useMemo(
-    () => groupSortedRows(visibleList, sort.key, today),
-    [visibleList, sort.key, today],
+    () => groupSortedRows(sorted, sort.key, today),
+    [sorted, sort.key, today],
   );
   const sortControl = <RowSortControl sort={sort} setSort={setSort} />;
+  const visibilityControls = [
+    { hidden: hidden.passed, reason: "passed", showLabel: "Show", hideLabel: "Hide passed", shown: showPassed,
+      toggle: () => setShowPassed(!showPassed) },
+    { hidden: hidden.earlier, reason: "2026", showLabel: "Show 2026", hideLabel: "Hide 2026", shown: show2026,
+      toggle: () => setShow2026(!show2026) },
+    ...(view === "Timeline" ? [
+      { hidden: hidden.past, reason: "past", showLabel: "Show past", hideLabel: "Hide past", shown: showPast,
+        toggle: () => applyListPreferences({ showPast: !showPast }) },
+    ] : []),
+  ];
+  const eventCount = (
+    <div className="list-count" role="status">
+      <span>{viewEvents.length} {viewEvents.length === 1 ? "event" : "events"}</span>
+      {visibilityControls.filter((control) => control.hidden > 0 || control.shown).map((control) => (
+        <span key={control.reason} className="visibility-option">
+          <span aria-hidden="true"> · </span>
+          {control.hidden > 0 && (
+            <>
+              <span id={`hidden-${control.reason}`}>{control.hidden} hidden ({control.reason})</span>
+              <span aria-hidden="true"> · </span>
+            </>
+          )}
+          <button className="visibility-toggle" aria-pressed={control.shown}
+            aria-describedby={control.hidden > 0 ? `hidden-${control.reason}` : undefined} onClick={control.toggle}>
+            {control.shown ? control.hideLabel : control.showLabel}
+          </button>
+        </span>
+      ))}
+    </div>
+  );
+  const countries = useMemo(() => countryOptions(events), [events]);
+  const filterContents = filterOpen && (
+    <FilterContents countries={countries} filters={filters} set={set} reset={() => setFilters(emptyFilters)}
+      activeCount={chips.length} showPassed={showPassed} setShowPassed={setShowPassed} matchCount={viewEvents.length}
+      compact={filterSheet} close={() => setFilterOpen(false)} />
+  );
   const noResults = (
     <EmptyState
       icon={SearchX}
@@ -529,17 +620,10 @@ export default function App() {
             {view}
           </h2>
           <nav className="tabs" aria-label="Event views">
-            {[
-              "List",
-              "Top picks",
-              "Calendar",
-              "Timeline",
-              "Watchlist",
-              "Recurring SG",
-              "Pipeline",
-            ].map((v) => (
+            {Object.entries(viewDescriptions).map(([v, description]) => (
               <button
                 key={v}
+                title={description}
                 className={view === v ? "active" : ""}
                 aria-current={view === v ? "page" : undefined}
                 onClick={(ev) => {
@@ -560,13 +644,17 @@ export default function App() {
               </button>
             ))}
           </nav>
-          <UpcomingMilestones events={activeEvents} open={open} focusFallback={workspaceHeading} />
-          <OutreachFollowUps events={activeEvents} today={today} focusFallback={workspaceHeading}
-            open={(event, returnFocus) => open(event, undefined, returnFocus)} />
+          {view === "List" && !listPreferences.firstRunDismissed && (
+            <FirstRunTip dismiss={() => {
+              applyListPreferences({ firstRunDismissed: true });
+              searchInput.current?.focus();
+            }} />
+          )}
           <div className="toolbar">
             <label className="search">
               <Search size={18} />
               <input
+                ref={searchInput}
                 placeholder="Search events, cities, games…"
                 value={filters.search}
                 onChange={(e) => set("search", e.target.value)}
@@ -577,16 +665,15 @@ export default function App() {
               className={"button " + (filterOpen ? "selected" : "")}
               onClick={() => setFilterOpen(!filterOpen)}
               aria-expanded={filterOpen}
-              aria-controls="filters"
+              aria-controls={filterOpen ? "filters" : undefined}
+              aria-haspopup={filterSheet ? "dialog" : undefined}
               ref={filterTrigger}
             >
-              <SlidersHorizontal size={16} /> Filters{" "}
-              {chips.length > 0 && (
-                <span className="count">{chips.length}</span>
-              )}
+              <SlidersHorizontal size={16} /> Filters{chips.length > 0 && ` · ${chips.length}`}
             </button>
             <button
               className="button finds-toggle"
+              title="Show newly discovered events."
               aria-pressed={filters.newOnly}
               onClick={() => set("newOnly", !filters.newOnly)}
             >
@@ -595,6 +682,7 @@ export default function App() {
             </button>
             <button
               className="button finds-toggle going-filter"
+              title="Show your shortlisted events."
               aria-pressed={filters.going}
               onClick={() => set("going", !filters.going)}
             >
@@ -609,6 +697,15 @@ export default function App() {
               <Settings2 size={16} /> <span>Tools</span>
             </button>
           </div>
+          {view === "List" && (
+            <>
+              <UpcomingMilestones events={activeEvents} open={open} focusFallback={workspaceHeading}
+                bannerExpanded={deadlinesExpanded} toggle={() => applyListPreferences({ deadlinesExpanded: !deadlinesExpanded })} />
+              <OutreachFollowUps events={activeEvents} today={today} focusFallback={workspaceHeading}
+                bannerExpanded={followUpsExpanded} toggle={() => applyListPreferences({ followUpsExpanded: !followUpsExpanded })}
+                open={(event, returnFocus) => open(event, undefined, returnFocus)} />
+            </>
+          )}
           {filters.going && (
             <div className="going-summary">
               <strong>Showing {filtered.length} Going</strong>
@@ -629,7 +726,7 @@ export default function App() {
           )}
           <div className="quick-row">
             <CountryFilter
-              options={countryOptions(events)}
+              options={countries}
               selected={filters.countries}
               change={(countries) => set("countries", countries)}
             />
@@ -657,220 +754,21 @@ export default function App() {
               )}
             </div>
           </div>
-          {filterOpen && (
-            <section
-              className="filters"
-              id="filters"
-              ref={filterPanel}
-              tabIndex={-1}
-              onKeyDown={(e) => {
+          {filterOpen && !filterSheet && (
+            <section className="filters" id="filters" ref={filterPanel} tabIndex={-1}
+              aria-labelledby="filter-title" onKeyDown={(e) => {
                 if (e.key === "Escape") {
                   e.stopPropagation();
                   setFilterOpen(false);
                 }
-              }}
-              aria-label="Event filters"
-            >
+              }}>
               <div className="filter-heading">
-                <div>
-                  <span className="filter-kicker">
-                    <SlidersHorizontal size={13} aria-hidden="true" />{" "}
-                    {chips.length
-                      ? `${chips.length} active`
-                      : "No filters active"}
-                  </span>
-                  <h3>Find your fit</h3>
-                </div>
-                <button
-                  className="icon-button"
-                  aria-label="Close filters"
-                  onClick={() => setFilterOpen(false)}
-                >
+                <h3 id="filter-title">Filters</h3>
+                <button className="icon-button" aria-label="Close filters" onClick={() => setFilterOpen(false)}>
                   <X size={20} />
                 </button>
               </div>
-              <div className="filter-grid">
-                <fieldset>
-                  <legend>Countries</legend>
-                  <div className="check-scroll">
-                    {countryOptions(events).map((o) => (
-                      <label key={o.name}>
-                        <input
-                          type="checkbox"
-                          checked={filters.countries.includes(o.name)}
-                          onChange={() =>
-                            set(
-                              "countries",
-                              filters.countries.includes(o.name)
-                                ? filters.countries.filter((x) => x !== o.name)
-                                : [...filters.countries, o.name],
-                            )
-                          }
-                        />
-                        <CountryFlag code={o.code} /> {o.name} ({o.count})
-                      </label>
-                    ))}
-                  </div>
-                </fieldset>
-                <fieldset>
-                  <legend>Games</legend>
-                  <div className="check-scroll">
-                    {[...gameRules.map(([g]) => g), "Other"].map((g) => (
-                      <label key={g}>
-                        <input
-                          type="checkbox"
-                          checked={filters.games.includes(g)}
-                          onChange={() =>
-                            set(
-                              "games",
-                              filters.games.includes(g)
-                                ? filters.games.filter((x) => x !== g)
-                                : [...filters.games, g],
-                            )
-                          }
-                        />
-                        {g}
-                      </label>
-                    ))}
-                  </div>
-                </fieldset>
-                <div className="filter-fields">
-                  <label>
-                    Priority market
-                    <select
-                      value={filters.priority}
-                      onChange={(e) => set("priority", e.target.value)}
-                    >
-                      <option value="any">All markets</option>
-                      <option value="top">Top · HK & SG</option>
-                      <option value="high">High or top · MY, HK & SG</option>
-                    </select>
-                  </label>
-                  <label>
-                    Size tier
-                    <select
-                      value={filters.size}
-                      onChange={(e) => set("size", e.target.value)}
-                    >
-                      <option value="">All sizes</option>
-                      {["S", "M", "L", "XL"].map((s) => (
-                        <option key={s}>{s}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    Status
-                    <select
-                      value={filters.status}
-                      onChange={(e) => set("status", e.target.value)}
-                    >
-                      <option value="">All statuses</option>
-                      {["confirmed", "estimated", "tba", "cancelled", "postponed"].map((s) => (
-                        <option key={s}>{s}</option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-                <div className="filter-fields">
-                  <label>
-                    From
-                    <input
-                      type="date"
-                      value={filters.from}
-                      onChange={(e) => set("from", e.target.value)}
-                    />
-                  </label>
-                  <label>
-                    To
-                    <input
-                      type="date"
-                      value={filters.to}
-                      onChange={(e) => set("to", e.target.value)}
-                    />
-                  </label>
-                  <label className="check">
-                    <input
-                      type="checkbox"
-                      checked={filters.tba}
-                      onChange={(e) => set("tba", e.target.checked)}
-                    />{" "}
-                    Include TBA dates
-                  </label>
-                  <label className="passed-toggle">
-                    <input
-                      type="checkbox"
-                      checked={showPassed}
-                      onChange={(e) => setShowPassed(e.target.checked)}
-                    />{" "}
-                    Show passed / too expensive
-                  </label>
-                </div>
-                <div className="filter-fields">
-                  <label>
-                    Priority
-                    <select
-                      value={filters.minTier}
-                      onChange={(ev) =>
-                        set(
-                          "minTier",
-                          ev.target.value as typeof filters.minTier,
-                        )
-                      }
-                    >
-                      <option value="any">Any</option>
-                      <option value="strong">Strong+</option>
-                      <option value="must">Must-do only</option>
-                    </select>
-                  </label>
-                  <label>
-                    Minimum scanner score · {filters.score}
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={filters.score}
-                      style={{ "--fill": `${filters.score}%` } as CSSProperties}
-                      onChange={(e) => set("score", +e.target.value)}
-                    />
-                  </label>
-                  <fieldset>
-                    <legend>Pipeline stages</legend>
-                    {stages.map((stage) => (
-                      <label className="check" key={stage}>
-                        <input
-                          type="checkbox"
-                          checked={filters.stages.includes(stage)}
-                          onChange={() =>
-                            set(
-                              "stages",
-                              filters.stages.includes(stage)
-                                ? filters.stages.filter((s) => s !== stage)
-                                : [...filters.stages, stage],
-                            )
-                          }
-                        />
-                        {stage}
-                      </label>
-                    ))}
-                  </fieldset>
-                </div>
-              </div>
-              <div className="filter-foot">
-                <button
-                  className="button"
-                  disabled={chips.length === 0}
-                  onClick={() => setFilters(emptyFilters)}
-                >
-                  <RotateCcw size={16} aria-hidden="true" /> Reset all filters
-                </button>
-                <button
-                  className="button primary"
-                  onClick={() => setFilterOpen(false)}
-                >
-                  Show {filtered.length}{" "}
-                  {filtered.length === 1 ? "event" : "events"}
-                </button>
-              </div>
+              {filterContents}
             </section>
           )}
           {otherChips.length > 0 && (
@@ -895,6 +793,7 @@ export default function App() {
           )}
           {["Calendar", "Timeline", "Top picks", "Pipeline"].includes(view) && (
             <div className="timeline-controls">
+              {eventCount}
               {sortControl}
               {view === "Timeline" && <label className="passed-toggle">
                 <input
@@ -926,6 +825,10 @@ export default function App() {
               open={open}
               setGoing={setGoing}
               change={(e, stage) => setStage(e.id, stage)}
+              browse={() => {
+                setView("List");
+                requestAnimationFrame(() => focusHeading(workspaceHeading.current));
+              }}
             />
           ) : view === "Calendar" ? (
             <CalendarView
@@ -950,7 +853,7 @@ export default function App() {
                       {groupByStage
                         ? m
                         : m === "9999"
-                          ? "Dates to be announced"
+                          ? "Dates not announced"
                           : monthLabel(m)}
                       <span>{items.length} events</span>
                     </h3>
@@ -963,10 +866,7 @@ export default function App() {
           ) : (
             <>
               <div className="list-heading">
-                <span className="list-count" role="status">
-                  {visibleList.length}{" "}
-                  {visibleList.length === 1 ? "event" : "events"}
-                </span>
+                {eventCount}
                 {sortControl}
                 {showRows && (
                   <>
@@ -1007,7 +907,7 @@ export default function App() {
                 )}
               </div>
               {showRows ? (
-                visibleList.length > 0 && (
+                sorted.length > 0 && (
                   <EventRows
                     columns={columns}
                     groups={listGroups}
@@ -1053,7 +953,7 @@ export default function App() {
                   )}
                 </CardSections>
               )}
-              {visibleList.length === 0 && noResults}
+              {sorted.length === 0 && noResults}
             </>
           )}
           {view === "Timeline" && groups.size === 0 && noResults}
@@ -1067,7 +967,7 @@ export default function App() {
                   ◷ Estimated
                 </span>
                 <span role="listitem" className="badge tba">
-                  ◇ TBA
+                  ◇ Dates not announced
                 </span>
                 <span role="listitem" className="badge recurring-key">
                   Recurring SG
@@ -1087,6 +987,12 @@ export default function App() {
           </small>
         </footer>
       </main>
+      {!onEventPage && filterOpen && filterSheet && (
+        <Modal title="Filters" titleId="filter-title" closeLabel="Close filters"
+          id="filters" className="filter-sheet" returnFocus={focusFilterTrigger} close={() => setFilterOpen(false)}>
+          {filterContents}
+        </Modal>
+      )}
       {!onEventPage && toolsOpen && (
         <Modal
           title={
@@ -1155,6 +1061,8 @@ export default function App() {
             tripBudget={tripBudget}
             ids={allEvents.map((e) => e.id)}
             apply={applyEntries}
+            listPreferences={listPreferences}
+            applyListPreferences={applyListPreferences}
             priority={{
               weights: priority.weights,
               overrides: priority.overrides,
@@ -1210,7 +1118,7 @@ export default function App() {
                 saved={saved}
                 setGoing={setGoing}
                 onStage={(stage) => setStage(selected.id, stage)}
-                onNote={(note) => update(selected.id, "note", note)}
+                onNote={(note) => update(selected.id, note)}
                 knownOutreach={sharedSelection?.outreach}
                 onOutreach={(patch) => updateOutreach(selected.id, patch, sharedSelection?.outreach)}
                 sharedMilestones={sharedSelection?.vendor_milestones}

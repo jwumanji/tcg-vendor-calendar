@@ -29,7 +29,7 @@ export function GoingButton({
       <span className="going-check" aria-hidden="true">
         <Icon size={19} strokeWidth={going ? 2.6 : 1.7} />
       </span>
-      {!compact && "Going"}
+      <span>Going</span>
     </button>
   );
 }

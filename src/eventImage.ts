@@ -1,4 +1,14 @@
 export type ImageKind = "cover" | "logo";
+export type LogoSize = "md" | "row" | "xl" | "detail";
+
+export function eventImageSources(path: string, size: LogoSize) {
+  if (!/^logos\/[^/]+\.webp$/i.test(path)) return { src: path };
+  const variant = (suffix: string) => path.replace(/\.webp$/i, `-${suffix}.webp`);
+  return {
+    src: size === "row" || size === "md" ? variant("thumb") : path,
+    mobile: size === "xl" ? variant("480") : undefined,
+  };
+}
 type EdgeSample = { transparent: number; flatEdge: number };
 
 // Reviewed assets carry an explicit fit. Sampling is only for new, unlabelled art.
@@ -130,7 +140,7 @@ function trimLogo(image: HTMLImageElement, matte?: number[]) {
 }
 
 export function inspectImage(image: HTMLImageElement): ImageArt {
-  const src = image.src;
+  const src = image.currentSrc || image.src;
   const cached = eventImageCache.get(src);
   if (cached) return cached;
   const aspect = image.naturalWidth / image.naturalHeight;

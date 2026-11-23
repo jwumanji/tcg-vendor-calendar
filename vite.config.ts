@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { fileURLToPath } from "node:url";
+import { generateEventImageVariants } from "./scripts/event-image-variants";
 // The planner is served at the root of planner.grailfoxtcg.com. Set VITE_BASE
 // (for example "/vendor-planner/") to host it under a sub-path instead.
 const base = `/${(process.env.VITE_BASE ?? "/").replace(/^\/+|\/+$/g, "")}/`.replace(/^\/\/$/, "/");
@@ -8,6 +10,12 @@ const base = `/${(process.env.VITE_BASE ?? "/").replace(/^\/+|\/+$/g, "")}/`.rep
 export default defineConfig({
   plugins: [
     react(),
+    {
+      name: "event-image-variants",
+      async buildStart() {
+        await generateEventImageVariants(fileURLToPath(new URL("./public/logos/", import.meta.url)));
+      },
+    },
     {
       name: "planner-build-id",
       apply: "build",

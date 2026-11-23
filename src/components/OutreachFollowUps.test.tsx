@@ -40,3 +40,13 @@ it("caps the queue and labels a nudge for an automatic acknowledgement", () => {
 it("omits the section when there are no due actions", () => {
   expect(render("2026-11-18")("section")).toHaveLength(0);
 });
+
+it("offers a collapsed summary with the full number of follow-ups due", () => {
+  const $ = load(renderToStaticMarkup(
+    <OutreachFollowUps events={events} today="2026-11-24" open={vi.fn()} bannerExpanded={false} toggle={vi.fn()} />,
+  ));
+  const summary = $(".reminder-summary");
+  expect(summary.attr("aria-expanded")).toBe("false");
+  expect(summary.text()).toContain("6 follow-ups due");
+  expect($("#" + summary.attr("aria-controls")).is("[hidden]")).toBe(true);
+});

@@ -53,6 +53,27 @@ export const emptyEntry: Entry = {
   stageUpdatedAt: null,
 };
 
+export type StageUndo = Pick<Entry, "stage" | "stageUpdatedAt"> & { id: string; changedAt: string };
+
+export function changeStage(entries: Entries, id: string, stage: Stage, now: string) {
+  const entry = entries[id] ?? emptyEntry;
+  const undo: StageUndo = { id, stage: entry.stage, stageUpdatedAt: entry.stageUpdatedAt, changedAt: now };
+  return {
+    entries: { ...entries, [id]: { ...entry, stage, stageUpdatedAt: now } },
+    undo,
+  };
+}
+
+export function undoStagePatch(entries: Entries, patch: StageUndo, now: string): Entries {
+  const { id, stage, stageUpdatedAt, changedAt } = patch;
+  const entry = entries[id];
+  if (!entry || entry.stageUpdatedAt !== changedAt) return entries;
+  return {
+    ...entries,
+    [id]: { ...entry, stage, stageUpdatedAt: stageUpdatedAt === null ? null : now },
+  };
+}
+
 function suggestedStage(event: Event): Stage | undefined {
   const outreach = event.outreach;
   if (outreach?.status === "declined") return "Passed";
@@ -167,6 +188,13 @@ export const STORAGE_KEY = "tcg-pipeline-v1";
 export const WEIGHTS_KEY = "tcg-priority-weights";
 export const OVERRIDES_KEY = "tcg-priority-overrides";
 export const HOME_BASE_KEY = "tcg-priority-home-base";
+export const LIST_PREFERENCE_KEYS = {
+  firstRunDismissed: "tcg-first-run-dismissed",
+  deadlinesExpanded: "tcg-deadlines-expanded",
+  followUpsExpanded: "tcg-follow-ups-expanded",
+  showPast: "tcg-timeline-show-past",
+} as const;
+export type ListPreferences = Partial<Record<keyof typeof LIST_PREFERENCE_KEYS, boolean>>;
 export function normalizeOverrides(value: unknown): Record<string, number> {
   if (!object(value)) return {};
   return Object.fromEntries(
@@ -183,6 +211,7 @@ export interface PriorityPreferences {
   homeBase?: string;
 }
 export interface Backup {
+  listPreferences?: ListPreferences;
   priority?: PriorityPreferences;
   outreach?: OutreachPatches;
   milestones?: MilestoneEdits;
@@ -264,6 +293,17 @@ export function validateBackup(value: unknown): Backup {
     };
   }
   const result: Backup = { version: 1, exportedAt: value.exportedAt, entries };
+  if (value.listPreferences !== undefined) {
+    if (!object(value.listPreferences)) throw new Error("Invalid list preferences in backup.");
+    const preferences = value.listPreferences;
+    result.listPreferences = {};
+    for (const key of Object.keys(LIST_PREFERENCE_KEYS) as (keyof ListPreferences)[]) {
+      const setting = preferences[key];
+      if (setting === undefined) continue;
+      if (typeof setting !== "boolean") throw new Error("Invalid list preference in backup.");
+      result.listPreferences[key] = setting;
+    }
+  }
   if (value.outreach !== undefined) {
     if (!object(value.outreach)) throw new Error("Invalid outreach in backup.");
     result.outreach = Object.assign(
@@ -324,6 +364,7 @@ export function backup(
   milestones?: MilestoneEdits,
   vendorPricing?: VendorPricingEdits,
   tripBudget?: BudgetSettings,
+  listPreferences?: ListPreferences,
 ): Backup {
   return {
     version: 1,
@@ -334,6 +375,7 @@ export function backup(
     ...(milestones && { milestones }),
     ...(vendorPricing && { vendorPricing }),
     ...(tripBudget && { tripBudget }),
+    ...(listPreferences && { listPreferences }),
   };
 }
 export function importPriority(
@@ -627,9 +669,10 @@ export function stashBeforeReplace(
   milestones?: MilestoneEdits,
   vendorPricing?: VendorPricingEdits,
   tripBudget?: BudgetSettings,
+  listPreferences?: ListPreferences,
 ): string {
   const key = `${STORAGE_KEY}-before-replace-${Date.now()}`;
-  localStorage.setItem(key, JSON.stringify(backup(entries, priority, outreach, milestones, vendorPricing, tripBudget)));
+  localStorage.setItem(key, JSON.stringify(backup(entries, priority, outreach, milestones, vendorPricing, tripBudget, listPreferences)));
   return key;
 }
 export function saveValue(key: string, value: unknown): string {

@@ -17,8 +17,8 @@ export const ROW_SORT_LABELS = {
   city: "City",
   status: "Status",
   priority: "Priority",
-  scanner: "Scanner score",
-  size: "Size tier",
+  scanner: "Fit score",
+  size: "Show size",
   stage: "Stage",
   notes: "Notes",
   source: "Source",
@@ -87,10 +87,10 @@ export function rowDateLabel(e: Event, today: string) {
             "en-GB",
             { month: "short", year: "numeric" },
           )
-      : "TBA";
+      : "Dates not announced";
   }
   const range = dateSortRange(e, today);
-  if (!range) return "TBA";
+  if (!range) return "Dates not announced";
   const { start_date: start, end_date: end } = range;
   if (start === end) return prettyDate(start);
   const left =

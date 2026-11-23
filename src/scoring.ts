@@ -45,8 +45,8 @@ export const FACTOR_META = {
     description: "Date certainty, estimated travel from your home base and time to apply.",
   },
   scanner_score: {
-    label: "Scanner score",
-    description: "Scanner vendor score or a proxy from its shortlist priority.",
+    label: "Fit score",
+    description: "Vendor fit rating or an estimate based on shortlist priority.",
   },
 } satisfies Record<FactorKey, { label: string; description: string }>;
 const keys = Object.keys(DEFAULT_WEIGHTS) as FactorKey[];
@@ -224,8 +224,8 @@ function scale(e: Event): Evidence {
   if (e.size_tier && Object.hasOwn(sizes, e.size_tier))
     return estimated(
       sizes[e.size_tier],
-      [`Size tier ${e.size_tier} (estimated)`],
-      "Scanner size tier used as a proxy.",
+      [`Show size ${e.size_tier} (estimated)`],
+      "Estimated show size used as a proxy.",
     );
   return missing("No count, recognized hall or size tier.");
 }
@@ -414,7 +414,7 @@ function commercial(e: Event, now: number): Evidence {
   } else {
     if (e.size_tier && Object.hasOwn(sizes, e.size_tier)) {
       value += (sizes[e.size_tier] - 0.5) * 0.14;
-      signals.push(`Size tier ${e.size_tier} (estimated economics)`);
+      signals.push(`Show size ${e.size_tier} (estimated economics)`);
     }
     if (country(e)) {
       value += (market(e).value - 0.5) * 0.08;
@@ -549,18 +549,18 @@ function scanner(e: Event): Evidence {
   if (finite(e.vendor_score))
     return real(
       e.vendor_score / 100,
-      [`Scanner vendor score ${e.vendor_score}/100`],
-      "Direct Scanner rating.",
+      [`Vendor fit rating ${e.vendor_score}/100`],
+      "Recorded vendor fit rating.",
     );
   const p = e.shortlist_priority;
   if (p === 1 || p === 2 || p === 3)
     return estimated(
       [0.8, 0.55, 0.3][p - 1],
       [`Shortlist priority ${p} (estimated)`],
-      "Scanner shortlist proxy.",
+      "Estimated from shortlist priority.",
       0.8,
     );
-  return missing("No Scanner score or shortlist priority.");
+  return missing("No fit score or shortlist priority.");
 }
 
 function baseScore(

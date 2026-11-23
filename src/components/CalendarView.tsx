@@ -225,7 +225,7 @@ export function CalendarView({
       {tba.length > 0 && (
         <section className="tba-section">
           <h4>
-            ◇ Dates to be announced <span>{tba.length} on your radar</span>
+            ◇ Dates not announced <span>{tba.length} on your radar</span>
           </h4>
           <div className="tba-links">
             {tba.map((e) => (

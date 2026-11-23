@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   applyGoing,
+  changeStage,
   inverseGoingPatch,
   undoGoingPatch,
+  undoStagePatch,
   backup,
   emptyEntry,
   loadEntries,
@@ -16,6 +18,8 @@ import {
   type MilestoneEdits,
   type OutreachPatches,
   type StageSuggestions,
+  type Stage,
+  type StageUndo,
   type VendorPricingEdits,
 } from "../storage";
 import type { BudgetDefaults, TripBudget, Outreach, OutreachPatch, VendorMilestone, VendorPricingPatch } from "../model";
@@ -40,7 +44,8 @@ export function useEntries() {
       };
     }
   });
-  type Undo = {
+  type Undo = { kind: "stage"; name: string; stage: Stage; patch: StageUndo; changedAt: string } | {
+    kind: "going";
     going: boolean;
     patch: ReturnType<typeof inverseGoingPatch>;
     changedAt: string;
@@ -64,7 +69,7 @@ export function useEntries() {
   const [saved, setSaved] = useState(false);
   const [canSave, setCanSave] = useState(!loaded.error);
   const update = useCallback(
-    (id: string, field: "stage" | "note", value: string) => {
+    (id: string, note: string) => {
       setSaved(false);
       const now = new Date().toISOString();
       setState((current) => ({
@@ -73,14 +78,22 @@ export function useEntries() {
           ...current.entries,
           [id]: {
             ...(current.entries[id] || emptyEntry),
-            [field]: value,
-            [field === "stage" ? "stageUpdatedAt" : "noteUpdatedAt"]: now,
+            note,
+            noteUpdatedAt: now,
           },
         },
       }));
     },
     [],
   );
+  const updateStage = useCallback((id: string, name: string, stage: Stage) => {
+    setSaved(false);
+    const now = new Date().toISOString();
+    setState((current) => {
+      const { entries, undo } = changeStage(current.entries, id, stage, now);
+      return { ...current, entries, undo: { kind: "stage", name, stage, patch: undo, changedAt: now } };
+    });
+  }, []);
   const updateOutreach = useCallback((id: string, patch: OutreachPatch, shared?: Outreach | null) => {
     setSaved(false);
     setState((current) => ({
@@ -153,7 +166,7 @@ export function useEntries() {
       const next = applyGoing(current.entries, ids, going, now, suggestions);
       const patch = inverseGoingPatch(current.entries, next, ids);
       return patch.length
-        ? { ...current, entries: next, undo: { patch, going, changedAt: now } }
+        ? { ...current, entries: next, undo: { kind: "going", patch, going, changedAt: now } }
         : current;
     });
   }, []);
@@ -168,18 +181,15 @@ export function useEntries() {
     );
     return () => window.clearTimeout(timer);
   }, [undo]);
-  function undoGoing() {
+  function undoChange() {
     const now = new Date().toISOString();
     setState((current) => {
       if (!current.undo) return current;
       return {
         ...current,
-        entries: undoGoingPatch(
-          current.entries,
-          current.undo.patch,
-          current.undo.changedAt,
-          now,
-        ),
+        entries: current.undo.kind === "stage"
+          ? undoStagePatch(current.entries, current.undo.patch, now)
+          : undoGoingPatch(current.entries, current.undo.patch, current.undo.changedAt, now),
         undo: null,
       };
     });
@@ -205,11 +215,12 @@ export function useEntries() {
     updateVendorPricing,
     resetVendorPricing,
     update,
+    updateStage,
     updateOutreach,
     updateMilestone,
     resetMilestone,
     undo,
-    undoGoing,
+    undoChange,
     setGoing,
     applyEntries,
     saved,

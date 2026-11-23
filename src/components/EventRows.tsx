@@ -5,7 +5,7 @@ import type { Event } from "../model";
 import type { ScoreResult } from "../scoring";
 import { emptyEntry, type DisplayEntry, type Stage } from "../storage";
 import { vendorApplyAction } from "../eventDecision";
-import { games, gameKey, upcoming } from "../utils";
+import { displayDateLabel, upcoming } from "../utils";
 import {
   ROW_SORT_LABELS,
   optionalColumns,
@@ -17,7 +17,7 @@ import {
   type RowKey,
   type RowSort,
 } from "../rows";
-import { Logo, Place, NoteTag, ClashCue, ScheduleBadge } from "./EventIdentity";
+import { Logo, Place, NoteTag, ClashCue, GameTags, Status } from "./EventIdentity";
 import { GoingButton, type SetGoing } from "./GoingButton";
 import { StagePicker } from "./Pipeline";
 import { ApplyLink } from "./ApplyLink";
@@ -233,7 +233,6 @@ export function EventRows({
               )}
               {items.map((e) => {
                 const entry = entries[e.id] || emptyEntry;
-                const titles = games(e);
                 const past = !upcoming(e, today);
                 const dates = rowDateLabel(e, today);
                 const status = scheduleStatus(e);
@@ -241,6 +240,7 @@ export function EventRows({
                 return (
                   <tr
                     key={e.id}
+                    data-event-id={e.id}
                     role="row"
                     data-going={entry.going}
                     data-selected={selectMode && selected.has(e.id)}
@@ -303,7 +303,6 @@ export function EventRows({
                             {e.name}
                           </button>
                           <div className="row-markers">
-                            <ScheduleBadge e={e} />
                             {selectMode && entry.going && (
                               <span className="going-marker">Going</span>
                             )}
@@ -325,35 +324,19 @@ export function EventRows({
                     <td
                       role="cell"
                       className="row-dates"
-                      data-status={dates === "TBA" ? "tba" : e.date_status}
+                      data-event-date={displayDateLabel(e, today)}
+                      data-status={e.date_status}
                       title={status + " · " + dates}
                     >
-                      <i aria-hidden="true" />
-                      {(e.event_status || status === "confirmed") && (
-                        <span className="sr-only">{status[0].toUpperCase() + status.slice(1)} </span>
-                      )}
-                      {dates}
+                      {dates !== "Dates not announced" && <><span className="row-date-label">{dates}</span>{" "}</>}
+                      <Status e={e} />
                     </td>
                     <td role="cell" className="row-place">
-                      <Place e={e} cityOnly />
+                      <Place e={e} />
                     </td>
                     <td role="cell" className="row-games">
                       <div>
-                        {titles.slice(0, 2).map((g) => (
-                          <span
-                            key={g}
-                            className="game-tag"
-                            title={g}
-                            data-game={gameKey(g)}
-                          >
-                            <span>{g}</span>
-                          </span>
-                        ))}
-                        {titles.length > 2 && (
-                          <span title={titles.slice(2).join(", ")}>
-                            +{titles.length - 2}
-                          </span>
-                        )}
+                        <GameTags event={e} />
                       </div>
                     </td>
                     <td role="cell" className="row-priority">
@@ -364,7 +347,7 @@ export function EventRows({
                     </td>
                     {columns.includes("scanner") && (
                       <td role="cell" className="row-scanner">
-                        <span className="row-mobile-header" aria-hidden="true">Scanner score · </span>
+                        <span className="row-mobile-header" aria-hidden="true">Fit score · </span>
                         {e.vendor_score ?? "—"}
                       </td>
                     )}
@@ -458,38 +441,17 @@ export function RowSortControl({
   const Direction = sort.direction === "asc" ? ArrowUp : ArrowDown;
   return (
     <div className="row-sort-control">
-      <div role="group" aria-label="Quick sort" className="quick-sort">
-        {(["priority", "dates"] as const).map((key) => (
-          <button
-            key={key}
-            aria-pressed={sort.key === key}
-            onClick={() =>
-              setSort({ key, direction: key === "priority" ? "desc" : "asc" })
-            }
-          >
-            {key === "priority" ? "Priority" : "Date"}
-          </button>
+      <select aria-label="Sort by" value={sort.key}
+        onChange={(ev) => setSort(nextRowSort(sort, ev.target.value as RowKey))}>
+        {Object.entries(ROW_SORT_LABELS).map(([key, label]) => (
+          <option key={key} value={key}>{label}</option>
         ))}
-      </div>
-      <label>
-        <span className="sr-only">Sort events by</span>
-        <select
-          value={sort.key}
-          onChange={(ev) =>
-            setSort(nextRowSort(sort, ev.target.value as RowKey))
-          }
-        >
-          {Object.entries(ROW_SORT_LABELS).map(([key, label]) => (
-            <option key={key} value={key}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </label>
+      </select>
       <button
         className="button"
         onClick={() => setSort(nextRowSort(sort, sort.key))}
         aria-label={`Sort ${sort.direction === "asc" ? "descending" : "ascending"}`}
+        aria-pressed={sort.direction === "desc"}
       >
         <Direction size={15} />
       </button>

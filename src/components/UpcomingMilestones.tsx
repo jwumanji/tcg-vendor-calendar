@@ -5,6 +5,7 @@ import { milestoneCountdown, milestoneTimes, upcomingMilestones } from "../miles
 import { vendorApplyAction } from "../eventDecision";
 import { MilestoneExport } from "./EventExports";
 import { ApplyLink } from "./ApplyLink";
+import { ListReminder } from "./ListReminder";
 
 const cardLimit = 3;
 
@@ -32,10 +33,12 @@ export function useMilestoneClock() {
   return now;
 }
 
-export function UpcomingMilestones({ events, open, focusFallback }: {
+export function UpcomingMilestones({ events, open, focusFallback, bannerExpanded, toggle }: {
   events: Event[];
   open: (event: Event) => void;
   focusFallback?: RefObject<HTMLHeadingElement | null>;
+  bannerExpanded?: boolean;
+  toggle?: () => void;
 }) {
   const now = useMilestoneClock();
   const [expanded, setExpanded] = useState(false);
@@ -61,10 +64,9 @@ export function UpcomingMilestones({ events, open, focusFallback }: {
   const visible = expanded ? upcoming : upcoming.slice(0, cardLimit);
   const extra = upcoming.length - cardLimit;
   return (
-    <section className="upcoming-milestones" aria-labelledby="upcoming-milestones-title">
-      <h3 id="upcoming-milestones-title">
-        <CalendarClock size={17} aria-hidden="true" /> Upcoming vendor deadlines &amp; openings
-      </h3>
+    <ListReminder id="upcoming-milestones" title="Upcoming vendor deadlines & openings"
+      summary={`${upcoming.length} upcoming vendor ${upcoming.length === 1 ? "date" : "dates"}`}
+      expanded={bannerExpanded} toggle={toggle} icon={<CalendarClock size={17} aria-hidden="true" />}>
       <ul id="upcoming-milestones-list" ref={list}>
         {visible.map(({ event, milestone }) => {
           const application = (milestone.type === "application_closes" || milestone.type === "booking_opens") &&
@@ -93,6 +95,6 @@ export function UpcomingMilestones({ events, open, focusFallback }: {
           {expanded ? "Show fewer milestones" : `Show ${extra} more ${extra === 1 ? "milestone" : "milestones"}`}
         </button>
       )}
-    </section>
+    </ListReminder>
   );
 }

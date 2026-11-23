@@ -56,6 +56,20 @@ it("renders a keyboard-accessible reminder list ordered by booking time", () => 
   }
 });
 
+it("offers the upcoming milestones as a single collapsed summary", () => {
+  const clock = vi.spyOn(Date, "now").mockReturnValue(Date.parse(today));
+  try {
+    const $ = load(renderToStaticMarkup(<UpcomingMilestones open={shared.open} bannerExpanded={false} toggle={vi.fn()}
+      events={[{ ...event, vendor_milestones: [booking] }]} />));
+    const summary = $(".reminder-summary");
+    expect(summary.attr("aria-expanded")).toBe("false");
+    expect(summary.text()).toContain("1 upcoming vendor date");
+    expect($("#" + summary.attr("aria-controls")).is("[hidden]")).toBe(true);
+  } finally {
+    clock.mockRestore();
+  }
+});
+
 it("renders an event empty state and only shows a calendar action for verified booking dates", () => {
   const empty = load(renderToStaticMarkup(<BookingMilestones event={event} {...milestoneActions} />));
   expect(empty(".booking-milestones > p").text()).toBe("No booking milestones recorded yet.");
@@ -134,8 +148,8 @@ it("renders matching stage controls and vendor actions on Grid and Rows", () => 
 
 describe("Grid and Rows sections", () => {
   it.each<[RowSort, string[]]>([
-    [defaultRowSort, ["January 2027 · 2 events", "March 2027 · 1 event", "Date TBA · 1 event"]],
-    [{ key: "dates", direction: "desc" }, ["March 2027 · 1 event", "January 2027 · 2 events", "Date TBA · 1 event"]],
+    [defaultRowSort, ["January 2027 · 2 events", "March 2027 · 1 event", "Dates not announced · 1 event"]],
+    [{ key: "dates", direction: "desc" }, ["March 2027 · 1 event", "January 2027 · 2 events", "Dates not announced · 1 event"]],
     [{ key: "country", direction: "asc" }, ["Hong Kong · 1 event", "Malaysia · 2 events", "Singapore · 1 event"]],
     [{ key: "priority", direction: "desc" }, []],
   ])("renders the shared groups and headings for %o", (sort, expected) => {
@@ -168,9 +182,9 @@ describe("Grid and Rows sections", () => {
     expect(grid(".list-section-heading").text()).toBe("January 2027 · 2 events");
     expect(grid(".card-when").map((_, el) => grid(el).text()).get())
       .toEqual(["31 Jan 2027 – 1 Feb 2027", "Est. January 2027"]);
-    expect(grid(".event-card").last().find(".badge.tba").text()).toContain("TBA");
-    expect(rows(".row-dates").first().text()).toBe("Confirmed 31 Jan–1 Feb 2027");
-    expect(rows(".row-dates[data-status=tba]").text()).toBe("Est. Jan 2027");
+    expect(grid(".event-card").last().find(".badge.tba").text()).toContain("Dates not announced");
+    expect(rows(".row-dates").first().text()).toBe("31 Jan–1 Feb 2027 ● Confirmed");
+    expect(rows(".row-dates[data-status=tba]").text()).toBe("Est. Jan 2027 ◇ Dates not announced");
   });
 });
 
@@ -180,7 +194,7 @@ it("shows only priority chips on list cards, rows, pipeline cards and top picks"
   const picks = <TopPicks events={[event]} scores={scores} today={today} {...shared} />;
   for (const $ of [grid, rows, load(renderToStaticMarkup(pipeline)), load(renderToStaticMarkup(picks))]) {
     expect($(".priority-chip").length).toBeGreaterThan(0);
-    expect($(".gem, .gem-tier, [data-tier], [title^='Scanner score']")).toHaveLength(0);
+    expect($(".gem, .gem-tier, [data-tier], [title^='Fit score']")).toHaveLength(0);
   }
   expect(rows(".row-scanner")).toHaveLength(0);
   const { rows: optedIn } = layouts(defaultRowSort, ["scanner"]);
@@ -248,14 +262,14 @@ it("labels the event outreach section, editor, research links and prices indepen
   expect($("label[for=detail-stage]").text()).toBe("Pipeline stage");
 });
 
-it("keeps the scanner value in the event page priority breakdown", () => {
+it("keeps the fit rating in the event page priority breakdown", () => {
   const $ = load(renderToStaticMarkup(
     <Detail today={today} e={event} entry={emptyEntry} score={scores[event.id]} saved setGoing={shared.setGoing}
       onStage={vi.fn()} onNote={vi.fn()} onOutreach={vi.fn()} onMilestone={vi.fn()} onRemoveMilestone={vi.fn()} setOverride={vi.fn()} openClash={vi.fn()} toast={null} />,
   ));
-  const factor = $(".priority-detail details").filter((_, el) => $(el).find("summary").text().includes("Scanner score"));
+  const factor = $(".priority-detail details").filter((_, el) => $(el).find("summary").text().includes("Fit score"));
   expect(factor).toHaveLength(1);
-  expect(factor.text()).toContain("Scanner vendor score 51/100");
+  expect(factor.text()).toContain("Vendor fit rating 51/100");
   expect($("meter, .vendor-meter, .gem")).toHaveLength(0);
 });
 
@@ -295,7 +309,7 @@ it("shows the same schedule status and zero priority in Rows and Grid and exclud
   expect(rows(".row-name").first().text()).toBe(postponed.name);
   const cell = rows(".row-dates").last();
   expect(cell.attr("title")).toMatch(/^cancelled · /);
-  expect(cell.text()).toMatch(/^Cancelled /);
+  expect(cell.text()).toMatch(/ Cancelled$/);
   expect(cell.text()).not.toContain("Confirmed");
   expect(matches(cancelled, { ...emptyFilters, status: "cancelled" }, {})).toBe(true);
   expect(matches(cancelled, { ...emptyFilters, status: "confirmed" }, {})).toBe(false);
@@ -303,7 +317,7 @@ it("shows the same schedule status and zero priority in Rows and Grid and exclud
 
 it("identifies a hidden sort column and direction in Rows", () => {
   const { rows } = layouts({ key: "scanner", direction: "desc" });
-  expect(rows(".rows-sort-note").text()).toBe("Sorted by Scanner score (descending)");
+  expect(rows(".rows-sort-note").text()).toBe("Sorted by Fit score (descending)");
   expect(layouts({ key: "scanner", direction: "desc" }, ["scanner"]).rows(".rows-sort-note")).toHaveLength(0);
 });
 

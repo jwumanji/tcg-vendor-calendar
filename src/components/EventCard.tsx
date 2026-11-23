@@ -8,7 +8,7 @@ import { CalendarDays } from "lucide-react";
 import type { Event } from "../model";
 import type { DisplayEntry, Entries, Stage } from "../storage";
 import { vendorApplyAction } from "../eventDecision";
-import { games, displayDateLabel, gameKey, primaryGameKey } from "../utils";
+import { displayDateLabel, primaryGameKey } from "../utils";
 import { holo } from "../holo";
 import {
   ClashCue,
@@ -16,6 +16,7 @@ import {
   Status,
   Place,
   NoteTag,
+  GameTags,
 } from "./EventIdentity";
 import { StagePicker } from "./Pipeline";
 import { ApplyLink } from "./ApplyLink";
@@ -47,12 +48,14 @@ export const EventCard = memo(function EventCard({
 }) {
   const Title = titleLevel === 4 ? "h4" : "h3";
   const application = vendorApplyAction(e, now);
+  const date = occurrence || displayDateLabel(e, today);
   return (
     <article
       className={`event-card holo status-${e.date_status}`}
       data-game={primaryGameKey(e)}
       data-event-status={e.event_status}
       data-going={entry.going}
+      data-event-id={e.id}
       {...holo}
     >
       <Logo e={e} size="xl" />
@@ -63,16 +66,16 @@ export const EventCard = memo(function EventCard({
               {e.name}
               <span className="sr-only">
                 {" "}
-                · {occurrence || displayDateLabel(e, today)} · {entry.stage}
+                · {date} · {entry.stage}
               </span>
             </button>
           </Title>
           <GoingButton e={e} going={entry.going} setGoing={setGoing} />
         </div>
         <div className="card-art">
-          <div className="card-when">
+          <div className="card-when" data-event-date={date}>
             <CalendarDays size={16} aria-hidden="true" />
-            <span>{occurrence || displayDateLabel(e, today)}</span>
+            <span>{date}</span>
           </div>
           <div className="card-location">
             <Place e={e} />
@@ -87,13 +90,7 @@ export const EventCard = memo(function EventCard({
           <OutreachChip outreach={e.outreach} />
           <VendorPriceCue event={e} now={now} />
           <FindBadges e={e} />
-          {games(e)
-            .slice(0, 3)
-            .map((g) => (
-              <span key={g} className="game-tag" data-game={gameKey(g)}>
-                {g}
-              </span>
-            ))}
+          <GameTags event={e} />
           {entry.note.trim() && <NoteTag />}
         </div>
         <div className="card-actions">

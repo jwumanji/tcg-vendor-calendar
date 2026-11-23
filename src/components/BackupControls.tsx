@@ -11,6 +11,7 @@ import {
   importPriority,
   type PriorityPreferences,
   type Backup,
+  type ListPreferences,
   stashBeforeReplace,
   validateBackup,
   importEntries,
@@ -37,6 +38,8 @@ export function BackupControls({
   apply,
   priority,
   applyPriority,
+  listPreferences,
+  applyListPreferences,
 }: {
   entries: Entries;
   outreach: OutreachPatches;
@@ -46,6 +49,8 @@ export function BackupControls({
   ids: string[];
   priority: PriorityPreferences;
   applyPriority: (value: PriorityPreferences) => void;
+  listPreferences: ListPreferences;
+  applyListPreferences: (value: ListPreferences) => void;
   apply: (entries: Entries, outreach: OutreachPatches, milestones: MilestoneEdits, vendorPricing: VendorPricingEdits, tripBudget: BudgetSettings) => void;
 }) {
   const [preview, setPreview] = useState<Backup | null>(null);
@@ -74,7 +79,7 @@ export function BackupControls({
           <HardDrive size={16} aria-hidden="true" /> Backup &amp; restore
         </span>
         <span>
-          Going choices, stages, notes, outreach edits, booking milestones, booth option and document edits, trip budgets and defaults, and score settings are kept in this
+          Going choices, stages, notes, outreach edits, booking milestones, booth option and document edits, trip budgets and defaults, score settings, and list preferences are kept in this
           browser only. Export a backup before switching devices.
         </span>
       </div>
@@ -83,7 +88,7 @@ export function BackupControls({
           className="button"
           onClick={() =>
             download(
-              JSON.stringify(backup(entries, priority, outreach, milestones, vendorPricing, tripBudget), null, 2),
+              JSON.stringify(backup(entries, priority, outreach, milestones, vendorPricing, tripBudget, listPreferences), null, 2),
               "tcg-pipeline-backup.json",
               "application/json",
             )
@@ -201,7 +206,8 @@ export function BackupControls({
               className="button primary"
               onClick={() => {
                 try {
-                  if (mode === "replace") stashBeforeReplace(entries, priority, outreach, milestones, vendorPricing, tripBudget);
+                  if (mode === "replace")
+                    stashBeforeReplace(entries, priority, outreach, milestones, vendorPricing, tripBudget, listPreferences);
                   apply(
                     importEntries(entries, preview.entries, mode),
                     importOutreach(outreach, preview.outreach, mode),
@@ -212,6 +218,7 @@ export function BackupControls({
                   applyPriority(
                     importPriority(priority, preview.priority, mode),
                   );
+                  if (preview.listPreferences) applyListPreferences(preview.listPreferences);
                   const summary = [
                     `${Object.keys(preview.entries).length} entries`,
                     preview.outreach && outreachSummary,

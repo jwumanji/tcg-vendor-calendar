@@ -13,10 +13,12 @@ import {
 import { describe, it, expect, vi } from "vitest";
 import {
   applyGoing,
+  changeStage,
   stageSuggestions,
   withSuggestedStages,
   inverseGoingPatch,
   undoGoingPatch,
+  undoStagePatch,
   stages,
   stashBeforeReplace,
   backup,
@@ -38,6 +40,13 @@ const entry = {
   noteUpdatedAt: "2026-11-16T10:00:00.000Z",
 };
 describe("versioned pipeline backup validation", () => {
+  it("round trips first-run, reminder and timeline preferences alongside planner records", () => {
+    const listPreferences = { firstRunDismissed: true, deadlinesExpanded: false, followUpsExpanded: true, showPast: false };
+    const value = backup({ event: entry }, undefined, undefined, undefined, undefined, undefined, listPreferences);
+    expect(validateBackup(JSON.parse(JSON.stringify(value)))).toEqual(value);
+    expect(validateBackup(backup({ event: entry })).listPreferences).toBeUndefined();
+    expect(() => validateBackup({ ...value, listPreferences: { firstRunDismissed: "yes" } })).toThrow(/list preference/i);
+  });
   it("round trips notes and timestamps and ignores unknown fields", () => {
     const value = backup({ event: entry, missing: emptyEntry });
     expect(
@@ -94,6 +103,29 @@ describe("versioned pipeline backup validation", () => {
       '{"__proto__":{"stage":"Not reviewed","note":"","noteUpdatedAt":null,"stageUpdatedAt":null}}',
     );
     expect(Object.keys(validateBackup(value).entries)).toEqual(["__proto__"]);
+  });
+});
+
+it.each(["Passed", "Too expensive"] as const)("undoes %s through saved entries and preserves independent changes", (stage) => {
+  const now = "2026-11-24T00:00:00.000Z";
+  const later = "2026-11-24T00:00:04.000Z";
+  const before = { event: { ...entry, stageUpdatedAt: entry.noteUpdatedAt }, other: emptyEntry };
+  const { entries, undo } = changeStage(before, "event", stage, now);
+  expect(entries.event).toMatchObject({ stage, stageUpdatedAt: now });
+  const restoredEntries = validateBackup(backup(entries)).entries;
+  const edited = { ...restoredEntries, event: { ...restoredEntries.event, note: "New note", noteUpdatedAt: later } };
+  const restored = undoStagePatch(edited, undo, later);
+  expect(restored.event).toEqual({ ...before.event, stageUpdatedAt: later, note: "New note", noteUpdatedAt: later });
+  expect(restored.other).toEqual(before.other);
+  expect(undoStagePatch(restored, undo, later)).toBe(restored);
+});
+
+it("restores the suggested stage after undoing the first explicit decision", () => {
+  const { entries, undo } = changeStage({}, "event", "Passed", "2026-11-24T00:00:00.000Z");
+  const restored = undoStagePatch(entries, undo, "2026-11-24T00:00:05.000Z");
+  expect(restored.event).toEqual(emptyEntry);
+  expect(withSuggestedStages(restored, { event: "Contacted" }).event).toMatchObject({
+    stage: "Contacted", stageSuggested: true,
   });
 });
 

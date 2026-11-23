@@ -7,7 +7,8 @@ import { homeBaseLabel, resolveHomeBase } from "../homeBase";
 import { applicableVendorPrice, formatVendorAmount, legacyVendorPrice } from "../vendorPricing";
 import { eventPath } from "../route";
 import { flushSync } from "react-dom";
-import React, { useRef, useEffect, useState, useCallback, useSyncExternalStore } from "react";
+import React, { useRef, useEffect, useState, useCallback } from "react";
+import { useMediaQuery } from "../hooks/useMediaQuery";
 import {
   AlertTriangle,
   ArrowUpRight,
@@ -49,12 +50,11 @@ function meaningful(value?: string | number | null) {
   return text && !/^(?:unknown|tba|tbd|other|unspecified|[-—–])$/i.test(text) ? text : undefined;
 }
 
-const desktopQuery = "(min-width: 900px)";
-function subscribeDesktop(callback: () => void) {
-  const query = window.matchMedia(desktopQuery);
-  query.addEventListener("change", callback);
-  return () => query.removeEventListener("change", callback);
-}
+const areaLabels: Record<string, string> = {
+  "SEA/HK": "Southeast Asia and Hong Kong",
+  "GCC (other)": "Other Gulf countries",
+  UAE: "United Arab Emirates",
+};
 function DetailDisclosure({ label, hint, defaultOpen, children, disclosureRef }: {
   label: string;
   hint: string;
@@ -189,8 +189,9 @@ export function Detail({
         <ArrowUpRight size={14} />
       </a>
     ) : null;
-  const desktop = useSyncExternalStore(subscribeDesktop, () => window.matchMedia(desktopQuery).matches, () => false);
+  const desktop = useMediaQuery("(min-width: 900px)");
   const [loggingQuote, setLoggingQuote] = useState(false);
+  const [showAllDates, setShowAllDates] = useState(false);
   const priceFact = useRef<HTMLDivElement>(null);
   const outreachPanel = useRef<HTMLDetailsElement>(null);
   const moneyPanel = useRef<HTMLDetailsElement>(null);
@@ -227,7 +228,7 @@ export function Detail({
   const priceAmount = price && formatVendorAmount(price.amount, price.currency);
   const date = occurrence || displayDateLabel(e, today);
   const fit = meaningful(e.fit) || meaningful(e.expected_size) ||
-    (meaningful(e.size_tier) && `Size tier ${e.size_tier}${e.size_tier_estimated ? " (estimated)" : ""}`);
+    (meaningful(e.size_tier) && `Show size ${e.size_tier}${e.size_tier_estimated ? " (estimated)" : ""}`);
   const access = meaningful(e.vendor_booths) || (routes.application ? "Vendor route published" : "Vendor access not published");
   const normalize = (text?: string | null) => text?.trim().toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
   const terms = meaningful(e.booth_detail) && e.booth_detail &&
@@ -254,8 +255,6 @@ export function Detail({
   const about: [string, string | number | null | undefined][] = [
     ["Organizer", e.organizer],
     ["Audience", e.audience],
-    ["Event type", e.event_type],
-    ["Region", e.region_group],
     ["Expected size", e.expected_size === fit ? null : e.expected_size],
     ["Size notes", e.size_note],
     ["Visitors", e.visitors?.toLocaleString()],
@@ -263,9 +262,11 @@ export function Detail({
     ["Previous editions", e.previous_editions],
     ["Edition count", e.previous_editions_count],
     ["First year", e.first_year],
-    ["Priority market", e.priority_market ? e.priority_market_level || "Yes" : null],
   ];
   const aboutRows = about.filter(([, value]) => meaningful(value));
+  const publishedDates = e.occurrences ?? [];
+  const nextDates = publishedDates.filter((date) => date.end_date >= today).slice(0, 3);
+  const visibleDates = showAllDates ? publishedDates : nextDates;
   const money = <VendorMoney event={e} now={now} shared={sharedVendorPricing} local={localVendorPricing}
     onSave={onVendorPricing} onRemove={onRemoveVendorPricing} terms={terms} />;
   const trip = <TripBudget event={e} now={now} today={today} occurrence={occurrence} homeBase={homeBase}
@@ -274,7 +275,7 @@ export function Detail({
     onSave={onMilestone} onRemove={onRemoveMilestone} featuredId={timing.milestone?.id} hideEmptyNotice />;
 
   return (
-    <article className="event-layout" data-game={primaryGameKey(e)}>
+    <article className="event-layout" data-game={primaryGameKey(e)} data-event-id={e.id}>
       <header className="event-facts">
         <div className="event-identity">
           <h1 ref={title} tabIndex={-1}>{e.name}</h1>
@@ -353,7 +354,7 @@ export function Detail({
               <dd>
                 <strong>Current booth price unknown</strong>
                 <div className="decision-links">
-                  {contactAction && action.panel !== "outreach-edit" &&
+                  {contactAction && action.panel !== "outreach-edit" && action.href !== contactAction.href &&
                     <ActionLink href={contactAction.href}>{contactAction.label}</ActionLink>}
                   {onVendorPricing && <button type="button" className="text-button" aria-haspopup="dialog"
                     onClick={() => setLoggingQuote(true)}>Log a quote</button>}
@@ -376,7 +377,8 @@ export function Detail({
         </dl>
       </section>
       <div className="detail-body event-information">
-        <DetailDisclosure label="Outreach" hint={outreachStatusLabels[outreach?.status ?? "not_contacted"]} defaultOpen={desktop || hasOutreach} disclosureRef={outreachPanel}>
+        <DetailDisclosure label="Outreach" hint={outreachStatusLabels[outreach?.status ?? "not_contacted"]}
+          defaultOpen={hasOutreach || (desktop && publishedDates.length === 0)} disclosureRef={outreachPanel}>
           <OutreachSection today={outreachDay} outreach={outreach ?? undefined} knownOutreach={knownOutreach}
             routes={routes} editor={outreachEditor} eventContacts={[e.contact, e.vendor_application]}
             onSave={onOutreach} saved={saved} />
@@ -385,22 +387,34 @@ export function Detail({
           disclosureRef={moneyPanel} defaultOpen={desktop || moneyHasPricesOrDocs}>{money}</DetailDisclosure>}
         {hasBudget && <DetailDisclosure label="Budget / break-even" hint={budgetHint} defaultOpen={desktop || budgetHasCosts}>{trip}</DetailDisclosure>}
         {hasSchedule && (
-          <DetailDisclosure label="When and where" hint={date} disclosureRef={schedulePanel} defaultOpen={desktop || Boolean(e.vendor_milestones?.length)}>
+          <DetailDisclosure label="When and where" hint={date} disclosureRef={schedulePanel}
+            defaultOpen={desktop || Boolean(e.vendor_milestones?.length || publishedDates.length)}>
             <dl>
-              {row("Dates", date)}
               {row("Venue", e.venue)}
-              {row("Place", e.city || e.country ? <Place e={e} /> : null)}
+              {row("Show type", meaningful(e.event_type))}
+              {row("Area", e.region_group && (areaLabels[e.region_group] ?? e.region_group))}
+              {row("Key market", e.priority_market ? "Yes" : "No")}
               {row("Date note", e.date_note)}
               {row("Vendor notice", timing.referenceNotice)}
             </dl>
-            {e.occurrences?.length ? (
+            {publishedDates.length > 0 && (
               <div className="detail-occurrences">
-                <h3>Published occurrences</h3>
-                <div className="occurrences">{ranges(e).map((r) => (
-                  <span key={r.start_date}>{prettyDate(r.start_date)}{r.end_date !== r.start_date && ` – ${prettyDate(r.end_date)}`}</span>
-                ))}</div>
+                <div className="published-dates-heading">
+                  <h3>Published dates</h3>
+                  {publishedDates.length > nextDates.length && (
+                    <button className="text-button" aria-expanded={showAllDates} aria-controls="published-event-dates"
+                      onClick={() => setShowAllDates(!showAllDates)}>
+                      {showAllDates ? "Show fewer dates" : `Show all ${publishedDates.length}`}
+                    </button>
+                  )}
+                </div>
+                <div className="occurrences" id="published-event-dates">
+                  {visibleDates.length ? visibleDates.map((r) => (
+                    <span key={r.start_date}>{prettyDate(r.start_date)}{r.end_date !== r.start_date && ` – ${prettyDate(r.end_date)}`}</span>
+                  )) : <p>No upcoming dates.</p>}
+                </div>
               </div>
-            ) : null}
+            )}
             {hasConfirmedDates(e) && (
               <button className="button" onClick={() => download(ics([e]), e.id + ".ics", "text/calendar;charset=utf-8")}>
                 <Download size={16} /> Add {e.occurrences ? "all occurrences" : "event"} to calendar
@@ -411,7 +425,6 @@ export function Detail({
         )}
         <DetailDisclosure label="Your planning" hint={entry.stage} disclosureRef={planningPanel} defaultOpen={desktop || !!entry.note.trim()}>
           <div className="planning">
-          <small>Change the pipeline stage in Decide.</small>
           <label htmlFor="event-note">Your notes</label>
           <textarea
             id="event-note"
@@ -461,7 +474,7 @@ export function Detail({
           {!hasSchedule && milestones}
         </DetailDisclosure>
         {(e.description || e.games.length > 0 || aboutRows.length > 0) && (
-          <DetailDisclosure label="About" hint={meaningful(e.organizer) || e.event_type} defaultOpen={desktop}>
+          <DetailDisclosure label="About" hint={meaningful(e.organizer) || "Show background"}>
             {e.description && <p className="description">{e.description}</p>}
             {e.games.length > 0 && <div className="game-pills">{e.games.map((g) => (
               <span key={g} className="game-tag" data-game={gameKeyOf(g)}>{g}</span>
@@ -475,7 +488,7 @@ export function Detail({
           </DetailDisclosure>
         )}
         {(sources.length > 0 || e.source || e.instagram_followers != null) && (
-          <DetailDisclosure label="Sources" hint={routes.official ? "Official site and research" : "Research links"} defaultOpen={desktop}>
+          <DetailDisclosure label="Sources" hint={routes.official ? "Official site and research" : "Research links"}>
             {sources.length > 0 && <div className="source-links">
               {sources.map((url, i) => <React.Fragment key={url}>{link(url, url === e.website ? "Official website"
                 : url === e.tickets ? "Tickets" : url === e.instagram ? "Instagram" : `Source ${i + 1}`)}</React.Fragment>)}

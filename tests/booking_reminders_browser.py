@@ -36,6 +36,10 @@ class PlannerBrowser(TestCase):
         self.addCleanup(context.close)
         context.route(f"{ORIGIN}/**", serve_build)
         self.page = context.new_page()
+        self.page.add_init_script("""
+            localStorage.setItem("tcg-deadlines-expanded", "true");
+            localStorage.setItem("tcg-follow-ups-expanded", "true");
+        """)
         self.strip = self.page.get_by_role("region", name="Upcoming vendor deadlines & openings")
 
     def test_detail_first_screen_layout_and_inline_actions(self):
@@ -127,13 +131,16 @@ class PlannerBrowser(TestCase):
             return document.elementFromPoint(x + width / 2, y + height / 2) === node;
         }"""))
         grid.locator(picker).select_option("Booked")
-        page.get_by_role("combobox", name="Sort events by").select_option("stage")
+        page.get_by_role("combobox", name="Sort by").select_option("stage")
         page.get_by_role("button", name=re.compile(r"^Filters")).click()
-        page.get_by_role("checkbox", name="Booked", exact=True).check()
+        filters = page.get_by_role("dialog", name="Filters")
+        filters.get_by_text("Score and stage", exact=True).click()
+        filters.get_by_role("checkbox", name="Booked", exact=True).check()
+        filters.get_by_role("button", name=re.compile(r"^Show \d+ event")).click()
         expect(grid.locator(picker)).to_have_value("Booked")
         layout.get_by_role("button", name="Rows").click()
         expect(rows.locator(picker)).to_have_value("Booked")
-        expect(page.get_by_role("combobox", name="Sort events by")).to_have_value("stage")
+        expect(page.get_by_role("combobox", name="Sort by")).to_have_value("stage")
         page.goto(f"{ORIGIN}/event/cardcon3")
         expect(picker).to_have_value("Booked")
         expect(page.get_by_role("button", name="Review booking")).to_be_visible()
@@ -238,8 +245,7 @@ class PlannerBrowser(TestCase):
         page.get_by_role("button", name="Grid", exact=True).click()
         expect(passed).to_have_count(0)
         expect(costly).to_have_count(0)
-        page.get_by_role("button", name=re.compile(r"^Filters")).click()
-        page.get_by_role("checkbox", name="Show passed / too expensive").check()
+        page.get_by_role("button", name="Show", exact=True).click()
         expect(passed).to_have_value("Passed")
         expect(costly).to_have_value("Too expensive")
 

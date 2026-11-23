@@ -2,6 +2,7 @@ import { useCallback, useLayoutEffect, useRef, useState, type RefObject } from "
 import { ArrowUpRight, Bell, MessagesSquare, Reply } from "lucide-react";
 import type { Event, Outreach } from "../model";
 import { dueOutreach, followUpLabels } from "../outreach";
+import { ListReminder } from "./ListReminder";
 
 const cardLimit = 3;
 const dayFormat = new Intl.DateTimeFormat("en-GB", {
@@ -35,11 +36,13 @@ function lastExchange(outreach: Outreach, kind: "reply" | "nudge") {
   };
 }
 
-export function OutreachFollowUps({ events, today, open, focusFallback }: {
+export function OutreachFollowUps({ events, today, open, focusFallback, bannerExpanded, toggle }: {
   events: Event[];
   today: string;
   open: (event: Event, returnFocus: () => HTMLElement | null) => void;
   focusFallback?: RefObject<HTMLHeadingElement | null>;
+  bannerExpanded?: boolean;
+  toggle?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const list = useRef<HTMLUListElement>(null);
@@ -65,10 +68,9 @@ export function OutreachFollowUps({ events, today, open, focusFallback }: {
   const visible = expanded ? queue : queue.slice(0, cardLimit);
   const extra = queue.length - cardLimit;
   return (
-    <section className="outreach-follow-ups" aria-labelledby="outreach-follow-ups-title">
-      <h3 id="outreach-follow-ups-title">
-        <MessagesSquare size={17} aria-hidden="true" /> Outreach follow-ups
-      </h3>
+    <ListReminder id="outreach-follow-ups" title="Outreach follow-ups"
+      summary={`${queue.length} follow-${queue.length === 1 ? "up" : "ups"} due`}
+      expanded={bannerExpanded} toggle={toggle} icon={<MessagesSquare size={17} aria-hidden="true" />}>
       <ul id="outreach-follow-ups-list" role="list" ref={list}>
         {visible.map(({ event, outreach, kind, due }) => {
           const exchange = lastExchange(outreach, kind);
@@ -103,6 +105,6 @@ export function OutreachFollowUps({ events, today, open, focusFallback }: {
           {expanded ? "Show fewer follow-ups" : `Show ${extra} more ${extra === 1 ? "follow-up" : "follow-ups"}`}
         </button>
       )}
-    </section>
+    </ListReminder>
   );
 }

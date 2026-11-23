@@ -1,5 +1,7 @@
 node_modules/
 dist/
+/public/logos/*-thumb.webp
+/public/logos/*-480.webp
 *.local
 
 *.tsbuildinfo

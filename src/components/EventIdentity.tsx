@@ -1,13 +1,13 @@
 import type { ScoreResult } from "../scoring";
 import type { Entries } from "../storage";
 import { TriangleAlert, StickyNote } from "lucide-react";
-import { flagFile, placeLabel } from "../utils";
+import { flagFile, gameKey, games, placeLabel } from "../utils";
 import type { Event } from "../model";
 import { useState } from "react";
 import { GeneratedCover } from "./GeneratedCover";
 import { EventImage } from "./EventImage";
+import type { LogoSize } from "../eventImage";
 
-export type LogoSize = "md" | "row" | "xl" | "detail";
 export function Logo({ e, size = "md" }: { e: Event; size?: LogoSize }) {
   const cls = "logo" + (size === "md" ? "" : " logo-" + size);
   const [failed, setFailed] = useState<string | null>(null);
@@ -18,6 +18,7 @@ export function Logo({ e, size = "md" }: { e: Event; size?: LogoSize }) {
           key={e.logo}
           path={e.logo}
           hint={e.logo_kind}
+          size={size}
           eager={size === "detail"}
           onError={() => setFailed(e.logo)}
         />
@@ -43,8 +44,23 @@ export function Status({ e }: { e: Event }) {
         ? "● Confirmed"
         : e.date_status === "estimated"
           ? "◷ Estimated"
-          : "◇ TBA"}
+          : "◇ Dates not announced"}
     </span>
+  );
+}
+
+export function GameTags({ event }: { event: Event }) {
+  const titles = games(event);
+  const more = titles.slice(3);
+  return (
+    <>
+      {titles.slice(0, 3).map((game) => (
+        <span key={game} className="game-tag" data-game={gameKey(game)} title={game}>
+          <span>{game}</span>
+        </span>
+      ))}
+      {more.length > 0 && <span className="game-tag-more" title={more.join(", ")}>+{more.length}</span>}
+    </>
   );
 }
 
@@ -75,16 +91,14 @@ export function CountryFlag({ code }: { code: string | null }) {
 export function Place({
   e,
   countryOnly = false,
-  cityOnly = false,
 }: {
   e: Pick<Event, "city" | "country" | "country_code">;
   countryOnly?: boolean;
-  cityOnly?: boolean;
 }) {
   return (
-    <span className="place" title={cityOnly ? placeLabel(e) : undefined}>
+    <span className="place">
       <CountryFlag code={e.country ? e.country_code : null} />
-      <span>{cityOnly && e.city ? e.city : placeLabel(e, countryOnly)}</span>
+      <span>{placeLabel(e, countryOnly)}</span>
     </span>
   );
 }

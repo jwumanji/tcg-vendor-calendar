@@ -52,7 +52,8 @@ it("puts Decide and the next action before the ordered reference sections", () =
   expect($(".event-decision #detail-stage").attr("aria-label")).toBe("Pipeline stage for Color Fiesta #18: Bon Appétit");
   expect($("#detail-stage, .planning .stage-picker")).toHaveLength(1);
   expect($("#detail-stage option[selected]").text()).toBe("Considering");
-  expect($(".planning").text()).toContain("Change the pipeline stage in Decide.");
+  expect($(".planning").text()).not.toContain("Change the pipeline stage in Decide.");
+  expect($(".planning #event-note")).toHaveLength(1);
 });
 
 it("leads a sparse find with missing facts and keeps editors reachable without empty reference panels", () => {
@@ -68,6 +69,20 @@ it("leads a sparse find with missing facts and keeps editors reachable without e
     "Outreach", "Your planning", "Score breakdown",
   ]);
   expect($(".planning").parent().text()).toContain("Set up trip budget");
+});
+
+it("shows the next three recurring dates and keeps the full published schedule accessible", () => {
+  const $ = render(event("r-tradeting"), { today: "2027-02-01" });
+  const dates = $("#published-event-dates");
+  expect(dates.children().map((_, el) => $(el).text()).get()).toEqual([
+    "13 Mar 2027 – 14 Mar 2027", "24 Apr 2027 – 25 Apr 2027", "22 May 2027 – 23 May 2027",
+  ]);
+  const toggle = $("button[aria-controls=published-event-dates]");
+  expect(toggle.attr("aria-expanded")).toBe("false");
+  expect(toggle.text()).toBe("Show all 10");
+  expect($(".detail-row").filter((_, el) => $(el).find("dt").text() === "Key market").find("dd").text()).toBe("Yes");
+  expect($(".event-information").text()).not.toMatch(/start_date|end_date|on the Page/i);
+  expect($(".event-information .detail-row").text()).toContain("AreaSoutheast Asia and Hong Kong");
 });
 
 it("assigns the mobile artwork below the decision and keeps Going and the primary action inline", () => {

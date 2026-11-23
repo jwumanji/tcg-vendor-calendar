@@ -102,6 +102,7 @@ export function Pipeline({
   open,
   setGoing,
   change,
+  browse,
 }: {
   today: string;
   now?: number;
@@ -112,6 +113,7 @@ export function Pipeline({
   open: (event: Event) => void;
   setGoing: SetGoing;
   change: (event: Event, stage: Stage) => void;
+  browse?: () => void;
 }) {
   return (
     <>
@@ -134,7 +136,14 @@ export function Pipeline({
                 <StageBadge stage={stage} /> <span>{items.length}</span>
               </h3>
               {items.length === 0 && (
-                <p className="pipeline-empty">No events in this stage.</p>
+                <div className="pipeline-empty">
+                  {stage === "Considering" ? (
+                    <p>Mark an event Going to see it here.</p>
+                  ) : (
+                    <p>Set an event’s stage to {stage} to see it here.</p>
+                  )}
+                  {browse && <button className="text-button" onClick={browse}>Browse events</button>}
+                </div>
               )}
               {items.map((e) => (
                 <PipelineCard
@@ -197,6 +206,7 @@ const PipelineCard = memo(function PipelineCard({
       className={`pipeline-card holo status-${e.date_status}`}
       data-game={primaryGameKey(e)}
       data-going={going}
+      data-event-id={e.id}
       {...holo}
     >
       <span className="pcard-edge" aria-hidden="true" />

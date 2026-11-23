@@ -8,6 +8,8 @@ export function Modal({
   close,
   children,
   className = "",
+  id,
+  returnFocus,
 }: {
   title: ReactNode;
   titleId: string;
@@ -15,21 +17,24 @@ export function Modal({
   close: () => void;
   children: ReactNode;
   className?: string;
+  id?: string;
+  returnFocus?: () => HTMLElement | null;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const dialog = ref.current!;
-    const trigger = document.activeElement;
+    const trigger = returnFocus?.() ?? document.activeElement;
     dialog.showModal();
     return () => {
       dialog.close();
       if (trigger instanceof HTMLElement)
         trigger.focus({ preventScroll: true });
     };
-  }, []);
+  }, [returnFocus]);
   return (
     <dialog
       ref={ref}
+      id={id}
       className={`score-settings ${className}`}
       aria-labelledby={titleId}
       onCancel={(ev) => {
@@ -42,9 +47,9 @@ export function Modal({
           return;
         }
         if (ev.key !== "Tab") return;
-        const controls = ev.currentTarget.querySelectorAll<HTMLElement>(
-          "button:enabled,input:enabled,select:enabled",
-        );
+        const controls = [...ev.currentTarget.querySelectorAll<HTMLElement>(
+          "button:enabled,input:enabled,select:enabled,textarea:enabled,a[href],summary",
+        )].filter((control) => control.tabIndex >= 0 && control.getClientRects().length > 0);
         const first = controls[0],
           last = controls[controls.length - 1];
         if (ev.shiftKey && document.activeElement === first) {

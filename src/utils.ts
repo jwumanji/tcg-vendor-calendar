@@ -185,7 +185,7 @@ export function scheduleStatus(e: Event) {
 export function dateLabel(e: Event) {
   if (e.date_status === "estimated")
     return e.estimated_month ? monthLabel(e.estimated_month) : "Estimated";
-  if (!e.start_date) return "Dates to be announced";
+  if (!e.start_date) return "Dates not announced";
   return (
     prettyDate(e.start_date) +
     (e.end_date && e.end_date !== e.start_date

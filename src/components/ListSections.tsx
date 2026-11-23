@@ -15,7 +15,7 @@ export function SectionHeading({
     <h3 className="list-section-heading">
       {sortKey === "country" ? (
         <Place e={items.find((e) => e.country_code) ?? items[0]} countryOnly />
-      ) : groupKey === "tba" ? "Date TBA" : monthLabel(groupKey)}
+      ) : groupKey === "tba" ? "Dates not announced" : monthLabel(groupKey)}
       <span className="section-count"> · {items.length} {items.length === 1 ? "event" : "events"}</span>
     </h3>
   );

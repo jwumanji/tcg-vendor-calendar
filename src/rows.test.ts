@@ -90,7 +90,7 @@ describe("row ordering", () => {
     ).toEqual([tentative, b, recurring]);
     expect(rowDateLabel(recurring, today)).toBe("2–4 Apr 2027");
     expect(rowDateLabel(tentative, today)).toBe("Est. Feb 2027");
-    expect(rowDateLabel(c, today)).toBe("TBA");
+    expect(rowDateLabel(c, today)).toBe("Dates not announced");
     const missing = { ...c, city: null, country: null };
     const sameCity = { ...a, country: "Australia" };
     for (const direction of ["asc", "desc"] as const)

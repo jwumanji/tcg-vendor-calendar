@@ -3427,7 +3427,7 @@
     "size_tier_estimated": false,
     "visitors": null,
     "vendor_count": null,
-    "previous_editions": "Annual Master Ball League. Series confirmed; 2027 dates TBA.",
+    "previous_editions": "Annual Master Ball League. Series confirmed; 2027 dates not announced.",
     "previous_editions_count": null,
     "first_year": "Not tabulated",
     "vendor_booths": "No public vendor program",
@@ -4731,7 +4731,7 @@
     "start_date": null,
     "end_date": null,
     "date_status": "tba",
-    "date_note": "Dates TBA, placed at Aug (WCS 2026 was 28–30 Aug; Konami has not given a 2027 month)",
+    "date_note": "Dates not announced, placed at Aug (WCS 2026 was 28–30 Aug; Konami has not given a 2027 month)",
     "estimated_month": null,
     "city": "Singapore",
     "country": "Singapore",
@@ -5361,7 +5361,7 @@
     "start_date": null,
     "end_date": null,
     "date_status": "estimated",
-    "date_note": "2027 dates TBA; est. Oct or early Nov from the last two editions (4–5 Oct 2025; 31 Oct–1 Nov 2026) — estimate only, not a booking date. Official site confirms a 2027 return.",
+    "date_note": "2027 dates not announced; est. Oct or early Nov from the last two editions (4–5 Oct 2025; 31 Oct–1 Nov 2026) — estimate only, not a booking date. Official site confirms a 2027 return.",
     "estimated_month": "2027-10",
     "city": "Dubai",
     "country": "United Arab Emirates",
@@ -6440,7 +6440,7 @@
     "start_date": null,
     "end_date": null,
     "date_status": "estimated",
-    "date_note": "Dec 2027, exact dates TBA (2026: 19–20 Dec)",
+    "date_note": "Dec 2027, exact dates not announced (2026: 19–20 Dec)",
     "estimated_month": "2027-12",
     "city": "Kuala Lumpur",
     "country": "Malaysia",
@@ -6543,7 +6543,7 @@
     "start_date": null,
     "end_date": null,
     "date_status": "tba",
-    "date_note": "Recurring through 2027; volume dates TBA. Series is ongoing and ran roughly monthly in late 2026. Next already-dated show is Vol 7: 28–29 Nov 2026 (before this window).",
+    "date_note": "Recurring through 2027; volume dates not announced. Series is ongoing and ran roughly monthly in late 2026. Next already-dated show is Vol 7: 28–29 Nov 2026 (before this window).",
     "estimated_month": null,
     "city": "Dubai",
     "country": "United Arab Emirates",
@@ -6594,7 +6594,7 @@
     "start_date": null,
     "end_date": null,
     "date_status": "tba",
-    "date_note": "Recurring through 2027; dates TBA. 2026 dates found include 23 May, 3 Oct, 10 Oct and 21 Nov. Next already-dated 2026 market: Sat 21 Nov 2026, 10am–10pm, Dubai Outlet Mall, free admission.",
+    "date_note": "Recurring through 2027; dates not announced. 2026 dates found include 23 May, 3 Oct, 10 Oct and 21 Nov. Next already-dated 2026 market: Sat 21 Nov 2026, 10am–10pm, Dubai Outlet Mall, free admission.",
     "estimated_month": null,
     "city": "Dubai",
     "country": "United Arab Emirates",
@@ -6647,7 +6647,7 @@
     "start_date": null,
     "end_date": null,
     "date_status": "tba",
-    "date_note": "Recurring through 2027; dates TBA. 2026 examples: POP UP CON Vol. 25 on 27–28 Jun; Celebrate Japan 1–2 Aug; Come Play 10–11 Oct; Give Back 28–29 Nov (year-end, 11am–10pm, free entry).",
+    "date_note": "Recurring through 2027; dates not announced. 2026 examples: POP UP CON Vol. 25 on 27–28 Jun; Celebrate Japan 1–2 Aug; Come Play 10–11 Oct; Give Back 28–29 Nov (year-end, 11am–10pm, free entry).",
     "estimated_month": null,
     "city": "Dubai",
     "country": "United Arab Emirates",
@@ -6951,7 +6951,7 @@
     "start_date": "2027-01-01",
     "end_date": "2027-01-03",
     "date_status": "confirmed",
-    "date_note": "2027 dates: 1–3 Jan. start_date/end_date = first 2027 occurrence; all listed in occurrences.",
+    "date_note": "2027 dates: 1–3 Jan.",
     "estimated_month": null,
     "occurrences": [
       {
@@ -6990,7 +6990,7 @@
     "instagram_followers": null,
     "description": null,
     "audience": null,
-    "fit": "Weekend community tradeshow; useful extra SG weekend, not a destination show (not scored on the Page).",
+    "fit": "Weekend community tradeshow; useful extra SG weekend, not a destination show.",
     "source_urls": [
       "https://cardian.sg/market/calendar"
     ],
@@ -7019,7 +7019,7 @@
     "start_date": "2027-01-02",
     "end_date": "2027-01-03",
     "date_status": "confirmed",
-    "date_note": "2027 dates: 2–3 Jan, 13–14 Mar, 24–25 Apr, 22–23 May, 19–20 Jun, 24–25 Jul, 21–22 Aug, 18–19 Sep, 23–24 Oct, 27–28 Nov. start_date/end_date = first 2027 occurrence; all listed in occurrences.",
+    "date_note": null,
     "estimated_month": null,
     "occurrences": [
       {
@@ -7094,7 +7094,7 @@
     "instagram_followers": null,
     "description": null,
     "audience": null,
-    "fit": "Weekend community tradeshow; useful extra SG weekend, not a destination show (not scored on the Page).",
+    "fit": "Weekend community tradeshow; useful extra SG weekend, not a destination show.",
     "source_urls": [
       "https://cardian.sg/market/calendar"
     ],
@@ -7123,7 +7123,7 @@
     "start_date": "2027-01-03",
     "end_date": "2027-01-03",
     "date_status": "confirmed",
-    "date_note": "2027 dates: 3 Jan, 17 Jan. start_date/end_date = first 2027 occurrence; all listed in occurrences.",
+    "date_note": "2027 dates: 3 Jan, 17 Jan.",
     "estimated_month": null,
     "occurrences": [
       {
@@ -7166,7 +7166,7 @@
     "instagram_followers": null,
     "description": null,
     "audience": null,
-    "fit": "Weekend community tradeshow; useful extra SG weekend, not a destination show (not scored on the Page).",
+    "fit": "Weekend community tradeshow; useful extra SG weekend, not a destination show.",
     "source_urls": [
       "https://cardian.sg/market/calendar"
     ],
@@ -7197,7 +7197,7 @@
     "start_date": "2027-01-09",
     "end_date": "2027-01-10",
     "date_status": "confirmed",
-    "date_note": "2027 dates: 9–10 Jan (#3), 16–17 Jan (#4). start_date/end_date = first 2027 occurrence; all listed in occurrences.",
+    "date_note": "2027 dates: 9–10 Jan (#3), 16–17 Jan (#4).",
     "estimated_month": null,
     "occurrences": [
       {
@@ -7240,7 +7240,7 @@
     "instagram_followers": null,
     "description": null,
     "audience": null,
-    "fit": "Weekend community tradeshow; useful extra SG weekend, not a destination show (not scored on the Page).",
+    "fit": "Weekend community tradeshow; useful extra SG weekend, not a destination show.",
     "source_urls": [
       "https://cardian.sg/market/calendar"
     ],
@@ -7269,7 +7269,7 @@
     "start_date": "2027-01-30",
     "end_date": "2027-01-31",
     "date_status": "confirmed",
-    "date_note": "2027 dates: 30–31 Jan, 13–14 Feb, 20–21 Mar. start_date/end_date = first 2027 occurrence; all listed in occurrences.",
+    "date_note": "2027 dates: 30–31 Jan, 13–14 Feb, 20–21 Mar.",
     "estimated_month": null,
     "occurrences": [
       {
@@ -7316,7 +7316,7 @@
     "instagram_followers": null,
     "description": null,
     "audience": null,
-    "fit": "Weekend community tradeshow; useful extra SG weekend, not a destination show (not scored on the Page).",
+    "fit": "Weekend community tradeshow; useful extra SG weekend, not a destination show.",
     "source_urls": [
       "https://cardian.sg/market/calendar"
     ],
@@ -7345,7 +7345,7 @@
     "start_date": "2027-02-12",
     "end_date": "2027-02-14",
     "date_status": "confirmed",
-    "date_note": "2027 dates: 12–14 Feb (Junction 8); 27–28 Feb and 8–9 May (City Square Mall). start_date/end_date = first 2027 occurrence; all listed in occurrences.",
+    "date_note": "2027 dates: 12–14 Feb (Junction 8); 27–28 Feb and 8–9 May (City Square Mall).",
     "estimated_month": null,
     "occurrences": [
       {
@@ -7392,7 +7392,7 @@
     "instagram_followers": null,
     "description": null,
     "audience": null,
-    "fit": "Weekend community tradeshow; useful extra SG weekend, not a destination show (not scored on the Page).",
+    "fit": "Weekend community tradeshow; useful extra SG weekend, not a destination show.",
     "source_urls": [
       "https://cardian.sg/market/calendar"
     ],
@@ -7913,7 +7913,7 @@
     "start_date": null,
     "end_date": null,
     "date_status": "tba",
-    "date_note": "Not announced; the last Round 3 was 22–24 May 2026 in Kuala Lumpur. Region: SEA, location TBA.",
+    "date_note": "Not announced; the last Round 3 was 22–24 May 2026 in Kuala Lumpur. The venue in Southeast Asia has yet to be announced.",
     "estimated_month": null,
     "city": null,
     "country": null,
@@ -8101,7 +8101,7 @@
     "instagram_followers": null,
     "description": "Kyo Cards' free-entry trading card convention at Singapore EXPO, with guest Japanese card artists, a Riftbound tournament and VIP early access. The official site says the 2026 season has ended; no 2027 dates yet, so the Feb–Mar slot is an estimate from KCC1 2026.",
     "audience": "Singapore and regional (MY, ID) TCG collectors and players.",
-    "fit": "Large free-entry Singapore EXPO card convention that ran five times in 2026. Not on the Page before this scan. Watch for the 2027 calendar and register as a vendor early.",
+    "fit": "Large free-entry Singapore EXPO card convention that ran five times in 2026. Watch for the 2027 calendar and register as a vendor early.",
     "source_urls": [
       "https://events.kyocards.com/"
     ],
@@ -8222,7 +8222,7 @@
     "start_date": "2027-01-08",
     "end_date": "2027-01-09",
     "date_status": "confirmed",
-    "date_note": "2027 dates: 8–9 Jan, 9–10 Apr (Fri–Sat); Nov date TBA. start_date/end_date = first 2027 occurrence; all listed in occurrences.",
+    "date_note": "2027 dates: 8–9 Jan, 9–10 Apr (Fri–Sat); November date not announced.",
     "estimated_month": null,
     "occurrences": [
       {
@@ -8265,7 +8265,7 @@
     "instagram_followers": null,
     "description": null,
     "audience": null,
-    "fit": "Weekend community tradeshow; useful extra SG weekend, not a destination show (not scored on the Page).",
+    "fit": "Weekend community tradeshow; useful extra SG weekend, not a destination show.",
     "source_urls": [
       "https://cardian.sg/market/calendar",
       "https://www.instagram.com/p/DfltCdiNOLm/",
@@ -8283,7 +8283,7 @@
     "start_date": "2027-01-16",
     "end_date": "2027-01-17",
     "date_status": "confirmed",
-    "date_note": "2027 dates: 16–17 Jan, 13–14 Feb, 6–7 Mar, 10–11 Apr, 29–30 May, 26–27 Jun. start_date/end_date = first 2027 occurrence; all listed in occurrences.",
+    "date_note": "2027 dates: 16–17 Jan, 13–14 Feb, 6–7 Mar, 10–11 Apr, 29–30 May, 26–27 Jun.",
     "estimated_month": null,
     "occurrences": [
       {
@@ -8342,7 +8342,7 @@
     "instagram_followers": null,
     "description": null,
     "audience": null,
-    "fit": "Weekend community tradeshow; useful extra SG weekend, not a destination show (not scored on the Page).",
+    "fit": "Weekend community tradeshow; useful extra SG weekend, not a destination show.",
     "source_urls": [
       "https://cardian.sg/market/calendar"
     ],
@@ -8358,7 +8358,7 @@
     "start_date": "2027-05-15",
     "end_date": "2027-05-16",
     "date_status": "confirmed",
-    "date_note": "2027 dates: 15–16 May. start_date/end_date = first 2027 occurrence; all listed in occurrences.",
+    "date_note": "2027 dates: 15–16 May.",
     "estimated_month": null,
     "occurrences": [
       {
@@ -8397,7 +8397,7 @@
     "instagram_followers": null,
     "description": null,
     "audience": null,
-    "fit": "Weekend community tradeshow; useful extra SG weekend, not a destination show (not scored on the Page).",
+    "fit": "Weekend community tradeshow; useful extra SG weekend, not a destination show.",
     "source_urls": [
       "https://bawvault.com/card-shows/singapore/"
     ],

@@ -123,7 +123,7 @@ export function EventRows({
             {header("stage")}
             {header("going")}
             <th scope="col" role="columnheader" className="col-apply">Apply</th>
-            {comparison && <th scope="col" role="columnheader" className="col-compare">Pin</th>}
+            {comparison && <th scope="col" role="columnheader" className="col-compare">Compare</th>}
           </tr>
         </thead>
         {Array.from(groups, ([key, items]) => (

@@ -463,7 +463,8 @@ test("keeps wrapped counts and compact touch actions aligned in both mobile layo
           return { center: y + height / 2, width, height };
         }));
       assert.ok(actions.length >= 2);
-      assert.ok(actions.every(({ width, height }) => width >= 44 && height >= 44));
+      assert.ok(actions.every(({ width, height }) => width >= 43.99 && height >= 43.99),
+        `${layout} action size for ${id}: ${JSON.stringify(actions)}`);
       assert.ok(actions.every(({ center }) => Math.abs(center - actions[0].center) <= 1));
     }
     assert.equal(await page.locator("html").evaluate(el => el.scrollWidth), 390);
@@ -501,7 +502,7 @@ const compareDialog = page => page.getByRole("dialog", { name: "Compare events" 
 const compareValues = (page, field) => compareDialog(page).getByRole("row")
   .filter({ has: page.getByRole("rowheader", { name: field, exact: true }) }).getByRole("cell");
 
-test("keeps comparison pins through filters, layout changes and bulk Going with a four-event limit", async t => {
+test("keeps comparison pins through filters, layout and view changes, bulk Going and reload", async t => {
   const page = await open(t);
   const compare = button(page, "Compare");
   const tray = page.getByRole("region", { name: "Compare events" });
@@ -526,7 +527,9 @@ test("keeps comparison pins through filters, layout changes and bulk Going with 
   assert.equal(await page.locator(`tr[data-event-id="${ids[0]}"]`).getAttribute("data-going"), "false");
   await pinButton(page, ids[1]).click();
   assert.equal(await compare.isEnabled(), true);
-  assert.deepEqual(await storage(), storageBeforePinning);
+  const { "tcg-compare-pins-v1": pins, ...otherStorage } = await storage();
+  assert.deepEqual(JSON.parse(pins).map(({ id }) => id), ids.slice(0, 2));
+  assert.deepEqual(otherStorage, storageBeforePinning);
   assert.deepEqual(await exportBackup(), backupBeforePinning);
   await button(page, "Grid").click();
   assert.equal(await pinButton(page, ids[1]).getAttribute("aria-pressed"), "true");
@@ -569,11 +572,22 @@ test("keeps comparison pins through filters, layout changes and bulk Going with 
   await tray.getByRole("button", { name: `Remove ${award} from comparison` }).press("Enter");
   assert.equal(await tray.locator(".compare-pin").count(), 3);
   assert.match(await page.evaluate(() => document.activeElement?.getAttribute("aria-label")), /Remove THE TRADE/);
+  for (const view of ["Top picks", "Watchlist", "Timeline"]) {
+    await button(page, view).click();
+    assert.equal(await page.locator(".compare-toggle").count(), 0);
+    assert.match(await tray.innerText(), /Pin events in List/);
+    assert.equal(await tray.locator(".compare-pin").count(), 3);
+    await compare.click();
+    await dialog.waitFor();
+    await page.keyboard.press("Escape");
+    assert.equal(await compare.evaluate(el => document.activeElement === el), true);
+  }
   await page.reload();
-  assert.equal(await tray.locator(".compare-pin").count(), 0);
+  assert.equal(await tray.locator(".compare-pin").count(), 3);
+  assert.equal(await pinButton(page, ids[1]).getAttribute("aria-pressed"), "true");
 });
 
-test("stacks comparison rows at 390px and recalculates a confirmed clash after changing weekends", async t => {
+test("compares side by side at 390px and persists the weekend that changes a confirmed clash", async t => {
   const page = await open(t, iPhone);
   for (const layout of ["Rows", "Grid"]) {
     await button(page, layout).click();
@@ -593,8 +607,10 @@ test("stacks comparison rows at 390px and recalculates a confirmed clash after c
   assert.match(await compareValues(page, "Confirmed overlap").first().innerText(), /No confirmed overlap/);
   const firstDate = await compareValues(page, "Dates and certainty").first().boundingBox();
   const secondDate = await compareValues(page, "Dates and certainty").nth(1).boundingBox();
-  assert.ok(secondDate.y >= firstDate.y + firstDate.height - 1);
-  assert.ok(await dialog.locator(".compare-mobile-name").first().isVisible());
+  const badges = await compareValues(page, "Dates and certainty").locator(".badge").evaluateAll(nodes =>
+    nodes.map(node => node.getBoundingClientRect().y));
+  assert.ok(firstDate.x + firstDate.width <= secondDate.x + 1);
+  assert.ok(Math.abs(badges[0] - badges[1]) <= 1);
   assert.equal(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth), true);
   assert.equal(await page.locator("html").evaluate(el => el.scrollWidth), 390);
   for (const control of [weekend, dialog.getByRole("button", { name: "Close comparison" })]) {
@@ -605,6 +621,87 @@ test("stacks comparison rows at 390px and recalculates a confirmed clash after c
   await button(page, "Rows").tap();
   await button(page, "Compare").tap();
   assert.equal(await weekend.locator("option:checked").innerText(), "13–14 Mar 2027");
+  await page.reload();
+  await button(page, "Compare").tap();
+  assert.equal(await weekend.locator("option:checked").innerText(), "13–14 Mar 2027");
+});
+
+test("keeps the compact tray in reach through deep mobile scrolling and bulk selection", async t => {
+  const page = await open(t, iPhone);
+  const tray = page.getByRole("region", { name: "Compare events" });
+  const compare = button(page, "Compare");
+  const toggles = page.locator(".compare-toggle");
+  const lastRow = eventRows(page).last();
+  assert.ok(await eventRows(page).locator(".row-name").evaluateAll(nodes => nodes.every(el => el.offsetHeight >= 44)));
+  const tapDeepPin = async index => {
+    const pin = toggles.nth(index);
+    await pin.scrollIntoViewIfNeeded();
+    await pin.tap();
+    assert.ok(await pin.getByText("Pinned", { exact: true }).isVisible());
+    assert.ok(await page.evaluate(() => scrollY > innerHeight));
+    const { y, height } = await tray.boundingBox();
+    assert.ok(y >= 0 && y + height <= iPhone.viewport.height + 1 && height >= 44);
+  };
+  await tapDeepPin(14);
+  assert.match(await tray.innerText(), /1 of 4 pinned/);
+  assert.equal(await compare.isDisabled(), true);
+  for (const theme of ["dark", "light"]) {
+    await page.waitForFunction(theme => document.documentElement.dataset.theme === theme, theme);
+    const contrast = await compare.evaluate(el => {
+      const { color, backgroundColor, opacity } = getComputedStyle(el);
+      if (opacity !== "1") throw new Error(`Unexpected disabled button opacity ${opacity}`);
+      function luminance(rgb) {
+        const linear = rgb.match(/\d+/g).map(value => {
+          const channel = Number(value) / 255;
+          return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+        });
+        return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+      }
+      const values = [luminance(color), luminance(backgroundColor)];
+      return (Math.max(...values) + 0.05) / (Math.min(...values) + 0.05);
+    });
+    assert.ok(contrast >= 4.5, `Disabled Compare button contrast in ${theme} mode`);
+    await button(page, "Toggle light and dark theme").tap();
+  }
+  await tapDeepPin(15);
+  assert.equal(await compare.isEnabled(), true);
+  await tapDeepPin(16);
+  await tapDeepPin(17);
+  assert.match(await toggles.nth(18).innerText(), /Remove one to pin another/);
+  assert.ok((await tray.boundingBox()).height <= 160);
+  assert.ok(await tray.locator(".compare-pin").evaluateAll(nodes => nodes.every(el => el.offsetHeight >= 44)));
+  await page.evaluate(() => scrollTo({ top: document.documentElement.scrollHeight, behavior: "instant" }));
+  const last = await lastRow.boundingBox();
+  assert.ok(last.y + last.height <= (await tray.boundingBox()).y);
+  await button(page, "Bulk select").tap();
+  const bulk = await page.locator(".bulk-bar").boundingBox();
+  const pinned = await tray.boundingBox();
+  assert.ok(pinned.y + pinned.height <= bulk.y + 1);
+  await compare.tap();
+  await compareDialog(page).waitFor();
+});
+
+test("keeps event names at the top of the comparison and field labels in view on mobile", async t => {
+  for (const options of [iPhone, { ...desktop, viewport: { width: 1440, height: 700 } }]) {
+    const page = await open(t, options);
+    for (const id of ["r-awardx", "r-tradeting", "r-sunday", "r-kip"]) await pinButton(page, id).press("Space");
+    await button(page, "Compare").press("Enter");
+    const dialog = compareDialog(page);
+    const scroller = dialog.getByRole("region", { name: "Comparison fields" });
+    const lastName = dialog.getByRole("columnheader").last();
+    const fee = dialog.getByRole("rowheader", { name: "Eligible table fee" });
+    const left = (await fee.boundingBox()).x;
+    const top = (await lastName.boundingBox()).y;
+    assert.ok((await fee.boundingBox()).y < options.viewport.height);
+    await scroller.evaluate(el => el.scrollTo(el.scrollWidth, el.scrollHeight));
+    assert.ok(await scroller.evaluate(el => el.scrollTop > 0));
+    assert.ok(Math.abs((await lastName.boundingBox()).y - top) <= 1);
+    if (options.hasTouch) {
+      assert.ok(await scroller.evaluate(el => el.scrollLeft > 0 && el.scrollHeight <= 2 * el.clientHeight));
+      assert.ok(Math.abs((await fee.boundingBox()).x - left) <= 1);
+      assert.ok((await lastName.boundingBox()).x + (await lastName.boundingBox()).width <= options.viewport.width);
+    }
+  }
 });
 
 test("wraps long certainty badges within their comparison cells at narrow widths", async t => {

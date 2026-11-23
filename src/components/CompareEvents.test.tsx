@@ -2,7 +2,7 @@ import { load } from "cheerio";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it, vi } from "vitest";
 import raw from "../../data/events.json";
-import { canCompare, compareOccurrenceKey, compareOverlaps, resolveComparePins, selectCompareOccurrence, toggleComparePin, type ComparePin } from "../compare";
+import { canCompare, compareOccurrenceKey, compareOverlaps, normalizeComparePins, resolveComparePins, selectCompareOccurrence, toggleComparePin, type ComparePin } from "../compare";
 import { normalizeEvents } from "../data";
 import { DEFAULT_HOME_BASE } from "../homeBase";
 import { emptyFilters, type Event, type VendorMilestone } from "../model";
@@ -10,6 +10,7 @@ import { scoreEvent } from "../scoring";
 import { emptyEntry, stageSuggestions, withSuggestedStages } from "../storage";
 import { displayDateLabel, matchingEvent, overlappingDateRange } from "../utils";
 import { CompareEvents, CompareTable, CompareTray } from "./CompareEvents";
+import { CompareToggle } from "./CompareToggle";
 import { Detail } from "./Detail";
 import { EventCard } from "./EventCard";
 import { EventRows } from "./EventRows";
@@ -64,13 +65,24 @@ it("pins the displayed filtered weekend and retains its whole date range after f
   expect(hidden[0]).toMatchObject({ event: trade, range: { start_date: "2027-03-13", end_date: "2027-03-14" }, visible: false });
   expect(hidden[0].occurrences).toHaveLength(trade.occurrences!.length);
   expect(hidden[1].visible).toBe(true);
-  const $ = load(renderToStaticMarkup(<CompareTray pins={hidden} trigger={{ current: null }} open={noop} remove={noop} />));
+  const $ = load(renderToStaticMarkup(<CompareTray pins={hidden} canPin={false} trigger={{ current: null }} open={noop} remove={noop} />));
   expect($(".compare-pins button").map((_, button) => $(button).attr("aria-label")).get())
     .toEqual([`Remove ${trade.name} from comparison`, `Remove ${award.name} from comparison`]);
   expect($(".compare-pin small").text()).toBe("Outside current results");
   expect($(".compare-pin").first().attr("aria-describedby")).toBe($(".compare-pin small").attr("id"));
   expect($(".compare-pin").last().attr("aria-describedby")).toBeUndefined();
   expect($(".compare-trigger").is(":disabled")).toBe(false);
+  expect($(".compare-tray [role=status]").text()).toBe("2 of 4 pinned. Pin events in List.");
+});
+
+it("restores valid stored pins in order with their selected weekends and drops stale or duplicate entries", () => {
+  const occurrence = compareOccurrenceKey(trade.occurrences![1]);
+  const stored = [null, { id: "old-event" }, { id: trade.id, occurrence }, { id: trade.id },
+    { id: award.id, occurrence: "2027-02-30/2027-03-01" }, { id: urban.id }, { id: caps.id }, { id: color.id }];
+  expect(normalizeComparePins(stored, events)).toEqual([
+    { id: trade.id, occurrence }, { id: award.id }, { id: urban.id }, { id: caps.id },
+  ]);
+  expect(normalizeComparePins({ id: award.id }, events)).toEqual([]);
 });
 
 it("keeps published weekends distinct even when a moved weekend shares an original date", () => {
@@ -166,13 +178,38 @@ it("shows useful missing rate reasons and leaves totals blank when there are no 
   ];
   for (const [index, message] of messages.entries()) {
     expect(cell($, "Eligible table fee", index).text()).toBe(message);
-    expect(cell($, "Trip total for entered costs", index).text()).toBe("Total pending an applicable table fee.");
     expect(cell($, "Break-even per selling day", index).text()).not.toMatch(/USD|VND|\d/);
   }
+  expect(cell($, "Trip total for entered costs", 0).text()).toBe("Total pending an applicable table fee.");
   const withCost = renderComparison([award, urban], { budgets: { [award.id]: { costs: { travel: { amount: 80, currency: "USD" } } } } });
   expect(cell(withCost, "Trip total for entered costs", 0).text()).toContain("Known costs subtotal");
   expect(cell(withCost, "Trip total for entered costs", 0).text()).toContain("USD 80.00");
   expect(cell(withCost, "Break-even per selling day", 0).text()).toBe("Available when the trip total is known.");
+});
+
+it("spans all event columns for identical unavailable values and keeps prices and budget details separate", () => {
+  const shows = [award, trade, caps, urban].map((show) => ({
+    ...show, vendor_cost: null, vendor_options: [], vendor_application: null, vendor_milestones: [], outreach: undefined,
+  }));
+  const $ = renderComparison(shows);
+  for (const [field, message] of [
+    ["Eligible table fee", "No booth price recorded."],
+    ["Trip total for entered costs", "Total pending an applicable table fee."],
+    ["Break-even per selling day", "Available when the trip total is known."],
+    ["Next verified milestone", "No upcoming verified milestone"],
+    ["Vendor application", "No application link available"],
+  ]) {
+    const row = $("tbody tr").filter((_, el) => $(el).children("th").text() === field);
+    const shared = row.children("td");
+    expect(shared).toHaveLength(1);
+    expect(shared.attr("colspan")).toBe("4");
+    expect(shared.attr("headers")).toBe(row.children("th").attr("id"));
+    expect(shared.text()).toBe(message);
+  }
+  const samePrice = shows.slice(0, 2).map((show) => ({ ...show, vendor_cost: "USD 300 per booth" }));
+  const priced = renderComparison(samePrice);
+  expect([0, 1].map((index) => cell(priced, "Eligible table fee", index).find("strong").text()))
+    .toEqual(["USD 300", "USD 300"]);
 });
 
 it("excludes expired quotes and leaves the budget pending when a saved cost has no conversion rate", () => {
@@ -184,7 +221,7 @@ it("excludes expired quotes and leaves the budget pending when a saved cost has 
   expect(cell($, "Eligible table fee", 0).text()).toBe("All booth rates have expired.");
   expect(cell($, "Eligible table fee", 1).text()).toContain("HKD 1,488");
   expect(cell($, "Trip total for entered costs", 1).text()).toContain("Total pending conversion");
-  expect(cell($, "Break-even per selling day", 1).text()).toBe("Available when the trip total is known.");
+  expect(cell($, "Break-even per selling day", 0).text()).toBe("Available when the trip total is known.");
 });
 
 it("matches Detail's effective stage and selected quote, with labelled columns and rows", () => {
@@ -207,7 +244,7 @@ it("matches Detail's effective stage and selected quote, with labelled columns a
       .toBe(detail(".priority-chip").first().attr("aria-label"));
     const td = price.parent();
     expect(td.attr("headers")?.split(" ")).toEqual([headers.eq(index).attr("id"), td.siblings("th").attr("id")]);
-    expect(td.children(".compare-mobile-name").text()).toBe(show.name);
+    expect($("th[scope=col]").filter((_, th) => $(th).text() === show.name)).toHaveLength(1);
   }
   expect(cell($, "Eligible table fee", 0).text()).toContain("AED 7,686Organizer quote · incl. VAT");
   expect(cell($, "Pipeline stage", 0).text()).toContain("Quote received");
@@ -248,8 +285,21 @@ it("renders the shared pin state in Grid and Rows with ordinary stage and Going 
     sort={{ key: "dates", direction: "asc" }} scores={{ [trade.id]: score }} {...shared} />));
   for (const $ of [grid, rows]) {
     expect($(".compare-toggle").attr("aria-pressed")).toBe("true");
-    expect($(".compare-toggle").attr("aria-label")).toBe(`Pin ${trade.name} for comparison`);
+    expect($(".compare-toggle").attr("aria-label")).toBe(`Compare ${trade.name}`);
+    expect($(".compare-toggle small").text()).toBe("Pinned");
     expect($(".stage-picker, .going-button")).toHaveLength(2);
   }
   expect(grid(".row-date-label").text()).toBe(rows(".row-date-label").text());
+});
+
+it("labels unpinned controls and gives capped pins a visible, associated reason", () => {
+  const toggle = vi.fn();
+  const render = (pins: ComparePin[]) => load(renderToStaticMarkup(<CompareToggle event={caps} selection={{ pins, toggle }} />));
+  const available = render([]);
+  expect(available(".compare-toggle-label").text().trim()).toBe("Compare");
+  expect(available("button").attr("aria-disabled")).toBeUndefined();
+  const full = render([award, trade, urban, color].map(({ id }) => ({ id })));
+  expect(full("button").attr("aria-disabled")).toBe("true");
+  expect(full("button").attr("aria-describedby")).toBe(full("small").attr("id"));
+  expect(full("small").text()).toBe("Remove one to pin another");
 });

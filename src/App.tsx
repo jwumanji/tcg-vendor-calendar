@@ -11,7 +11,7 @@ import { CalendarView } from "./components/CalendarView";
 import { CardSections } from "./components/ListSections";
 import { EventCard } from "./components/EventCard";
 import { CompareEvents, CompareTray } from "./components/CompareEvents";
-import { canCompare, resolveComparePins, selectCompareOccurrence, toggleComparePin, type ComparePin } from "./compare";
+import { canCompare, COMPARE_PINS_KEY, normalizeComparePins, resolveComparePins, selectCompareOccurrence, toggleComparePin } from "./compare";
 import { EventBulkBar, useEventSelection } from "./components/EventSelection";
 import { BrandLockup, BrandMark } from "./components/Brand";
 import { EmptyState } from "./components/EmptyState";
@@ -199,7 +199,11 @@ export default function App() {
   const { scores } = priority;
   const [toolsOpen, setToolsOpen] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
-  const [comparePins, setComparePins] = useState<ComparePin[]>([]);
+  const [comparePins, setComparePins] = useState(() => normalizeComparePins(stored(COMPARE_PINS_KEY), shippedEvents));
+  useEffect(() => {
+    const error = saveValue(COMPARE_PINS_KEY, comparePins.length ? comparePins : undefined);
+    if (error) setStorageError(error);
+  }, [comparePins, setStorageError]);
   const [compareOpen, setCompareOpen] = useState(false);
   const compareTrigger = useRef<HTMLButtonElement>(null);
   const focusCompareTrigger = useCallback(() => compareTrigger.current, []);
@@ -516,6 +520,7 @@ export default function App() {
   const selection = view === "List" && selectMode ? eventSelection : undefined;
   const pinnedEvents = useMemo(() => resolveComparePins(comparePins, allEvents, events, sorted, today),
     [comparePins, allEvents, events, sorted, today]);
+  const canPin = view === "List";
   const compareSelection = useMemo(() => ({
     pins: comparePins,
     toggle: (event: Event) => setComparePins((pins) => toggleComparePin(pins, event, today)),
@@ -536,7 +541,7 @@ export default function App() {
         titleLevel={titleLevel}
         columns={view === "List" ? columns : undefined}
         selection={selection}
-        comparison={view === "List" ? compareSelection : undefined}
+        comparison={canPin ? compareSelection : undefined}
         open={open}
       />
     );
@@ -836,6 +841,13 @@ export default function App() {
               </label>}
             </div>
           )}
+          {!onEventPage && (canPin || pinnedEvents.length > 0) && (
+            <CompareTray pins={pinnedEvents} canPin={canPin} trigger={compareTrigger} open={() => setCompareOpen(true)}
+              remove={(id) => {
+                if (!canPin && pinnedEvents.length === 1) focusHeading(workspaceHeading.current);
+                setComparePins((pins) => pins.filter((pin) => pin.id !== id));
+              }} />
+          )}
           {view === "Top picks" ? (
             <TopPicks
               events={sorted}
@@ -924,10 +936,6 @@ export default function App() {
                   </div>
                 )}
               </div>
-              {view === "List" && (
-                <CompareTray pins={pinnedEvents} trigger={compareTrigger} open={() => setCompareOpen(true)}
-                  remove={(id) => setComparePins((pins) => pins.filter((pin) => pin.id !== id))} />
-              )}
               {selection && sorted.length > 0 && <EventBulkBar selection={selection} rows={showRows} />}
               {showRows ? (
                 sorted.length > 0 && (
@@ -1006,8 +1014,11 @@ export default function App() {
           </small>
         </footer>
       </main>
-      {!onEventPage && view === "List" && compareOpen && canCompare(pinnedEvents) && (
-        <CompareEvents pins={pinnedEvents} entries={entries} scores={scores} budgets={tripBudget.events}
+      {!onEventPage && compareOpen && canCompare(pinnedEvents) && (
+        <CompareEvents pins={pinnedEvents} entries={entries} budgets={tripBudget.events}
+          scores={Object.fromEntries(pinnedEvents.map(({ event }) => [event.id, scores[event.id] ?? scoreEvent(event, {
+            today, now, weights: priority.weights, overrides: priority.overrides, homeBase: priority.homeBase,
+          })]))}
           defaults={tripBudget.defaults} homeBase={priority.homeBase} today={today} now={now}
           onOccurrence={(id, occurrence) => setComparePins((pins) => selectCompareOccurrence(pins, id, occurrence))}
           returnFocus={focusCompareTrigger} close={() => setCompareOpen(false)} />

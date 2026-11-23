@@ -1,9 +1,27 @@
 import type { Event, EventDateRange } from "./model";
+import { validDate } from "./data";
 import { dateSortRange, overlappingDateRange } from "./utils";
 
 export const MAX_COMPARE_PINS = 4;
+export const COMPARE_PINS_KEY = "tcg-compare-pins-v1";
 
 export type ComparePin = { id: string; occurrence?: string };
+
+export function normalizeComparePins(value: unknown, events: readonly Event[]): ComparePin[] {
+  if (!Array.isArray(value)) return [];
+  const available = new Set(events.map(({ id }) => id));
+  const pins: ComparePin[] = [];
+  for (const pin of value as unknown[]) {
+    if (!pin || typeof pin !== "object" || !("id" in pin) || typeof pin.id !== "string" || !available.delete(pin.id)) continue;
+    const occurrence = "occurrence" in pin && typeof pin.occurrence === "string" ? pin.occurrence : undefined;
+    const [start, end, extra] = occurrence?.split("/") ?? [];
+    pins.push(validDate(start) && validDate(end) && start <= end && extra === undefined
+      ? { id: pin.id, occurrence }
+      : { id: pin.id });
+    if (pins.length === MAX_COMPARE_PINS) break;
+  }
+  return pins;
+}
 
 export type CompareSelection = {
   pins: readonly ComparePin[];

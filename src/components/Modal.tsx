@@ -48,7 +48,7 @@ export function Modal({
         }
         if (ev.key !== "Tab") return;
         const controls = [...ev.currentTarget.querySelectorAll<HTMLElement>(
-          "button:enabled,input:enabled,select:enabled,textarea:enabled,a[href],summary",
+          "button:enabled,input:enabled,select:enabled,textarea:enabled,a[href],summary,[tabindex]:not(:disabled)",
         )].filter((control) => control.tabIndex >= 0 && control.getClientRects().length > 0);
         const first = controls[0],
           last = controls[controls.length - 1];

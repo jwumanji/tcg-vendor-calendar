@@ -17,17 +17,20 @@ fetch() {
   local url="$1" code rc
   if code=$(curl -sS --max-time 25 -o "$scratch/body" -D "$scratch/headers" -w '%{http_code}' "$url"); then
     [[ "$code" == 200 ]] && return 0
-    [[ "$code" == 401 ]] && return 3
+    if [[ "${2:-}" == immutable && "$code" =~ ^(302|401|403)$ ]] &&
+       grep -Eqi '^location:[[:blank:]]*https://(www\.)?vercel\.com/(sso-api|sso|login)([/?#]|[[:space:]]*$)' "$scratch/headers"; then
+      echo "$url (HTTP $code, Vercel sign-in): protected, skipped"
+      return 3
+    fi
     echo "Smoke check failed: $url (HTTP $code)" >&2
   else
     rc=$?
     echo "Smoke check failed: $url (curl exit $rc)" >&2
-    case "$rc" in 6|7) return 2 ;; esac
   fi
   return 1
 }
 check_document() {
-  fetch "$1" || return $?
+  fetch "$@" || return $?
   if ! grep -qi '^x-robots-tag:.*noindex' "$scratch/headers" ||
      [[ "$(build_id "$scratch/body")" != "$identity" || "$(assets "$scratch/body")" != "$expected" ]]; then
     echo "Smoke check failed: $1 (expected current build and noindex)" >&2
@@ -37,7 +40,7 @@ check_document() {
 check_assets() {
   local asset mime
   while IFS= read -r asset; do
-    fetch "$1$asset" || return 1
+    fetch "$1$asset" "${2:-}" || return $?
     if ! cmp -s -- "$scratch/body" "dist$asset"; then
       echo "Smoke check failed: $asset differs from dist" >&2
       return 1
@@ -54,39 +57,33 @@ check_assets() {
   done <<< "$expected"
 }
 verify_site() {
-  local base="$1" optional="$2" answered=false attempt rc
+  local base="$1" kind="${2:-}" attempt
   for attempt in 1 2 3 4; do
-    if check_document "$base/"; then
-      answered=true
-      if check_document "$base/some/deep/link" && check_assets "$base"; then
-        echo "Smoke checks passed on $base (current build, entry assets, root + deep link, noindex)."
-        return 0
-      fi
-    else
-      rc=$?
-      if (( rc == 3 )) && [[ "${3:-}" == immutable && "$base" =~ ^https://[a-zA-Z0-9-]+\.vercel\.app$ ]]; then
-        echo "Protected deployment (HTTP 401), skipping $base and verifying both public domains."
-        protected=true
-        return 0
-      fi
-      if (( rc != 2 )); then answered=true; fi
+    if check_document "$base/" "$kind" &&
+       check_document "$base/some/deep/link" "$kind" &&
+       check_assets "$base" "$kind"; then
+      echo "Smoke checks passed on $base (current build, entry assets, root + deep link, noindex)."
+      return 0
+    elif (( $? == 3 )); then
+      return 0
     fi
     if (( attempt < 4 )); then sleep 5; fi
   done
-  if "$optional" && ! "$answered"; then
-    echo "Note: $base is not answering yet."
-    return 0
-  fi
   echo "ERROR: $base did not serve the tested build" >&2
   return 1
 }
 # deploy.sh supplies the immutable URL before the usual alias and custom domain.
-protected=false
 if (( $# == 3 )); then
-  if [[ "$1" != "$2" ]]; then verify_site "$1" false immutable; fi
+  if [[ "$1" != "$2" && "$1" != "$3" ]]; then
+    if [[ "$1" =~ ^https://[a-zA-Z0-9-]+\.vercel\.app$ ]]; then
+      verify_site "$1" immutable
+    else
+      verify_site "$1"
+    fi
+  fi
   shift
 fi
-verify_site "$1" false
+verify_site "$1"
 if [[ "$2" != "$1" ]]; then
-  if "$protected"; then verify_site "$2" false; else verify_site "$2" true; fi
+  verify_site "$2"
 fi

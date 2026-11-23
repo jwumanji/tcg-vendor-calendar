@@ -33,4 +33,5 @@ url="$(printf '%s' "$out" | grep -Eo 'https://[^[:space:]"]+\.vercel\.app' | tai
 echo "Deployment URL: $url"
 cd "$repo_dir"
 
+# Both public aliases must serve this build, even if Vercel protects the unique URL.
 bash scripts/check-deployment.sh "$url" "https://$PROJECT.vercel.app" "$SITE_URL"

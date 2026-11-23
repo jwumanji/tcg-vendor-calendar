@@ -26,8 +26,30 @@ beforeEach(() => {
       *) cp dist/index.html "$body" ;;
     esac
     case "$SCENARIO:$url" in
-      protected*:https://immutable.vercel.app/) echo -n 401; exit 0 ;;
+      protected-deep-link:https://immutable.vercel.app/some/deep/link)
+        echo 'Location: https://vercel.com/login?next=deployment' >> "$headers"
+        echo -n 302; exit 0 ;;
+      protected-deep-link:https://immutable.vercel.app/) ;;
+      protected*:https://immutable.vercel.app/)
+        echo 'Location: https://vercel.com/sso-api?url=deployment' >> "$headers"
+        case "$SCENARIO" in
+          protected-401) echo -n 401 ;;
+          protected-403) echo -n 403 ;;
+          *) echo -n 302 ;;
+        esac
+        exit 0 ;;
+      wrong-redirect:https://immutable.vercel.app/)
+        echo 'Location: https://vercel.com.example.com/login' >> "$headers"
+        echo -n 302; exit 0 ;;
+      unrelated-vercel-redirect:https://immutable.vercel.app/)
+        echo 'Location: https://vercel.com/docs' >> "$headers"
+        echo -n 302; exit 0 ;;
+      bare-403:https://immutable.vercel.app/) echo -n 403; exit 0 ;;
+      public-sso:https://alias/*)
+        echo 'Location: https://vercel.com/login?next=deployment' >> "$headers"
+        echo -n 302; exit 0 ;;
       protected-wrong-alias:https://alias/*|protected-wrong-custom:https://custom/*) sed -i 's/new-release/old-release/' "$body" ;;
+      protected-stale-assets:https://custom/*) sed -i 's/current/stale/g' "$body" ;;
       protected-unreachable:https://custom/*) echo -n 000; exit 6 ;;
       public-401:https://alias/*) echo -n 401; exit 0 ;;
       html-asset:*/assets/*.js) cp dist/index.html "$body"; echo 'Content-Type: text/html' > "$headers" ;;
@@ -42,8 +64,10 @@ beforeEach(() => {
         echo -n 404; exit 0 ;;
       stale-alias:https://alias/*|stale-custom:https://custom/*)
         sed -i 's/current/stale/g' "$body" ;;
-      propagate:https://alias/)
-        if [[ ! -f seen ]]; then touch seen; sed -i 's/current/stale/g' "$body"; fi ;;
+      propagate:https://alias/|protected-propagate:https://alias/|protected-propagate:https://custom/)
+        marker=seen-alias
+        if [[ "$url" == https://custom/ ]]; then marker=seen-custom; fi
+        if [[ ! -f "$marker" ]]; then touch "$marker"; sed -i 's/current/stale/g' "$body"; fi ;;
       bad-fallback:*/some/deep/link) echo 'fallback' > "$body" ;;
       missing-header:*/some/deep/link) : > "$headers" ;;
     esac
@@ -53,15 +77,24 @@ beforeEach(() => {
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
 it.each([
-  ["html-asset", 1], ["wrong-js", 1], ["wrong-css", 1], ["stale-bytes", 1], ["protected", 0],
-  ["protected-wrong-alias", 1], ["protected-wrong-custom", 1], ["protected-unreachable", 1], ["public-401", 1],
+  ["html-asset", 1], ["wrong-js", 1], ["wrong-css", 1], ["stale-bytes", 1],
+  ["protected-302", 0], ["protected-401", 0], ["protected-403", 0], ["protected-propagate", 0],
+  ["protected-deep-link", 0],
+  ["protected-wrong-alias", 1], ["protected-wrong-custom", 1], ["protected-unreachable", 1],
+  ["protected-stale-assets", 1], ["public-401", 1], ["public-sso", 1],
+  ["wrong-redirect", 1], ["unrelated-vercel-redirect", 1], ["bare-403", 1],
   ["stale-immutable", 1], ["stale-public-only", 1], ["missing-js", 1], ["missing-css", 1],
-  ["bad-cert", 1], ["refused", 0], ["propagate", 0], ["unreachable", 0], ["stale-alias", 1],
+  ["bad-cert", 1], ["refused", 1], ["propagate", 0], ["unreachable", 1], ["stale-alias", 1],
   ["stale-custom", 1], ["bad-fallback", 1], ["missing-header", 1],
-])("checks the current build on the alias and answering custom domain: %s", (scenario, status) => {
+])("checks the current build on both public aliases: %s", (scenario, status) => {
   const result = spawnSync("bash", [script, "https://immutable.vercel.app", "https://alias", "https://custom"], {
     cwd: dir, encoding: "utf8",
     env: { ...process.env, PATH: dir + ":" + process.env.PATH, SCENARIO: scenario },
   });
   expect(result.status, result.stderr).toBe(status);
+  expect(result.stdout.includes("protected, skipped")).toBe(String(scenario).startsWith("protected-"));
+  if (status === 0) {
+    expect(result.stdout).toContain("Smoke checks passed on https://alias");
+    expect(result.stdout).toContain("Smoke checks passed on https://custom");
+  }
 });

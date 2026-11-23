@@ -4027,20 +4027,20 @@ body:has(.compare-tray[data-pinned="true"]) .going-toast:not(:empty) {
 .digest-dialog {
   width: min(760px, calc(100% - 24px));
   padding: 0;
-  overflow: hidden;
+  overscroll-behavior: contain;
+  scroll-padding-top: 62px;
 }
-.digest-dialog[open] { display: flex; flex-direction: column; }
 .digest-dialog .settings-head {
-  flex: none;
+  position: sticky;
+  top: 0;
+  z-index: 1;
   padding: 8px clamp(12px, 3vw, 24px);
   border-bottom: 1px solid var(--line);
+  background: var(--surface);
 }
 .digest-dialog .settings-head h2 { font-size: clamp(16px, 4.5vw, 22px); }
 .digest-dialog .settings-head .icon-button { flex: none; width: 44px; height: 44px; }
 .digest-content {
-  min-height: 0;
-  overflow: auto;
-  overscroll-behavior: contain;
   padding: 12px clamp(12px, 3vw, 24px) 20px;
   overflow-wrap: anywhere;
 }

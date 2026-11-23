@@ -118,6 +118,20 @@ describe("published changes", () => {
     ]);
   });
 
+  it("compares all venues for the same recurring dates without reporting reorder-only changes", () => {
+    const dates = { start_date: "2027-01-09", end_date: "2027-01-10" };
+    const hallA = { ...dates, venue: "Hall A" };
+    const hallZ = { ...dates, venue: "Hall Z" };
+    const before = review([event("weekly", { occurrences: [hallA, hallZ] })]);
+    expect(digestChanges(before, snapshot([event("weekly", { occurrences: [hallZ, hallA] })]))).toEqual([]);
+
+    const after = event("weekly", { occurrences: [hallZ, { ...dates, venue: "Hall B" }] });
+    expect(digestChanges(before, snapshot([after]))[0].fields).toEqual([
+      { key: "venue-2027-01-09/2027-01-10", label: "Venue for 9–10 Jan 2027",
+        previous: ["Hall A", "Hall Z"], current: ["Hall B", "Hall Z"] },
+    ]);
+  });
+
   it("distinguishes additions, archival and removal from explicit cancellation and postponement", () => {
     const previous = review(["archive", "cancel", "postpone", "remove", "relist"].map((id) =>
       event(id, id === "relist" ? { scanner_archived: true } : {})));
@@ -134,13 +148,23 @@ describe("published changes", () => {
       { key: "listing", label: "Listing", previous: ["Active listing"], current: ["Archived listing"] },
     ]);
     expect(changes[2].fields).toEqual([
-      { key: "status", label: "Event status", previous: ["Scheduled"], current: ["Cancelled"] },
+      { key: "status", label: "Event status", previous: [], current: ["Cancelled"] },
     ]);
     expect(changes[3].fields).toEqual(expect.arrayContaining([
-      { key: "status", label: "Event status", previous: ["Scheduled"], current: ["Postponed"] },
+      { key: "status", label: "Event status", previous: [], current: ["Postponed"] },
       { key: "month", label: "Estimated month", previous: [], current: ["April 2027"] },
     ]));
     expect(changes[5].fields.flatMap(({ current }) => current)).toEqual([]);
+  });
+
+  it("reports a newly shipped archived listing as an addition with its archived state", () => {
+    const archived = event("archive", { scanner_archived: true, date_status: "tba", start_date: null });
+    const [change] = digestChanges(review([]), snapshot([archived]));
+    expect(change.listing).toBe("Added");
+    expect(change.fields).toEqual([
+      { key: "listing", label: "Listing", previous: [], current: ["Archived listing"] },
+      { key: "date-status", label: "Date status", previous: [], current: ["To be announced"] },
+    ]);
   });
 
   it("includes published terms and local-currency price changes while excluding quotes, FX and correspondence", () => {
@@ -188,6 +212,25 @@ describe("published changes", () => {
     expect(field.current).toContain("25 Nov 2026, 12:05:50 Singapore");
     expect(field.current).toContain("Unverified date");
   });
+
+  it("ignores player registration changes and can read checkpoints saved with the original notice text", () => {
+    const storage = memoryStorage();
+    const original = "Player registration closes 25 Nov 2026; Vendor booths open soon";
+    const saved = review([event("show", { vendor_deadline: original })]);
+    expect(saved.eventsById.show.terms.vendor_deadline).toBe("Vendor booths open soon");
+    saved.eventsById.show.terms.vendor_deadline = original;
+    storage.setItem(DIGEST_STORAGE_KEY, JSON.stringify(saved));
+
+    const { checkpoint } = loadDigestCheckpoint(storage);
+    const updated = (terms: string) => snapshot([event("show", {
+      vendor_deadline: `Player registration closes 27 Nov 2026; ${terms}`,
+    })]);
+    expect(digestChanges(checkpoint, updated("Vendor booths open soon"))).toEqual([]);
+    expect(digestChanges(checkpoint, updated("Vendor booths are sold out"))[0].fields).toEqual([
+      { key: "vendor_deadline", label: "Vendor notice", previous: ["Vendor booths open soon"],
+        current: ["Vendor booths are sold out"] },
+    ]);
+  });
 });
 
 describe("live weekly actions", () => {
@@ -217,7 +260,7 @@ describe("live weekly actions", () => {
     const unverified = event("unverified", { vendor_milestones: [draft] });
     const undated = event("undated", { vendor_deadline: "First come, first served", website: "https://example.com" });
     const confirmed = event("verified", { vendor_deadline: "Booking on 1 Dec 2026",
-      vendor_milestones: [milestone("published", "2026-12-01")] });
+      vendor_milestones: [milestone("published", "2026-12-01", { notes: "Booking on 1 Dec 2026" })] });
     const separate = { ...confirmed, id: "separate", name: "separate", vendor_deadline: "Ask organizer about a deposit",
       website: "https://example.com/deposit" };
     const unverifiedDate = { ...separate, id: "other-date", name: "other-date", vendor_deadline: "Deposit due 11 Dec 2026" };
@@ -232,6 +275,23 @@ describe("live weekly actions", () => {
       expect(check).not.toHaveProperty("due");
       expect(check).not.toHaveProperty("day");
     }
+  });
+
+  it("keeps notices with separate terms or dates on hold available for source checks", () => {
+    const verified = milestone("booking", "2026-11-28", { notes: "Booking opens 28 Nov 2026" });
+    const notice = "Booking opens 28 Nov 2026; deposit timing to be announced";
+    const shared = { website: "https://example.com/vendors", vendor_milestones: [verified] };
+    const { days, sourceChecks } = digestActions([
+      event("multiple-terms", { ...shared, vendor_deadline: notice }),
+      event("postponed", { ...shared, event_status: "postponed", start_date: "2026-11-20",
+        vendor_deadline: "Vendor applications are on hold" }),
+      event("cancelled", { ...shared, event_status: "cancelled", vendor_deadline: notice }),
+    ], now);
+    expect([...days.values()].flat().map(({ event }) => event.id)).toEqual(["multiple-terms"]);
+    expect(sourceChecks.map(({ event, detail, href }) => [event.id, detail, href])).toEqual([
+      ["multiple-terms", notice, shared.website],
+      ["postponed", "Vendor applications are on hold", shared.website],
+    ]);
   });
 
   it("keeps due and overdue outreach separate from later outreach, and suppresses cancelled, archived and past events", () => {

@@ -49,6 +49,14 @@ const byId = (a: { id: string }, b: { id: string }) => a.id.localeCompare(b.id);
 const byOccurrence = (a: EventDateRange, b: EventDateRange) =>
   occurrenceKey(a).localeCompare(occurrenceKey(b)) || (a.venue ?? "").localeCompare(b.venue ?? "");
 
+function vendorNotice(value?: string | null) {
+  const text = clean(value);
+  if (!text || /^[-–—]+$/.test(text)) return null;
+  if (!/\bplayers?\b/i.test(text)) return text;
+  return text.split(/[;\n]/).map((clause) => clause.trim())
+    .filter((clause) => /\b(?:vendors?|exhibitors?|booths?)\b/i.test(clause)).join("; ") || null;
+}
+
 function publishedPrice(option: VendorOption): VendorTerms {
   const { id, name, currency, amount, amount_incl_vat, vat_rate, eligibility, kind,
     rate_status, size, includes, notes, source, early_bird, valid_until } = option;
@@ -102,7 +110,7 @@ export function buildDigestSnapshot(events: readonly Event[], snapshotDate: stri
         terms: {
           vendor_booths: clean(event.vendor_booths),
           vendor_application: clean(event.vendor_application),
-          vendor_deadline: clean(event.vendor_deadline),
+          vendor_deadline: vendorNotice(event.vendor_deadline),
           vendor_cost: clean(event.vendor_cost),
           booth_detail: clean(event.booth_detail),
           published_booth_price: clean(event.outreach?.published_booth_price),
@@ -162,7 +170,10 @@ function readPublishedEvent(value: unknown): PublishedEvent {
       start_date, end_date, ...(clean(venue) && { venue: clean(venue)! }),
     })).sort(byOccurrence),
     venue: clean(venue), city: clean(city), country: clean(country),
-    terms: Object.fromEntries(termKeys.map((key) => [key, clean(terms[key] as string | null)])) as PublishedEvent["terms"],
+    terms: Object.fromEntries(termKeys.map((key) => {
+      const term = terms[key] as string | null;
+      return [key, key === "vendor_deadline" ? vendorNotice(term) : clean(term)];
+    })) as PublishedEvent["terms"],
     milestones: normalizeMilestones(value.milestones, true).sort(byId),
     prices: readVendorTerms(value.prices),
     documents: readVendorTerms(value.documents),
@@ -215,6 +226,22 @@ const eventStatusLabel = { cancelled: "Cancelled", postponed: "Postponed" };
 const listingLabel = (event?: PublishedEvent) =>
   event && (event.archived ? "Archived listing" : "Active listing");
 
+function datesByRange(dates: EventDateRange[]) {
+  const byRange = new Map<string, EventDateRange[]>();
+  for (const date of dates) {
+    const key = occurrenceKey(date);
+    const sameDates = byRange.get(key);
+    if (sameDates) sameDates.push(date);
+    else byRange.set(key, [date]);
+  }
+  return byRange;
+}
+
+function occurrenceVenues(dates: EventDateRange[], fallback?: string | null) {
+  const venues = dates.map(({ venue }) => venue ?? fallback).filter((venue): venue is string => Boolean(venue));
+  return [...new Set(venues)].sort((a, b) => a.localeCompare(b));
+}
+
 function collectChanges(previous?: PublishedEvent, current?: PublishedEvent): Change[] {
   const fields: Change[] = [];
   const lines = (value?: string | string[] | null) => typeof value === "string" ? [value] : value ?? [];
@@ -224,7 +251,7 @@ function collectChanges(previous?: PublishedEvent, current?: PublishedEvent): Ch
   };
   const rangeLabel = (range: EventDateRange) => formatDateRange(range.start_date, range.end_date);
   const schedule = (event?: PublishedEvent) => event && dateStatusLabel[event.dateStatus];
-  const status = (event?: PublishedEvent) => event && (event.eventStatus ? eventStatusLabel[event.eventStatus] : "Scheduled");
+  const status = (event?: PublishedEvent) => event?.eventStatus && eventStatusLabel[event.eventStatus];
   const month = (event?: PublishedEvent) => event?.estimatedMonth && monthLabel(event.estimatedMonth);
   const location = (event?: PublishedEvent) => [event?.city, event?.country].filter(Boolean).join(", ") || null;
 
@@ -232,23 +259,22 @@ function collectChanges(previous?: PublishedEvent, current?: PublishedEvent): Ch
   compare("status", "Event status", status(previous), status(current));
   compare("date-status", "Date status", schedule(previous), schedule(current));
   const oldDates = previous?.dates ?? [], newDates = current?.dates ?? [];
-  const oldKeys = new Set(oldDates.map(occurrenceKey)), newKeys = new Set(newDates.map(occurrenceKey));
+  const oldRanges = datesByRange(oldDates), newRanges = datesByRange(newDates);
   const recurring = previous?.recurring || current?.recurring;
-  const removedDates = oldDates.filter((range) => !newKeys.has(occurrenceKey(range)));
-  const addedDates = newDates.filter((range) => !oldKeys.has(occurrenceKey(range)));
+  const removedDates = oldDates.filter((range) => !newRanges.has(occurrenceKey(range)));
+  const addedDates = newDates.filter((range) => !oldRanges.has(occurrenceKey(range)));
   const datesWithVenue = (range: EventDateRange) => [rangeLabel(range), range.venue].filter(Boolean).join(" · ");
   compare("dates", recurring ? "Recurring dates" : "Event dates",
-    removedDates.map(datesWithVenue), addedDates.map(datesWithVenue));
+    [...new Set(removedDates.map(datesWithVenue))], [...new Set(addedDates.map(datesWithVenue))]);
   compare("month", "Estimated month", month(previous), month(current));
   compare("date-note", "Date note", previous?.dateNote, current?.dateNote);
   compare("location", "City and country", location(previous), location(current));
   compare("venue", "Venue", previous?.venue, current?.venue);
-  const newVenues = new Map(newDates.map((range) => [occurrenceKey(range), range.venue]));
-  for (const range of oldDates) {
-    const key = occurrenceKey(range);
-    const currentVenue = newVenues.get(key);
-    if (newVenues.has(key) && range.venue !== currentVenue)
-      compare(`venue-${key}`, `Venue for ${rangeLabel(range)}`, range.venue ?? previous?.venue, currentVenue ?? current?.venue);
+  for (const [key, oldOccurrences] of oldRanges) {
+    const newOccurrences = newRanges.get(key);
+    if (!newOccurrences || ![...oldOccurrences, ...newOccurrences].some(({ venue }) => venue)) continue;
+    compare(`venue-${key}`, `Venue for ${rangeLabel(oldOccurrences[0])}`,
+      occurrenceVenues(oldOccurrences, previous?.venue), occurrenceVenues(newOccurrences, current?.venue));
   }
   for (const key of termKeys) compare(key, termLabels[key], previous?.terms[key], current?.terms[key]);
 
@@ -277,8 +303,8 @@ export function digestChanges(previous: DigestCheckpoint | null, current: Digest
     const fields = collectChanges(before, after);
     if (!fields.length) return [];
     const listing = !after ? "Removed from the data"
-      : after.archived && !before?.archived ? "Archived"
       : !before ? "Added"
+      : after.archived && !before.archived ? "Archived"
       : before.archived && !after.archived ? "Relisted" : undefined;
     return [{ id, name: (after ?? before!).name, listing, fields }];
   }).sort((a, b) => a.name.localeCompare(b.name) || byId(a, b));
@@ -291,17 +317,12 @@ type WeekAction =
 type SourceCheck = { event: Event; id: string; label: string; detail?: string; href?: string };
 
 function uncheckedNotice(event: Event) {
-  const text = clean(event.vendor_deadline);
-  if (!text) return;
-  const notice = /\bplayer\b/i.test(text)
-    ? text.split(";").map((clause) => clause.trim()).filter((clause) => /\b(?:vendor|exhibitor|booth)\b/i.test(clause)).join("; ")
-    : text;
-  if (!notice || /^[-–—]+$/.test(notice)) return;
-  // A verified milestone can already cover the same announcement. Text dates are only used to deduplicate.
+  const notice = vendorNotice(event.vendor_deadline);
+  if (!notice) return;
+  const normalized = notice.toLowerCase();
+  // Shared dates alone cannot establish that a milestone covers the notice.
   const covered = event.vendor_milestones?.some((milestone) =>
-    milestone.verified && (milestone.type === "booking_opens" || milestone.type === "application_closes") &&
-    [milestone.at.slice(0, 10), ...milestoneTimes(milestone).map((label) => label.split(/, | · /)[0])]
-      .some((date) => new RegExp(`\\b${date}\\b`, "i").test(notice)));
+    milestone.verified && [milestone.label, milestone.notes].some((line) => line?.toLowerCase() === normalized));
   if (!covered) return notice;
 }
 
@@ -314,10 +335,11 @@ export function digestActions(events: readonly Event[], now: number) {
   const actions: WeekAction[] = [];
   const sourceChecks: SourceCheck[] = [];
   for (const event of active) {
-    if (event.event_status) continue;
+    if (event.event_status === "cancelled") continue;
     const milestones = event.vendor_milestones ?? [];
     const notice = uncheckedNotice(event);
-    const checkSources = upcoming(event, today) && (Boolean(notice) || milestones.some((m) => !m.verified));
+    const checkSources = (event.event_status === "postponed" || upcoming(event, today)) &&
+      (Boolean(notice) || milestones.some((m) => !m.verified));
     const routes = checkSources ? vendorRoutes(event) : undefined;
     const source = routes && (milestoneSourceHref(routes.application?.href ?? "") ??
       milestoneSourceHref(routes.official?.href ?? "") ?? milestoneSourceHref(event.source?.url ?? "") ??
@@ -328,6 +350,7 @@ export function digestActions(events: readonly Event[], now: number) {
           detail: milestone.notes, href: milestoneSourceHref(milestone.source) ?? source });
         continue;
       }
+      if (event.event_status) continue;
       const day = milestoneDay(milestone);
       if (day >= today && day <= end) actions.push({ day, event, milestone, kind: "milestone" });
     }

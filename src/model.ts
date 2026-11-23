@@ -138,7 +138,12 @@ export interface BudgetDefaults {
   meals?: BudgetAmount;
 }
 
-export type EventDateRange = { start_date: string; end_date: string; original_start_date?: string };
+export type EventDateRange = {
+  start_date: string;
+  end_date: string;
+  original_start_date?: string;
+  venue?: string;
+};
 
 export interface Event {
   id: string;

@@ -1,13 +1,13 @@
 import { useId, useRef, type ReactNode, type RefObject } from "react";
 import { Pin, X } from "lucide-react";
-import { canCompare, compareOverlaps, confirmedCompareRange, MAX_COMPARE_PINS, type PinnedEvent } from "../compare";
+import { canCompare, compareOccurrenceKey, compareOverlaps, confirmedCompareRange, MAX_COMPARE_PINS, type PinnedEvent } from "../compare";
 import { saigonDay, vendorApplyAction } from "../eventDecision";
 import { upcomingMilestones } from "../milestones";
 import type { BudgetDefaults, TripBudget } from "../model";
 import type { ScoreResult } from "../scoring";
 import { emptyEntry, type DisplayEntry } from "../storage";
-import { calculateTripBudget, pendingTripTotal } from "../tripBudget";
-import { displayDateLabel, formatDateRange, occurrenceKey, placeLabel } from "../utils";
+import { calculateTripBudget, pendingTripTotal, travelCostReview, tripDefaultsNeedDays } from "../tripBudget";
+import { displayDateLabel, formatDateRange, placeLabel } from "../utils";
 import { budgetFxDate, formatVendorAmount, formatVendorUsd, missingPriceMessage, vendorPriceBasisLabels } from "../vendorPricing";
 import { ApplyLink } from "./ApplyLink";
 import { EventDates } from "./EventFields";
@@ -23,6 +23,7 @@ export function CompareTray({ pins, trigger, open, remove }: {
   remove: (id: string) => void;
 }) {
   const heading = useRef<HTMLHeadingElement>(null);
+  const trayId = useId();
   const count = pins.length;
   return (
     <section className="compare-tray" aria-labelledby="compare-tray-title">
@@ -42,16 +43,17 @@ export function CompareTray({ pins, trigger, open, remove }: {
       </div>
       {count > 0 && (
         <ul className="compare-pins">
-          {pins.map(({ event, visible }) => (
+          {pins.map(({ event, visible }, index) => (
             <li key={event.id}>
               <button type="button" className="button compare-pin" aria-label={`Remove ${event.name} from comparison`}
+                aria-describedby={visible ? undefined : `${trayId}-visibility-${index}`}
                 onClick={(ev) => {
                   const item = ev.currentTarget.parentElement;
                   const neighbor = item?.nextElementSibling ?? item?.previousElementSibling;
                   (neighbor?.querySelector("button") ?? heading.current)?.focus({ preventScroll: true });
                   remove(event.id);
                 }}>
-                <span>{event.name}{!visible && <small>Outside current results</small>}</span>
+                <span>{event.name}{!visible && <small id={`${trayId}-visibility-${index}`}>Outside current results</small>}</span>
                 <X size={16} aria-hidden="true" />
               </button>
             </li>
@@ -96,21 +98,26 @@ export function CompareTable({ pins, entries, scores, budgets, defaults, homeBas
     const { event, occurrences, range } = pin;
     const entry = entries[event.id] ?? emptyEntry;
     const score = scores[event.id];
-    const budget = calculateTripBudget(event, now, today, homeBase, occurrences.length ? range : undefined, budgets[event.id], defaults);
+    const plannedCosts = budgets[event.id] ?? event.trip_budget;
+    const budget = calculateTripBudget(event, now, today, homeBase, occurrences.length ? range : undefined, plannedCosts, defaults);
     const { tableFee, total, subtotal, perDay, days } = budget;
+    const travelReview = travelCostReview(plannedCosts, homeBase);
     const conflicts = compareOverlaps(pin, pins);
     const milestone = upcomingMilestones([event], now)[0]?.milestone;
     const selectedWeekendEnded = occurrences.length > 0 && range && range.end_date < saigonDay(now);
     const application = !selectedWeekendEnded && vendorApplyAction(event, now);
-    const date = occurrences.length && range ? formatDateRange(range.start_date, range.end_date) : displayDateLabel(event, today);
+    const date = occurrences.length && range ? formatDateRange(range.start_date, range.end_date)
+      : event.date_status === "tba" && !event.estimated_month ? "Dates not announced" : displayDateLabel(event, today);
+    const venue = (occurrences.length ? range?.venue : undefined) ?? event.venue?.trim();
+    const location = event.country ? placeLabel(event) : event.city;
     const rows: [string, ReactNode][] = [
       ["Dates and certainty", occurrences.length > 1 && range ? (
         <>
           <label className="compare-weekend">
             <span>Published weekend<span className="sr-only"> for {event.name}</span></span>
-            <select value={occurrenceKey(range)} onChange={(ev) => onOccurrence(event.id, ev.target.value)}>
+            <select value={compareOccurrenceKey(range)} onChange={(ev) => onOccurrence(event.id, ev.target.value)}>
               {occurrences.map((item) => (
-                <option key={occurrenceKey(item)} value={occurrenceKey(item)}>
+                <option key={compareOccurrenceKey(item)} value={compareOccurrenceKey(item)}>
                   {formatDateRange(item.start_date, item.end_date)}
                 </option>
               ))}
@@ -119,7 +126,7 @@ export function CompareTable({ pins, entries, scores, budgets, defaults, homeBas
           <Status e={event} />
         </>
       ) : <EventDates e={event} date={date} />],
-      ["Venue", <>{event.venue ?? "Venue not announced"}{(event.city || event.country) && <small>{placeLabel(event)}</small>}</>],
+      ["Venue", <>{venue || "Venue not announced"}{location && <small>{location}</small>}</>],
       ["Pipeline stage", <>{entry.stage}{entry.stageSuggested && <small>Suggested from vendor updates</small>}</>],
       ["Priority", <><PriorityChip result={score} /><small aria-hidden="true">{score.confidence} confidence</small></>],
       ["Confirmed overlap", conflicts.length ? (
@@ -134,14 +141,23 @@ export function CompareTable({ pins, entries, scores, budgets, defaults, homeBas
           <strong>{formatVendorAmount(tableFee.amount, tableFee.currency)}</strong>
           <small>{vendorPriceBasisLabels[tableFee.basis]}{tableFee.basis !== "listed" &&
             tableFee.option.amount_incl_vat !== undefined && " · incl. VAT"}</small>
-          {tableFee.basis !== "listed" && <small>{tableFee.option.name}</small>}
+          {tableFee.basis === "listed"
+            ? tableFee.conditions && <small>{tableFee.conditions}</small>
+            : <small>{tableFee.option.name}</small>}
         </>
       ) : missingPriceMessage(event, now)],
-      ["Trip total for entered costs", total ? <BudgetValue value={total} /> : (
+      ["Trip total for entered costs", (
         <>
-          {pendingTripTotal(event, budget)}
-          {subtotal && <small>Known costs subtotal</small>}
-          {subtotal && <BudgetValue value={subtotal} />}
+          {total ? <BudgetValue value={total} /> : (
+            <>
+              {pendingTripTotal(event, budget)}
+              {subtotal && <small>Known costs subtotal</small>}
+              {subtotal && <BudgetValue value={subtotal} />}
+            </>
+          )}
+          {travelReview && <small>{travelReview}</small>}
+          {tripDefaultsNeedDays(budget, plannedCosts, defaults) &&
+            <small>Enter lodging nights or meal days to apply the corresponding Tools default.</small>}
         </>
       )],
       ["Break-even per selling day", perDay ? <><BudgetValue value={perDay} /><small>{days} selling {days === 1 ? "day" : "days"}</small></>

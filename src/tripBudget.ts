@@ -1,5 +1,5 @@
 import { normalizeBudgetAmount, normalizeTripBudget, validDate } from "./data";
-import { estimateTravel, resolveHomeBase } from "./homeBase";
+import { estimateTravel, findHomeBase, resolveHomeBase } from "./homeBase";
 import { budgetCategories, type BudgetAmount, type BudgetDefaults, type Event, type EventDateRange, type TripBudget } from "./model";
 import { dateLabel, dateSortRange } from "./utils";
 import { applicableVendorPrice, snapshotFx, snapshotUsd } from "./vendorPricing";
@@ -14,6 +14,14 @@ export const budgetLabels = {
 } satisfies Record<(typeof budgetCategories)[number], string>;
 
 export const budgetOrigin = (homeBase?: string) => `Home base: ${resolveHomeBase(homeBase).city}`;
+
+export function travelCostReview(budget?: TripBudget, homeBase?: string) {
+  const base = resolveHomeBase(homeBase);
+  if (!budget?.costs?.travel || budget.travelHomeBase === base.id) return;
+  const previousBase = findHomeBase(budget.travelHomeBase);
+  const origin = previousBase ? `Saved for ${previousBase.city}.` : "Original home base unknown.";
+  return `${origin} Review this travel amount for ${base.city}.`;
+}
 
 export function convertBudgetAmount({ amount, currency }: BudgetAmount) {
   const usd = snapshotUsd(amount, currency);
@@ -93,6 +101,13 @@ export function pendingTripTotal(event: Event, result: ReturnType<typeof calcula
   if (result.totalOverflow) return "Costs exceed the supported total.";
   if (!result.tableFee) return "Total pending an applicable table fee.";
   return "Total pending conversion of all entered costs.";
+}
+
+export function tripDefaultsNeedDays(
+  { nights, mealDays }: ReturnType<typeof calculateTripBudget>, budget?: TripBudget, defaults?: BudgetDefaults,
+) {
+  return (!!defaults?.lodging?.amount && !budget?.costs?.lodging && nights === null) ||
+    (!!defaults?.meals?.amount && !budget?.costs?.meals && mealDays === null);
 }
 
 export function readBudgetMoney(fields: FormData, name: string, currency = "VND") {

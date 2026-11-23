@@ -2,7 +2,7 @@ import { load } from "cheerio";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it, vi } from "vitest";
 import raw from "../../data/events.json";
-import { canCompare, compareOverlaps, resolveComparePins, selectCompareOccurrence, toggleComparePin, type ComparePin } from "../compare";
+import { canCompare, compareOccurrenceKey, compareOverlaps, resolveComparePins, selectCompareOccurrence, toggleComparePin, type ComparePin } from "../compare";
 import { normalizeEvents } from "../data";
 import { DEFAULT_HOME_BASE } from "../homeBase";
 import { emptyFilters, type Event, type VendorMilestone } from "../model";
@@ -68,18 +68,33 @@ it("pins the displayed filtered weekend and retains its whole date range after f
   expect($(".compare-pins button").map((_, button) => $(button).attr("aria-label")).get())
     .toEqual([`Remove ${trade.name} from comparison`, `Remove ${award.name} from comparison`]);
   expect($(".compare-pin small").text()).toBe("Outside current results");
+  expect($(".compare-pin").first().attr("aria-describedby")).toBe($(".compare-pin small").attr("id"));
+  expect($(".compare-pin").last().attr("aria-describedby")).toBeUndefined();
   expect($(".compare-trigger").is(":disabled")).toBe(false);
 });
 
-it("resolves a rescheduled weekend through its original date key and shows published alternatives", () => {
+it("keeps published weekends distinct even when a moved weekend shares an original date", () => {
   const original = trade.occurrences![0];
   const moved = { ...original, start_date: "2027-01-16", end_date: "2027-01-17", original_start_date: original.start_date };
-  const updated = { ...trade, occurrences: [trade.occurrences![1], moved] };
-  const pins = toggleComparePin([], trade, today);
-  expect(pins[0].occurrence).toBe(original.start_date);
-  const resolved = resolveComparePins(pins, [updated], [updated], [], today);
-  expect(resolved[0].range).toBe(moved);
-  expect(resolved[0].occurrences).toEqual([moved, updated.occurrences[0]]);
+  const longer = { ...moved, end_date: "2027-01-18" };
+  const updated = { ...trade, occurrences: [moved, original, longer, { ...original }] };
+  const pins = toggleComparePin([], updated, today);
+  const resolve = (selected: ComparePin[]) => resolveComparePins(selected, [updated], [updated], [], today)[0];
+  expect(resolve(pins).range).toEqual(original);
+  expect(resolve(pins).occurrences).toEqual([original, moved, longer]);
+  for (const range of [moved, longer]) {
+    expect(resolve(selectCompareOccurrence(pins, updated.id, compareOccurrenceKey(range))).range).toBe(range);
+  }
+});
+
+it("shows event-level date certainty without treating tentative date ranges as published weekends", () => {
+  const estimated = { ...trade, date_status: "estimated", estimated_month: "2027-01" } as const;
+  const unannounced = { ...award, date_status: "tba" } as const;
+  const $ = renderComparison([estimated, unannounced]);
+  expect($(".compare-weekend").length).toBe(0);
+  expect(cell($, "Dates and certainty", 0).text()).toContain("January 2027");
+  expect(cell($, "Dates and certainty", 0).text()).not.toContain("2–3 Jan");
+  expect(cell($, "Dates and certainty", 1).text()).toBe("◇ Dates not announced");
 });
 
 it("reports an inclusive overlap on the last day of one show and the first day of another", () => {
@@ -113,17 +128,33 @@ it("updates overlaps and computes selling days and break-even for the chosen pub
     defaults, pins: resolveComparePins(pins, shows, shows, shows, today),
   });
   const $before = render(initial);
+  expect(cell($before, "Venue", 0).text()).toBe("Junction 8Singapore");
+  expect(cell($before, "Eligible table fee", 0).text()).toContain("Listed priceper booth");
   expect(cell($before, "Confirmed overlap", 0).text()).toContain("14 Feb 2027");
   expect(cell($before, "Trip total for entered costs", 0).text()).toContain("USD 390.00");
   expect(cell($before, "Break-even per selling day", 0).find("small").map((_, el) => $before(el).text()).get())
     .toEqual(["USD 130.00", "3 selling days"]);
-  const $after = render(selectCompareOccurrence(initial, pricedCaps.id, "2027-02-27"));
-  expect($after("select option[selected]").attr("value")).toBe("2027-02-27");
+  const selected = compareOccurrenceKey(pricedCaps.occurrences![1]);
+  const $after = render(selectCompareOccurrence(initial, pricedCaps.id, selected));
+  expect($after("select option[selected]").attr("value")).toBe(selected);
   expect($after("select option")).toHaveLength(3);
+  expect(cell($after, "Venue", 0).text()).toBe("City Square MallSingapore");
   expect(cell($after, "Confirmed overlap", 0).text()).toBe("No confirmed overlap");
   expect(cell($after, "Trip total for entered costs", 0).text()).toContain("USD 360.00");
   expect(cell($after, "Break-even per selling day", 0).find("small").map((_, el) => $after(el).text()).get())
     .toEqual(["USD 180.00", "2 selling days"]);
+});
+
+it("flags travel saved for a different home base and meal defaults missing a day count", () => {
+  const estimated = { ...urban, date_status: "estimated", estimated_month: "2027-01" } as const;
+  const $ = renderComparison([estimated, color], {
+    budgets: { [urban.id]: { costs: { travel: { amount: 80, currency: "USD" } }, travelHomeBase: "th-bangkok" } },
+    defaults: { meals: { amount: 30, currency: "USD" } },
+  });
+  const tripTotal = cell($, "Trip total for entered costs", 0).text();
+  expect(tripTotal).toContain("Saved for Bangkok. Review this travel amount for Ho Chi Minh City.");
+  expect(tripTotal).toContain("Enter lodging nights or meal days to apply the corresponding Tools default.");
+  expect(cell($, "Break-even per selling day", 0).text()).toBe("Selling days are unconfirmed.");
 });
 
 it("shows useful missing rate reasons and leaves totals blank when there are no costs", () => {

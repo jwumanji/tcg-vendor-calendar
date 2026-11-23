@@ -7350,15 +7350,18 @@
     "occurrences": [
       {
         "start_date": "2027-02-12",
-        "end_date": "2027-02-14"
+        "end_date": "2027-02-14",
+        "venue": "Junction 8"
       },
       {
         "start_date": "2027-02-27",
-        "end_date": "2027-02-28"
+        "end_date": "2027-02-28",
+        "venue": "City Square Mall"
       },
       {
         "start_date": "2027-05-08",
-        "end_date": "2027-05-09"
+        "end_date": "2027-05-09",
+        "venue": "City Square Mall"
       }
     ],
     "city": "Singapore",
@@ -8227,11 +8230,13 @@
     "occurrences": [
       {
         "start_date": "2027-01-08",
-        "end_date": "2027-01-09"
+        "end_date": "2027-01-09",
+        "venue": "Aperia Mall, 12 Kallang Avenue, Singapore 339511"
       },
       {
         "start_date": "2027-04-09",
-        "end_date": "2027-04-10"
+        "end_date": "2027-04-10",
+        "venue": "Aperia Mall, 12 Kallang Avenue, Singapore 339511"
       }
     ],
     "city": "Singapore",

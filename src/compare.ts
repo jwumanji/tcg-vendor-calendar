@@ -1,5 +1,5 @@
 import type { Event, EventDateRange } from "./model";
-import { dateSortRange, occurrenceKey, overlappingDateRange } from "./utils";
+import { dateSortRange, overlappingDateRange } from "./utils";
 
 export const MAX_COMPARE_PINS = 4;
 
@@ -14,11 +14,15 @@ export function canCompare(pins: readonly unknown[]) {
   return pins.length >= 2 && pins.length <= MAX_COMPARE_PINS;
 }
 
+export function compareOccurrenceKey({ start_date, end_date }: EventDateRange) {
+  return `${start_date}/${end_date}`;
+}
+
 export function toggleComparePin(pins: ComparePin[], event: Event, today: string) {
   if (pins.some(({ id }) => id === event.id)) return pins.filter(({ id }) => id !== event.id);
   if (pins.length >= MAX_COMPARE_PINS) return pins;
-  const displayed = event.occurrences?.length ? dateSortRange(event, today) : undefined;
-  return [...pins, { id: event.id, ...(displayed && { occurrence: occurrenceKey(displayed) }) }];
+  const displayed = event.date_status === "confirmed" && event.occurrences?.length ? dateSortRange(event, today) : undefined;
+  return [...pins, { id: event.id, ...(displayed && { occurrence: compareOccurrenceKey(displayed) }) }];
 }
 
 export function selectCompareOccurrence(pins: ComparePin[], id: string, occurrence: string) {
@@ -44,8 +48,11 @@ export function resolveComparePins(
     const published = publishedById.get(pin.id);
     if (!published) return [];
     const event = seasonById.get(pin.id) ?? published;
-    const occurrences = [...published.occurrences ?? []].sort((a, b) => a.start_date.localeCompare(b.start_date));
-    const range = occurrences.find((item) => occurrenceKey(item) === pin.occurrence) ?? dateSortRange(event, today);
+    const publishedDates = event.date_status === "confirmed" ? published.occurrences ?? [] : [];
+    const occurrenceByKey = new Map(publishedDates.map((range) => [compareOccurrenceKey(range), range]));
+    const occurrences = [...occurrenceByKey.values()].sort((a, b) =>
+      a.start_date.localeCompare(b.start_date) || a.end_date.localeCompare(b.end_date));
+    const range = occurrenceByKey.get(pin.occurrence ?? "") ?? dateSortRange(event, today);
     return [{ event, occurrences, range, visible: visibleIds.has(pin.id) }];
   });
 }

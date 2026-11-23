@@ -506,6 +506,17 @@ test("keeps comparison pins through filters, layout changes and bulk Going with 
   const compare = button(page, "Compare");
   const tray = page.getByRole("region", { name: "Compare events" });
   const ids = ["r-awardx", "r-tradeting", "r-sunday", "r-kip"];
+  const exportBackup = async () => {
+    await button(page, "Tools").click();
+    const exported = page.waitForEvent("download");
+    await button(page, "Export backup").click();
+    const backup = JSON.parse(await readFile(await (await exported).path(), "utf8"));
+    await button(page, "Close tools").click();
+    return backup;
+  };
+  const storage = () => page.evaluate(() => Object.fromEntries(Object.entries(localStorage)));
+  const backupBeforePinning = await exportBackup();
+  const storageBeforePinning = await storage();
   assert.equal(await compare.isDisabled(), true);
   await pinButton(page, ids[0]).press("Space");
   assert.equal(await pinButton(page, ids[0]).getAttribute("aria-pressed"), "true");
@@ -515,6 +526,8 @@ test("keeps comparison pins through filters, layout changes and bulk Going with 
   assert.equal(await page.locator(`tr[data-event-id="${ids[0]}"]`).getAttribute("data-going"), "false");
   await pinButton(page, ids[1]).click();
   assert.equal(await compare.isEnabled(), true);
+  assert.deepEqual(await storage(), storageBeforePinning);
+  assert.deepEqual(await exportBackup(), backupBeforePinning);
   await button(page, "Grid").click();
   assert.equal(await pinButton(page, ids[1]).getAttribute("aria-pressed"), "true");
   await pinButton(page, ids[2]).click();
@@ -573,10 +586,10 @@ test("stacks comparison rows at 390px and recalculates a confirmed clash after c
   await button(page, "Compare").tap();
   const dialog = compareDialog(page);
   const weekend = dialog.getByLabel("Published weekend for THE TRADE T!NG");
-  assert.equal(await weekend.inputValue(), "2027-01-02");
+  assert.equal(await weekend.locator("option:checked").innerText(), "2–3 Jan 2027");
   assert.match(await compareValues(page, "Confirmed overlap").first().innerText(), /THE TRADE T!NG[\s\S]*2–3 Jan 2027/);
   assert.match(await compareValues(page, "Eligible table fee").first().innerText(), /No booth price recorded/);
-  await weekend.selectOption("2027-03-13");
+  await weekend.selectOption({ label: "13–14 Mar 2027" });
   assert.match(await compareValues(page, "Confirmed overlap").first().innerText(), /No confirmed overlap/);
   const firstDate = await compareValues(page, "Dates and certainty").first().boundingBox();
   const secondDate = await compareValues(page, "Dates and certainty").nth(1).boundingBox();
@@ -591,7 +604,22 @@ test("stacks comparison rows at 390px and recalculates a confirmed clash after c
   await dialog.getByRole("button", { name: "Close comparison" }).tap();
   await button(page, "Rows").tap();
   await button(page, "Compare").tap();
-  assert.equal(await weekend.inputValue(), "2027-03-13");
+  assert.equal(await weekend.locator("option:checked").innerText(), "13–14 Mar 2027");
+});
+
+test("wraps long certainty badges within their comparison cells at narrow widths", async t => {
+  for (const width of [320, 800]) {
+    const page = await open(t, { ...desktop, viewport: { width, height: 844 } });
+    for (const id of ["ycs-wcs", "r-tradeting", "r-awardx", "urban"]) await pinButton(page, id).press("Space");
+    await button(page, "Compare").press("Enter");
+    const badge = compareValues(page, "Dates and certainty").first().locator(".badge");
+    assert.match(await badge.innerText(), /Dates not announced/);
+    assert.equal(await badge.evaluate(el => {
+      const cell = el.parentElement.getBoundingClientRect();
+      const bounds = el.getBoundingClientRect();
+      return bounds.right <= cell.right + 1 && el.scrollWidth <= el.clientWidth + 1;
+    }), true);
+  }
 });
 
 test("shows the same quote and effective stage in comparison and Detail", async t => {

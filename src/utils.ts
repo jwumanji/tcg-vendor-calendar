@@ -50,10 +50,6 @@ export function ranges(e: Event) {
       ? [{ start_date: e.start_date, end_date: e.end_date || e.start_date }]
       : [];
 }
-export function occurrenceKey(range: EventDateRange) {
-  return range.original_start_date ?? range.start_date;
-}
-
 export function overlappingDateRange(a: EventDateRange, b: EventDateRange) {
   const start_date = a.start_date > b.start_date ? a.start_date : b.start_date;
   const end_date = a.end_date < b.end_date ? a.end_date : b.end_date;
@@ -373,7 +369,7 @@ export function ics(events: Event[], includeEstimated = false) {
     ].filter(Boolean).join("\n");
     for (const [index, r] of dates.entries()) {
       const occurrence = e.occurrences?.[index];
-      const publishedStart = occurrence ? occurrenceKey(occurrence) :
+      const publishedStart = occurrence ? occurrence.original_start_date ?? occurrence.start_date :
         e.original_start_date ?? e.source?.original_dates?.[0]?.start_date ?? e.source?.previous_dates?.[0]?.start_date ?? r.start_date;
       const next = new Date(r.end_date + "T00:00:00Z");
       next.setUTCDate(next.getUTCDate() + 1);

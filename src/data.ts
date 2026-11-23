@@ -459,6 +459,7 @@ export function normalizeEvents(value: unknown): Event[] {
     e.occurrences = Array.isArray(v.occurrences) ? v.occurrences.filter(validRange).map((r: Record<string, unknown>) => ({
       start_date: r.start_date, end_date: r.end_date,
       ...(validDate(r.original_start_date) && { original_start_date: r.original_start_date }),
+      ...(typeof r.venue === "string" && r.venue.trim() && { venue: r.venue.trim() }),
     })) : undefined;
     if (v.source && typeof v.source === "object" && !Array.isArray(v.source)) {
       const src = v.source;

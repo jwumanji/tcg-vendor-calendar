@@ -51,7 +51,8 @@ export function validate(value: unknown): asserts value is Event[] {
       (raw.original_start_date !== undefined && !validDate(raw.original_start_date)) ||
       (raw.occurrences != null && (!Array.isArray(raw.occurrences) ||
         raw.occurrences.length !== row.occurrences?.length ||
-        raw.occurrences.some((r) => r.original_start_date !== undefined && !validDate(r.original_start_date)))) ||
+        raw.occurrences.some((r) => (r.original_start_date !== undefined && !validDate(r.original_start_date)) ||
+          (r.venue !== undefined && (typeof r.venue !== "string" || !r.venue.trim()))))) ||
       (raw.date_status === "confirmed" &&
         (!validDate(raw.start_date) ||
           !validDate(raw.end_date) ||

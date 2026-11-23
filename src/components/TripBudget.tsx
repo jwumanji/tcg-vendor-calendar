@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { findHomeBase, resolveHomeBase } from "../homeBase";
+import { resolveHomeBase } from "../homeBase";
 import { type BudgetAmount, type BudgetDefaults, type Event, type TripBudget as Budget } from "../model";
-import { budgetLabels, budgetOrigin, calculateTripBudget, convertBudgetAmount, pendingTripTotal, readBudgetMoney, readTripBudgetForm, walkAwayPrice } from "../tripBudget";
+import { budgetLabels, budgetOrigin, calculateTripBudget, convertBudgetAmount, pendingTripTotal, readBudgetMoney, readTripBudgetForm, travelCostReview, tripDefaultsNeedDays, walkAwayPrice } from "../tripBudget";
 import { budgetFxDate, formatVendorAmount, formatVendorUsd, missingPriceMessage, snapshotCurrencies, snapshotFx, vendorPriceBasisLabels } from "../vendorPricing";
 import { Modal } from "./Modal";
 
@@ -44,14 +44,10 @@ export function TripBudget({
 }) {
   const budget = local ?? event.trip_budget;
   const base = resolveHomeBase(homeBase);
-  const travelNeedsReview = !!budget?.costs?.travel && budget.travelHomeBase !== base.id;
-  const previousBase = findHomeBase(budget?.travelHomeBase);
+  const travelReview = travelCostReview(budget, homeBase);
   const result = calculateTripBudget(event, now, today, homeBase, occurrence, budget, defaults);
   const { tableFee, total, perDay, subtotal, days, extraCosts, nights, mealDays } = result;
   const { ceiling, basis, quote, above } = walkAwayPrice(event, now, budget?.walkAway);
-  const defaultsNeedDays =
-    (!!defaults?.lodging?.amount && !budget?.costs?.lodging && nights === null) ||
-    (!!defaults?.meals?.amount && !budget?.costs?.meals && mealDays === null);
   const [editing, setEditing] = useState(false);
   const editButton = useRef<HTMLButtonElement>(null);
   const localNights = result.localEvent && budget?.nights === undefined;
@@ -83,9 +79,7 @@ export function TripBudget({
         {extraCosts.map(({ category, cost, usesDefault }) => (
           <BudgetRow key={category} label={budgetLabels[category]}>
             {cost ? <CostValue value={cost} /> : <small>Not entered</small>}
-            {category === "travel" && travelNeedsReview && (
-              <small>{previousBase ? `Saved for ${previousBase.city}. ` : "Original home base unknown. "}Review this travel amount for {base.city}.</small>
-            )}
+            {category === "travel" && travelReview && <small>{travelReview}</small>}
             {category === "lodging" && localNights && (!cost || usesDefault) && (
               <small>0 lodging nights because the show is in your home city{usesDefault ? " · Tools default" : ""}.</small>
             )}
@@ -120,7 +114,7 @@ export function TripBudget({
         </dl>
         <p>Break-even is the gross sales to cover trip costs, before cost of goods. It uses the costs shown above, including any Tools defaults.</p>
         {days === null && <p>Selling days are unknown for this schedule.</p>}
-        {defaultsNeedDays && <p>Enter lodging nights or meal days to apply the corresponding Tools default.</p>}
+        {tripDefaultsNeedDays(result, budget, defaults) && <p>Enter lodging nights or meal days to apply the corresponding Tools default.</p>}
       </div>
       <p className="trip-budget-fx">Conversions use the {budgetFxDate} research FX snapshot.</p>
       {onSave && <div className="money-item-actions">
@@ -133,7 +127,7 @@ export function TripBudget({
         }}>{event.trip_budget ? "Reset budget to shared" : "Reset budget"}</button>}
       </div>}
       {editing && onSave && (
-        <BudgetEditor budget={budget} result={result} defaults={defaults} base={base} travelNeedsReview={travelNeedsReview}
+        <BudgetEditor budget={budget} result={result} defaults={defaults} base={base} travelNeedsReview={!!travelReview}
           close={() => setEditing(false)}
           save={(value) => {
             onSave(value);

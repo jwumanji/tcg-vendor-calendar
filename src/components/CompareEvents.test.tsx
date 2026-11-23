@@ -2,13 +2,13 @@ import { load } from "cheerio";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it, vi } from "vitest";
 import raw from "../../data/events.json";
-import { canCompare, compareOccurrenceKey, compareOverlaps, normalizeComparePins, resolveComparePins, selectCompareOccurrence, toggleComparePin, type ComparePin } from "../compare";
+import { canCompare, compareOverlaps, normalizeComparePins, resolveComparePins, selectCompareOccurrence, toggleComparePin, type ComparePin } from "../compare";
 import { normalizeEvents } from "../data";
 import { DEFAULT_HOME_BASE } from "../homeBase";
 import { emptyFilters, type Event, type VendorMilestone } from "../model";
 import { scoreEvent } from "../scoring";
 import { emptyEntry, stageSuggestions, withSuggestedStages } from "../storage";
-import { displayDateLabel, matchingEvent, overlappingDateRange } from "../utils";
+import { displayDateLabel, matchingEvent, occurrenceKey, overlappingDateRange } from "../utils";
 import { CompareEvents, CompareTable, CompareTray } from "./CompareEvents";
 import { CompareToggle } from "./CompareToggle";
 import { Detail } from "./Detail";
@@ -76,7 +76,7 @@ it("pins the displayed filtered weekend and retains its whole date range after f
 });
 
 it("restores valid stored pins in order with their selected weekends and drops stale or duplicate entries", () => {
-  const occurrence = compareOccurrenceKey(trade.occurrences![1]);
+  const occurrence = occurrenceKey(trade.occurrences![1]);
   const stored = [null, { id: "old-event" }, { id: trade.id, occurrence }, { id: trade.id },
     { id: award.id, occurrence: "2027-02-30/2027-03-01" }, { id: urban.id }, { id: caps.id }, { id: color.id }];
   expect(normalizeComparePins(stored, events)).toEqual([
@@ -95,7 +95,7 @@ it("keeps published weekends distinct even when a moved weekend shares an origin
   expect(resolve(pins).range).toEqual(original);
   expect(resolve(pins).occurrences).toEqual([original, moved, longer]);
   for (const range of [moved, longer]) {
-    expect(resolve(selectCompareOccurrence(pins, updated.id, compareOccurrenceKey(range))).range).toBe(range);
+    expect(resolve(selectCompareOccurrence(pins, updated.id, occurrenceKey(range))).range).toBe(range);
   }
 });
 
@@ -146,7 +146,7 @@ it("updates overlaps and computes selling days and break-even for the chosen pub
   expect(cell($before, "Trip total for entered costs", 0).text()).toContain("USD 390.00");
   expect(cell($before, "Break-even per selling day", 0).find("small").map((_, el) => $before(el).text()).get())
     .toEqual(["USD 130.00", "3 selling days"]);
-  const selected = compareOccurrenceKey(pricedCaps.occurrences![1]);
+  const selected = occurrenceKey(pricedCaps.occurrences![1]);
   const $after = render(selectCompareOccurrence(initial, pricedCaps.id, selected));
   expect($after("select option[selected]").attr("value")).toBe(selected);
   expect($after("select option")).toHaveLength(3);

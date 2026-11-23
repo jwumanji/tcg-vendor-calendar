@@ -19,6 +19,8 @@ import { EventExports } from "./components/EventExports";
 import { TopPicks } from "./components/TopPicks";
 import { UpcomingMilestones, useMilestoneClock } from "./components/UpcomingMilestones";
 import { OutreachFollowUps } from "./components/OutreachFollowUps";
+import { WeeklyDigest } from "./components/WeeklyDigest";
+import { buildDigestSnapshot, digestActions, digestChanges, DIGEST_STORAGE_KEY, loadDigestCheckpoint, saveDigestCheckpoint } from "./weeklyDigest";
 import { Pipeline } from "./components/Pipeline";
 import { BackupControls } from "./components/BackupControls";
 import { BudgetDefaultsForm } from "./components/TripBudget";
@@ -207,6 +209,22 @@ export default function App() {
   const [compareOpen, setCompareOpen] = useState(false);
   const compareTrigger = useRef<HTMLButtonElement>(null);
   const focusCompareTrigger = useCallback(() => compareTrigger.current, []);
+  const [digestOpen, setDigestOpen] = useState(false);
+  const digestTrigger = useRef<HTMLButtonElement>(null);
+  const focusDigestTrigger = useCallback(() => digestTrigger.current ?? workspaceHeading.current, []);
+  const digestSnapshot = useMemo(() => buildDigestSnapshot(shippedEvents, meta.updatedAt), [shippedEvents]);
+  const [digestReview, setDigestReview] = useState(loadDigestCheckpoint);
+  useEffect(() => {
+    function syncReview(event: StorageEvent) {
+      if (event.key === DIGEST_STORAGE_KEY || event.key === null) setDigestReview(loadDigestCheckpoint());
+    }
+    window.addEventListener("storage", syncReview);
+    return () => window.removeEventListener("storage", syncReview);
+  }, []);
+  function markDigestReviewed() {
+    const result = saveDigestCheckpoint(digestSnapshot);
+    setDigestReview((previous) => result.error ? { ...previous, error: result.error } : result);
+  }
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [listView, setListView] = useState(() =>
     normalizeListView(stored("tcg-list-view")),
@@ -247,10 +265,11 @@ export default function App() {
     }
   }
   const onEventPage = route.page === "event";
+  const openableEvent = (id: string | null) => allEvents.find((event) => event.id === id &&
+    (!event.scanner_archived || Object.hasOwn(priority.overrides, id) ||
+      hasLocalPlanning(id, { entries: savedEntries, outreach, milestones, vendorPricing, tripBudget })));
   const selected = onEventPage
-    ? events.find((event) => event.id === route.id) ?? allEvents.find((event) => event.id === route.id &&
-      (!event.scanner_archived || Object.hasOwn(priority.overrides, event.id) ||
-        hasLocalPlanning(event.id, { entries: savedEntries, outreach, milestones, vendorPricing, tripBudget })))
+    ? events.find((event) => event.id === route.id) ?? openableEvent(route.id)
     : null;
   const sharedSelection = selected && shippedEvents.find((event) => event.id === selected.id);
   useEffect(() => {
@@ -740,6 +759,12 @@ export default function App() {
               <OutreachFollowUps events={activeEvents} today={today} focusFallback={workspaceHeading}
                 bannerExpanded={followUpsExpanded} toggle={() => applyListPreferences({ followUpsExpanded: !followUpsExpanded })}
                 open={(event, returnFocus) => open(event, undefined, returnFocus)} />
+              <div className="digest-launch">
+                <button type="button" className="button" ref={digestTrigger} aria-haspopup="dialog"
+                  onClick={() => setDigestOpen(true)}>
+                  <CalendarDays size={17} aria-hidden="true" /> Weekly digest
+                </button>
+              </div>
             </>
           )}
           {filters.going && (
@@ -1014,6 +1039,19 @@ export default function App() {
           </small>
         </footer>
       </main>
+      {!onEventPage && digestOpen && (
+        <WeeklyDigest changes={digestChanges(digestReview.checkpoint, digestSnapshot)}
+          actions={digestActions(allEvents, now)} review={digestReview} now={now}
+          snapshotDate={digestSnapshot.snapshotDate} markReviewed={markDigestReviewed}
+          canOpen={(id) => Boolean(openableEvent(id))}
+          openEvent={(id) => {
+            const event = openableEvent(id);
+            if (!event) return;
+            setDigestOpen(false);
+            open(event, undefined, focusDigestTrigger);
+          }}
+          close={() => setDigestOpen(false)} returnFocus={focusDigestTrigger} />
+      )}
       {!onEventPage && compareOpen && canCompare(pinnedEvents) && (
         <CompareEvents pins={pinnedEvents} entries={entries} budgets={tripBudget.events}
           scores={Object.fromEntries(pinnedEvents.map(({ event }) => [event.id, scores[event.id] ?? scoreEvent(event, {

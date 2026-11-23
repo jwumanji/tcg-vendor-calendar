@@ -24,13 +24,15 @@ function wallClock(at: number, timeZone: string) {
   if (!formatter) {
     formatter = new Intl.DateTimeFormat("en-GB", {
       timeZone, era: "short", year: "numeric", month: "2-digit", day: "2-digit",
-      hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+      hour: "2-digit", minute: "2-digit", second: "2-digit", fractionalSecondDigits: 3, hourCycle: "h23",
     });
     wallClocks.set(timeZone, formatter);
   }
   const parts = Object.fromEntries(formatter.formatToParts(at).map(({ type, value }) => [type, value]));
   const year = parts.era === "AD" ? Number(parts.year) : 1 - Number(parts.year);
-  return { year, day: `${String(year).padStart(4, "0")}-${parts.month}-${parts.day}`, time: `${parts.hour}:${parts.minute}` };
+  const time = `${parts.hour}:${parts.minute}`;
+  const seconds = parts.fractionalSecond === "000" ? parts.second : `${parts.second}.${parts.fractionalSecond}`;
+  return { year, day: `${String(year).padStart(4, "0")}-${parts.month}-${parts.day}`, time, seconds };
 }
 
 export function milestoneInstantInRange(instant: number, organizerZone: string) {
@@ -41,17 +43,19 @@ export function milestoneInstantInRange(instant: number, organizerZone: string) 
 
 export const isTimedMilestone = (milestone: VendorMilestone) => milestone.at.includes("T");
 
-export function milestoneTimes(milestone: VendorMilestone) {
+export function milestoneTimes(milestone: VendorMilestone, precise = false) {
   const city = Object.hasOwn(cityNames, milestone.timeZone) ? cityNames[milestone.timeZone] : milestone.timeZone;
   const dayLabel = (day: string) => dateOnly.format(new Date(day + "T00:00:00Z"));
   if (!isTimedMilestone(milestone)) return [`${dayLabel(milestone.at)} · ${city} date`];
   const instant = Date.parse(milestone.at);
   const local = wallClock(instant, milestone.timeZone);
   const user = wallClock(instant, saigon);
-  const localLabel = `${dayLabel(local.day)}, ${local.time}`;
-  return local.day === user.day && local.time === user.time
+  const timeLabel = ({ time, seconds }: ReturnType<typeof wallClock>) =>
+    precise && seconds !== "00" ? `${time}:${seconds}` : time;
+  const localLabel = `${dayLabel(local.day)}, ${timeLabel(local)}`;
+  return local.day === user.day && timeLabel(local) === timeLabel(user)
     ? [`${localLabel} ${city === "Saigon" ? city : city + " / Saigon"}`]
-    : [`${dayLabel(user.day)}, ${user.time} Saigon`, `${localLabel} ${city}`];
+    : [`${dayLabel(user.day)}, ${timeLabel(user)} Saigon`, `${localLabel} ${city}`];
 }
 
 export function milestonePassed(milestone: VendorMilestone, now: number) {
@@ -60,7 +64,7 @@ export function milestonePassed(milestone: VendorMilestone, now: number) {
     : milestone.at < wallClock(now, milestone.timeZone).day;
 }
 
-function milestoneDay(milestone: VendorMilestone) {
+export function milestoneDay(milestone: VendorMilestone) {
   return isTimedMilestone(milestone) ? wallClock(Date.parse(milestone.at), saigon).day : milestone.at;
 }
 

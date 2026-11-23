@@ -1,13 +1,13 @@
 import { useId, useLayoutEffect, useRef, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { Pin, X } from "lucide-react";
-import { canCompare, compareOccurrenceKey, compareOverlaps, confirmedCompareRange, MAX_COMPARE_PINS, type PinnedEvent } from "../compare";
+import { canCompare, compareOverlaps, confirmedCompareRange, MAX_COMPARE_PINS, type PinnedEvent } from "../compare";
 import { saigonDay, vendorApplyAction } from "../eventDecision";
 import { upcomingMilestones } from "../milestones";
 import type { BudgetDefaults, TripBudget } from "../model";
 import type { ScoreResult } from "../scoring";
 import { emptyEntry, type DisplayEntry } from "../storage";
 import { calculateTripBudget, pendingTripTotal, travelCostReview, tripDefaultsNeedDays } from "../tripBudget";
-import { displayDateLabel, formatDateRange, placeLabel } from "../utils";
+import { displayDateLabel, formatDateRange, occurrenceKey, placeLabel } from "../utils";
 import { budgetFxDate, formatVendorAmount, formatVendorUsd, missingPriceMessage, vendorPriceBasisLabels } from "../vendorPricing";
 import { ApplyLink } from "./ApplyLink";
 import { Status } from "./EventIdentity";
@@ -137,9 +137,9 @@ export function CompareTable({ pins, entries, scores, budgets, defaults, homeBas
       ["Dates and certainty", allDatesUnannounced ? "Dates not announced" : <div className="compare-dates">
         {occurrences.length > 1 && range ? (
           <select className="compare-weekend" aria-label={`Published weekend for ${event.name}`}
-            value={compareOccurrenceKey(range)} onChange={(ev) => onOccurrence(event.id, ev.target.value)}>
+            value={occurrenceKey(range)} onChange={(ev) => onOccurrence(event.id, ev.target.value)}>
             {occurrences.map((item) => (
-              <option key={compareOccurrenceKey(item)} value={compareOccurrenceKey(item)}>
+              <option key={occurrenceKey(item)} value={occurrenceKey(item)}>
                 {formatDateRange(item.start_date, item.end_date)}
               </option>
             ))}

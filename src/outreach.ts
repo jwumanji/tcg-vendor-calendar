@@ -29,13 +29,17 @@ export function followUp(outreach: Outreach) {
   if (due) return { kind, due };
 }
 
-export function dueOutreach(events: Event[], today: string) {
+export function outreachReminders(events: Event[], today: string) {
   return events.flatMap((event) => {
     if (!event.outreach || event.event_status === "cancelled" || !upcoming(event, today)) return [];
     const follow = followUp(event.outreach);
-    return follow && follow.due <= today ? [{ event, outreach: event.outreach, ...follow }] : [];
+    return follow ? [{ event, outreach: event.outreach, ...follow }] : [];
   }).sort((a, b) => {
     if (a.kind !== b.kind) return a.kind === "reply" ? -1 : 1;
     return a.due.localeCompare(b.due) || a.event.name.localeCompare(b.event.name);
   });
+}
+
+export function dueOutreach(events: Event[], today: string) {
+  return outreachReminders(events, today).filter(({ due }) => due <= today);
 }

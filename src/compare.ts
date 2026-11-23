@@ -1,6 +1,6 @@
 import type { Event, EventDateRange } from "./model";
 import { validDate } from "./data";
-import { dateSortRange, overlappingDateRange } from "./utils";
+import { dateSortRange, occurrenceKey, overlappingDateRange } from "./utils";
 
 export const MAX_COMPARE_PINS = 4;
 export const COMPARE_PINS_KEY = "tcg-compare-pins-v1";
@@ -32,15 +32,11 @@ export function canCompare(pins: readonly unknown[]) {
   return pins.length >= 2 && pins.length <= MAX_COMPARE_PINS;
 }
 
-export function compareOccurrenceKey({ start_date, end_date }: EventDateRange) {
-  return `${start_date}/${end_date}`;
-}
-
 export function toggleComparePin(pins: ComparePin[], event: Event, today: string) {
   if (pins.some(({ id }) => id === event.id)) return pins.filter(({ id }) => id !== event.id);
   if (pins.length >= MAX_COMPARE_PINS) return pins;
   const displayed = event.date_status === "confirmed" && event.occurrences?.length ? dateSortRange(event, today) : undefined;
-  return [...pins, { id: event.id, ...(displayed && { occurrence: compareOccurrenceKey(displayed) }) }];
+  return [...pins, { id: event.id, ...(displayed && { occurrence: occurrenceKey(displayed) }) }];
 }
 
 export function selectCompareOccurrence(pins: ComparePin[], id: string, occurrence: string) {
@@ -67,7 +63,7 @@ export function resolveComparePins(
     if (!published) return [];
     const event = seasonById.get(pin.id) ?? published;
     const publishedDates = event.date_status === "confirmed" ? published.occurrences ?? [] : [];
-    const occurrenceByKey = new Map(publishedDates.map((range) => [compareOccurrenceKey(range), range]));
+    const occurrenceByKey = new Map(publishedDates.map((range) => [occurrenceKey(range), range]));
     const occurrences = [...occurrenceByKey.values()].sort((a, b) =>
       a.start_date.localeCompare(b.start_date) || a.end_date.localeCompare(b.end_date));
     const range = occurrenceByKey.get(pin.occurrence ?? "") ?? dateSortRange(event, today);

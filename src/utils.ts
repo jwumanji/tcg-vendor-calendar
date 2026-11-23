@@ -50,6 +50,9 @@ export function ranges(e: Event) {
       ? [{ start_date: e.start_date, end_date: e.end_date || e.start_date }]
       : [];
 }
+export function occurrenceKey({ start_date, end_date }: EventDateRange) {
+  return `${start_date}/${end_date}`;
+}
 export function overlappingDateRange(a: EventDateRange, b: EventDateRange) {
   const start_date = a.start_date > b.start_date ? a.start_date : b.start_date;
   const end_date = a.end_date < b.end_date ? a.end_date : b.end_date;

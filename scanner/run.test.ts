@@ -1,4 +1,5 @@
 import { it, expect } from "vitest";
+import sharp from "sharp";
 import { spawnSync } from "node:child_process";
 import {
   mkdtempSync,
@@ -18,7 +19,7 @@ import type { Event } from "../src/model.ts";
 import { mergeOutreach } from "../src/data.ts";
 
 const entry = fileURLToPath(new URL("./run.ts", import.meta.url));
-it("imports raw Scanner records, refreshes logos, fails soft, and performs read-only dry runs", () => {
+it("records import conflicts and scraper warnings, fills a logo, and performs read-only dry runs", () => {
   const dir = mkdtempSync(join(tmpdir(), "grailfox-refresh-"));
   try {
     for (const sub of ["data", "public/logos", "scanner", "export/logos"])
@@ -35,13 +36,14 @@ it("imports raw Scanner records, refreshes logos, fails soft, and performs read-
       id,
       logo: "logos/change.webp",
     };
-    put("data/events.json", JSON.stringify([{ ...original, id, outreach: { ...outreach, notes: "" } }]));
+    put("data/events.json", JSON.stringify([{
+      ...original, id, logo: null, logo_kind: null, outreach: { ...outreach, notes: "" },
+    }]));
     put("data/meta.json", '{"updatedAt":"2020-01-01"}');
     put("export/events.json", JSON.stringify([imported]));
     const webp = readFileSync("public/logos/mtg.webp");
     const preview = readFileSync("public/logos/afa.webp");
     put("export/logos/change.webp", webp);
-    put("public/logos/change.webp", "old");
     put("export/logos/unreferenced.svg", "<svg/>");
     put("export/logos/unreferenced.webp", webp);
     // Exercise the real executable without depending on public hosts or the current season.
@@ -52,7 +54,9 @@ it("imports raw Scanner records, refreshes logos, fails soft, and performs read-
       "network.mjs",
       `import { readFileSync, writeFileSync } from "node:fs";
     globalThis.fetch = async url => {
-      if (new URL(url).hostname !== "www.suntecsingapore.com" || process.env.ALL_FAIL) return new Response("",{status:403});
+      if (process.env.ALL_FAIL) return new Response("",{status:403});
+      if (new URL(url).hostname === "www.sgcardshow.com") return new Response("<h1>Welcome</h1>");
+      if (new URL(url).hostname !== "www.suntecsingapore.com") return new Response("",{status:403});
       if (process.env.SAVE_NOTE && new URL(url).pathname === "/robots.txt") {
         const events = JSON.parse(readFileSync("data/events.json", "utf8"));
         events[0].outreach.notes = process.env.SAVE_NOTE;
@@ -82,9 +86,16 @@ it("imports raw Scanner records, refreshes logos, fails soft, and performs read-
       report.sources.filter((s: { status: string }) => s.status === "FAILED"),
     ).toHaveLength(10);
     expect(report.new_count).toBe(1);
+    expect(report.warnings).toContainEqual({
+      source: "sg-card-show", message: "Missing event name in public HTML",
+    });
+    expect(report.import).toMatchObject({
+      new_count: 0, fields_filled: 2, conflict_count: 1, logos_added: 1, logos_rejected: 0,
+      conflicts: [{ event_id: id, field: "name", curated: original.name, incoming: imported.name }],
+    });
     const snapshot = read("data/events.json");
     expect(JSON.parse(snapshot).filter((e: Event) => !e.source)).toEqual([
-      { ...imported, outreach },
+      { ...imported, name: original.name, outreach },
     ]);
     expect(JSON.parse(read("data/meta.json")).updatedAt).toBe(date);
     expect(readFileSync(join(dir, "public/logos/change.webp"))).toEqual(webp);
@@ -111,22 +122,26 @@ it("imports raw Scanner records, refreshes logos, fails soft, and performs read-
     put("listing.html", markup);
     expect(run([]).status).toBe(0);
     expect(read("data/events.json")).toBe(snapshot);
-    expect(run(args, true).status).toBe(1);
+    expect(run([], true).status).toBe(1);
+    expect(run(args, true).status).toBe(0);
     expect(read("data/events.json")).toBe(snapshot);
     expect(readFileSync(join(dir, "public/logos/change.webp"))).toEqual(webp);
     put("export/events.json", "[]");
-    const empty = run(args);
-    expect(empty.stderr).toContain("Empty Scanner export");
+    expect(run(args).status).toBe(0);
+    expect(JSON.parse(read("scanner/last-run.json")).import).toMatchObject({ new_count: 0, fields_filled: 0 });
     expect(read("data/events.json")).toBe(snapshot);
     put("export/events.json", JSON.stringify([{ ...imported, logo: "logos/unreferenced.svg" }]));
-    expect(run(args).stderr).toContain("Invalid Scanner logo");
+    expect(run(args).status).toBe(0);
+    expect(JSON.parse(read("scanner/last-run.json")).import.logo_rejections[0].reason).toMatch(/expected logos/);
     put("export/events.json", JSON.stringify([imported]));
     put("export/logos/change.webp", "<svg/>");
-    expect(run(args).stderr).toContain("Invalid WebP");
+    expect(run(args).status).toBe(0);
+    expect(JSON.parse(read("scanner/last-run.json")).import.logo_rejections[0].reason).toBe("invalid WebP");
     const broken = Buffer.from(webp);
     broken.fill(0, 12);
     put("export/logos/change.webp", broken);
-    expect(run(args).status).toBe(1);
+    expect(run(args).status).toBe(0);
+    expect(JSON.parse(read("scanner/last-run.json")).import.logos_rejected).toBe(1);
     expect(readFileSync(join(dir, "public/logos/change.webp"))).toEqual(webp);
     put("export/events.json", '[{"id":""}]');
     expect(run(args).status).toBe(1);
@@ -135,3 +150,76 @@ it("imports raw Scanner records, refreshes logos, fails soft, and performs read-
     rmSync(dir, { recursive: true, force: true });
   }
 }, 20000);
+
+it("rejects tiny and placeholder art and only installs valid logos when curated art is absent", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "grailfox-refresh-logos-"));
+  try {
+    for (const sub of ["data", "public/logos", "scanner", "export/logos"])
+      mkdirSync(join(dir, sub), { recursive: true });
+    const put = (path: string, value: unknown) => writeFileSync(join(dir, path), JSON.stringify(value));
+    const logo = (path: string) => join(dir, "public/logos", path);
+    const raw = JSON.parse(readFileSync("data/events.json", "utf8")) as Event[];
+    const original = raw.find((e) => !e.source)!;
+    const event = (id: string, path: string | null): Event => ({
+      ...original, id, name: id, logo: path && "logos/" + path, logo_kind: path ? "logo" : null,
+    });
+    const protectedRows = [
+      event("protected-same-path", "protected.webp"),
+      event("protected-new-path", "protected.webp"),
+      event("restore-file", "restore.webp"),
+      event("restore-reference", "missing.webp"),
+    ];
+    put("data/events.json", protectedRows);
+    put("data/meta.json", {});
+    const curated = readFileSync("public/logos/mtg.webp");
+    const larger = await sharp(curated).resize(512, 512, { fit: "fill" }).webp().toBuffer();
+    const tiny = await sharp(larger).resize(32, 32).webp().toBuffer();
+    const blank = await sharp({
+      create: { width: 512, height: 512, channels: 3, background: "#caff47" },
+    }).webp().toBuffer();
+    writeFileSync(logo("protected.webp"), curated);
+    const exports = [
+      event("protected-same-path", "protected.webp"),
+      event("protected-new-path", "unused.webp"),
+      event("restore-file", "restore.webp"),
+      event("restore-reference", "restored-reference.webp"),
+      event("new-valid", "good.webp"),
+      event("new-tiny", "small.webp"),
+      event("new-placeholder", "generic-placeholder.webp"),
+      event("new-blank", "flat.webp"),
+    ];
+    put("export/events.json", exports);
+    for (const item of exports) {
+      const bytes = item.id === "new-tiny" ? tiny : item.id === "new-blank" ? blank : larger;
+      writeFileSync(join(dir, "export", item.logo!), bytes);
+    }
+    const stub = join(dir, "offline.mjs");
+    writeFileSync(stub, 'globalThis.fetch = async () => new Response("", { status: 403 });');
+    const result = spawnSync(process.execPath, ["--import", stub, entry, "--import-scanner", "export/events.json"],
+      { cwd: dir, encoding: "utf8" });
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toContain("Scanner import: 4 added");
+    expect(readFileSync(logo("protected.webp"))).toEqual(curated);
+    for (const name of ["restore.webp", "restored-reference.webp", "good.webp"])
+      expect(readFileSync(logo(name))).toEqual(larger);
+    for (const name of ["unused.webp", "small.webp", "generic-placeholder.webp", "flat.webp"])
+      expect(existsSync(logo(name))).toBe(false);
+    const output = JSON.parse(readFileSync(join(dir, "data/events.json"), "utf8")) as Event[];
+    expect(output.map(({ logo }) => logo)).toEqual([
+      "logos/protected.webp", "logos/protected.webp", "logos/restore.webp",
+      "logos/restored-reference.webp", "logos/good.webp", null, null, null,
+    ]);
+    expect(output.slice(-3).every(({ logo_kind }) => logo_kind === null)).toBe(true);
+    const report = JSON.parse(readFileSync(join(dir, "scanner/last-run.json"), "utf8"));
+    expect(report.import).toMatchObject({ new_count: 4, logos_added: 3, logos_rejected: 5 });
+    expect(report.import.logo_rejections).toEqual([
+      expect.objectContaining({ event_id: "protected-same-path", reason: "existing logo file kept" }),
+      expect.objectContaining({ event_id: "protected-new-path", reason: expect.stringContaining("curated logo kept") }),
+      expect.objectContaining({ event_id: "new-tiny", reason: expect.stringContaining("64px") }),
+      expect.objectContaining({ event_id: "new-placeholder", reason: "placeholder filename" }),
+      expect.objectContaining({ event_id: "new-blank", reason: "blank or single-colour image" }),
+    ]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from "node:util";
 import type { Event } from "../src/model.ts";
 import { mergeMilestones, mergeVendorPricing } from "../src/data.ts";
 import { listingKey, type Notice } from "./listing.ts";
@@ -110,10 +111,10 @@ function scannerReschedule(old: Event, next: Event) {
   const movedWithinSeason = oldStart && nextStart && Math.abs(stamp(oldStart) - stamp(nextStart)) <= 90 * day;
   if (similarTitles(old, next) && (movedWithinSeason || (previousEdition && previousEdition === nextEdition))) return true;
   // Dedicated listing links can corroborate a larger move or a rewritten title.
-  return [old.website, ...old.source_urls].some((link) => {
+  return [old.website, ...(old.source_urls ?? [])].some((link) => {
     if (!link || !URL.canParse(link)) return false;
     const url = new URL(link);
-    return /\b20\d\d\b/.test(url.pathname) && (next.website === link || next.source_urls.includes(link));
+    return /\b20\d\d\b/.test(url.pathname) && (next.website === link || next.source_urls?.includes(link));
   });
 }
 
@@ -137,23 +138,6 @@ function sourceHistory(old: Event, next: Event, listing = next) {
     }),
     ...(aliases.size && { aliases: [...aliases] }),
   };
-}
-
-// Scanner exports may drop weekends or move one. Match unchanged starts first.
-// Carry a moved weekend's UID only when exactly one old and new range remain.
-function calendarIdentity(old: Event, next: Event): Partial<Event> {
-  if (!next.occurrences?.length) {
-    const original = old.original_start_date ?? old.source?.original_dates?.[0]?.start_date ?? historicalRanges(old)[0]?.start_date ?? old.start_date;
-    return original && original !== next.start_date ? { original_start_date: original } : {};
-  }
-  const previous = old.occurrences ?? [];
-  const missing = previous.filter((r) => !next.occurrences!.some((n) => n.start_date === r.start_date));
-  const added = next.occurrences.filter((r) => !previous.some((p) => p.start_date === r.start_date));
-  return { occurrences: next.occurrences.map((r) => {
-    const match = previous.find((p) => p.start_date === r.start_date) ??
-      (missing.length === 1 && added.length === 1 ? missing[0] : undefined);
-    return { ...r, original_start_date: match?.original_start_date ?? r.original_start_date ?? match?.start_date ?? r.start_date };
-  }) };
 }
 
 function hasSharedPlanning(event: Event) {
@@ -184,6 +168,28 @@ function refreshVendorPricing(previous: Event, next: Event) {
   return pricing;
 }
 
+export function emptyField(value: unknown): boolean {
+  if (value == null) return true;
+  if (typeof value === "string") return value.trim().length === 0;
+  if (Array.isArray(value)) return value.length === 0;
+  return typeof value === "object" && Object.keys(value).length === 0;
+}
+
+export interface ImportConflict {
+  event_id: string;
+  export_id: string;
+  field: string;
+  curated: unknown;
+  incoming: unknown;
+  reason: string;
+}
+
+export interface ImportRow {
+  event: Event;
+  previous?: Event;
+  incoming: Event;
+}
+
 function reconcileScanner(existing: Event[], imported: Event[]) {
   const byId = new Map(existing.map((event) => [event.id, event]));
   const byExportId = new Map(
@@ -197,17 +203,21 @@ function reconcileScanner(existing: Event[], imported: Event[]) {
     return byId.get(event.id) ?? (alias && !importedIds.has(alias.id) ? alias : undefined);
   });
   const used = new Set(matched.filter(Boolean));
-  const unmatched = existing.filter((event) => !used.has(event) && (!event.source || hasSharedPlanning(event)));
+  const unmatched = existing.filter((event) => !used.has(event));
   const candidates = imported.map((event, index) => {
     if (matched[index]) return [];
     const near = unmatched.filter((old) => matches(event, old));
     const activeNear = near.filter((old) => !old.scanner_archived);
     if (activeNear.length) return activeNear;
-    const moved = unmatched.filter((old) => !old.scanner_archived && scannerReschedule(old, event));
+    const moved = unmatched.filter((old) => !old.scanner_archived &&
+      (!old.source || hasSharedPlanning(old)) && scannerReschedule(old, event));
     return moved.length ? moved : near;
   });
-  const scanner = imported.map<Event>(({ outreach: _outreach, scanner_export_id: _exportId,
-    scanner_archived: _archived, ...event }, index) => {
+  const matchedRows = new Map<Event, Event>();
+  const added: Event[] = [];
+  const conflicts: ImportConflict[] = [];
+  let fieldsFilled = 0;
+  const rows = imported.map<ImportRow>((incoming, index) => {
     const [candidate] = candidates[index];
     // Keep the planner ID so event links, seed log entries and local patches still resolve.
     const previous = matched[index] ?? (
@@ -215,21 +225,62 @@ function reconcileScanner(existing: Event[], imported: Event[]) {
       !candidates.some((rows, other) => other !== index && rows.includes(candidate))
         ? candidate : undefined
     );
-    if (!previous) return event;
-    used.add(previous);
-    return {
-      ...event,
-      ...calendarIdentity(previous, event),
-      ...preserveMilestones(previous, event),
-      ...refreshVendorPricing(previous, event),
-      ...(previous.trip_budget && { trip_budget: previous.trip_budget }),
-      ...(previous.id !== event.id && { id: previous.id, scanner_export_id: event.id }),
-      ...(previous.outreach !== undefined && { outreach: previous.outreach }),
-    };
+    const { scanner_export_id: _exportId, scanner_archived: _archived,
+      source: _source, is_new_find: _newFind, ...fields } = incoming;
+    if (!previous) {
+      added.push(fields);
+      return { event: fields, incoming };
+    }
+    const event = { ...previous };
+    // An export match takes ownership from the live scraper while keeping its planner data.
+    if (previous.source) {
+      const originalStart = previous.source.original_dates?.[0]?.start_date ??
+        previous.source.previous_dates?.[0]?.start_date;
+      if (!event.original_start_date && !event.occurrences?.length && originalStart)
+        event.original_start_date = originalStart;
+      delete event.source;
+      delete event.is_new_find;
+    }
+    delete event.scanner_archived;
+    if (previous.id !== incoming.id && emptyField(previous.scanner_export_id))
+      event.scanner_export_id = incoming.id;
+    const curated = new Map(Object.entries(event));
+    const fills: [string, unknown][] = [];
+    const scheduleDisagrees = (["date_status", "start_date", "end_date", "estimated_month"] as const).some(
+      (key) => !emptyField(previous[key]) && !isDeepStrictEqual(previous[key], fields[key]),
+    );
+    for (const [field, value] of Object.entries(fields)) {
+      if (field === "logo" || field === "logo_kind" || value === undefined) continue;
+      const current = curated.get(field);
+      if (isDeepStrictEqual(current, value)) continue;
+      let reason: string;
+      if (!emptyField(current)) reason = "curated value kept";
+      else if (emptyField(value)) continue;
+      else if (field === "website" && typeof value === "string" && previous.source_urls?.includes(value) &&
+          /official (?:website|site) (?:was )?not (?:independently )?(?:confirmed|verified|found)/i.test(previous.description ?? ""))
+        reason = "website is already listed as a reference and the official site is unconfirmed";
+      else if (scheduleDisagrees &&
+          ["start_date", "end_date", "estimated_month", "occurrences", "original_start_date", "date_note"].includes(field))
+        reason = "incompatible with curated schedule";
+      else {
+        fills.push([field, value]);
+        continue;
+      }
+      conflicts.push({ event_id: previous.id, export_id: incoming.id, field,
+        curated: current ?? null, incoming: value, reason });
+    }
+    const updated = { ...event, ...Object.fromEntries(fills) };
+    fieldsFilled += fills.length;
+    matchedRows.set(previous, updated);
+    return { event: updated, previous, incoming };
   });
   return {
-    scanner: [...scanner, ...unmatched.filter((event) => !event.source && hasSharedPlanning(event) && !used.has(event))],
-    old: existing.filter((event) => event.source && !used.has(event)),
+    scanner: [...existing.flatMap((event) => {
+      const matched = matchedRows.get(event);
+      return matched ? [matched] : !event.source && !event.scanner_archived ? [event] : [];
+    }), ...added],
+    old: existing.filter((event) => event.source && !matchedRows.has(event)),
+    rows, added, conflicts, fieldsFilled,
   };
 }
 
@@ -245,7 +296,8 @@ export function merge(
     const index = sourceOrder.indexOf(id);
     return index === -1 ? Infinity : index;
   };
-  const { scanner, old } = imported ? reconcileScanner(existing, imported) : {
+  const scannerImport = imported && reconcileScanner(existing, imported);
+  const { scanner, old } = scannerImport ?? {
     scanner: existing.filter((e) => !e.source && !e.scanner_archived),
     old: existing.filter((e) => e.source),
   };
@@ -272,7 +324,12 @@ export function merge(
         r.start_date.startsWith(named[2]) || r.end_date.startsWith(named[2])));
   }
   function compatibleKeys(a: Event, b: Event) {
-    return !listingKey(a) || !listingKey(b) || keyMatches(a, b);
+    if (!listingKey(a) || !listingKey(b) || keyMatches(a, b)) return true;
+    // The Singapore Card Show can change its title while keeping the same
+    // dates and booking form. Match the title separately in the caller.
+    return a.source!.id === "sg-card-show" && b.source!.id === "sg-card-show" &&
+      a.vendor_application === b.vendor_application && !!a.start_date &&
+      a.start_date === b.start_date && a.end_date === b.end_date;
   }
   function announced(stored: Event, listing: Event) {
     return !!listing.start_date && (stored.estimated_month === listing.start_date.slice(0, 7) ||
@@ -473,6 +530,7 @@ export function merge(
   }
   return {
     events: [...ordered, ...archived.values()],
+    scannerImport,
     added: ordered.filter((e) => newIds.has(e.id)),
     known,
     applied,

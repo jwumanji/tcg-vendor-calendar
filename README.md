@@ -113,7 +113,7 @@ Use Node 24 and install dependencies with `npm ci`. Run from the repository root
 | --- | --- |
 | `npm run scan:dry` | Fetch live listings, validate and print the proposed changes. Writes no files. |
 | `npm run scan` | Merge live finds, update the snapshot date when records change, and save the run report. |
-| `node scanner/run.ts --import-scanner /workspace/tcg-calendar/events.json` | Replace the Scanner export, copy changed sibling logos, deduplicate retained finds and run all sources. Add `--dry-run` to preview. |
+| `node scanner/run.ts --import-scanner /workspace/tcg-calendar/events.json` | Add events, fill empty fields on matched records, install usable logos at new paths, and run all sources. Add `--dry-run` to preview. |
 | `scripts/weekly-refresh.sh --no-push --no-deploy` | Refresh locally and run tests and the production build. |
 | `scripts/weekly-refresh.sh` | Refresh, test, build, commit changed data, rebase, push to main and deploy (`scripts/deploy.sh`). `--force-deploy` deploys even with no data changes. |
 
@@ -123,7 +123,7 @@ Each scraper-owned event carries a stable `scan-` ID, its source and discovery t
 
 To add a source, save a small fragment of its actual public listing in `scanner/fixtures/`, add its pure parser and source module in `scanner/sources/`, and register it in `scanner/sources/index.ts`. Venue calendars can configure `venueParser` with selectors, location and date extraction. Add a dated parser case and document the live result in the source review. Use `ctx.get` for all network access. It checks robots.txt, serializes requests per host with at least a one-second gap, uses a 15-second request timeout, retries transient failures once and sends no-cache headers. The user agent is `Mozilla/5.0 (compatible; GrailfoxEventScanner/1.0; +https://www.grailfoxtcg.com)`. Only public HTML and documented public feeds are eligible.
 
-The report counts parsed listings, relevant in-window listings, junk, out-of-window records, new finds, matches against Scanner or scraper records, ambiguous listings, and applied and unmatched schedule notices. Source failures include their reason. Failed sources retain their upcoming finds. Finds age out 30 days after their end date; a later Scanner export takes precedence when its date, location and title match. [Latest scan](scanner/last-run.json)
+The report counts new events, listing matches, ambiguous listings, and applied and unmatched schedule notices. Scraper failures appear as warnings, and a valid Scanner export can still be imported when every live scrape fails. Scraper finds without shared planning age out 30 days after their end date. Scanner imports keep omitted events and populated fields, and report field conflicts and rejected logos. Existing logo files are kept byte-for-byte. [Latest scan](scanner/last-run.json)
 
 ## 2027+ focus
 

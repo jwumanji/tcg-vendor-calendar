@@ -52,13 +52,17 @@ it("retains curated booking milestones, notices and planner IDs over Scanner exp
     vendor_deadline: "Superseded export notice",
     vendor_milestones: [{ ...booking, at: "2026-12-01" }, { ...booking, id: "extra-opening" }],
   });
-  const merged = merge([previous], [], today, [replacement]).events;
+  const { events: merged, scannerImport } = merge([previous], [], today, [replacement]);
   expect(merged).toHaveLength(1);
   expect(merged[0]).toMatchObject({
     id: previous.id, scanner_export_id: replacement.id, vendor_deadline: previous.vendor_deadline,
-    vendor_milestones: [booking, { ...booking, id: "extra-opening" }],
-    name: replacement.name, start_date: replacement.start_date, original_start_date: previous.start_date, outreach,
+    vendor_milestones: [booking],
+    name: previous.name, start_date: previous.start_date, outreach,
   });
+  expect(scannerImport?.conflicts).toEqual(expect.arrayContaining([
+    expect.objectContaining({ field: "vendor_deadline", curated: previous.vendor_deadline, incoming: replacement.vendor_deadline }),
+    expect.objectContaining({ field: "vendor_milestones", curated: previous.vendor_milestones, incoming: replacement.vendor_milestones }),
+  ]));
   expect(merge(merged, [], today, [replacement]).events).toEqual(merged);
   expect(merge(merged, [], today, []).events).toEqual(merged);
   expect(() => validate(merged)).not.toThrow();
@@ -74,7 +78,7 @@ it("keeps local-only edits and calendar UIDs on a renamed and rescheduled Scanne
   const refreshed = merge([previous], [], today, [replacement]).events;
   expect(refreshed).toHaveLength(1);
   const [next] = normalizeEvents(JSON.parse(JSON.stringify(refreshed)));
-  expect(next).toMatchObject({ id: previous.id, scanner_export_id: replacement.id, start_date: replacement.start_date });
+  expect(next).toMatchObject({ id: previous.id, scanner_export_id: replacement.id, start_date: previous.start_date });
   const [reminder] = mergeMilestones(next.vendor_milestones, edits[next.id]);
   expect(reminder).toEqual(booking);
   const uid = (value: string) => value.match(/^UID:.+$/m)?.[0];
@@ -89,14 +93,14 @@ it("uses an edition-specific listing link to preserve identity after a larger mo
   const replacement = scanner({ id: "new-title", website, name: "World Collectibles Expo",
     start_date: "2027-05-01", end_date: "2027-05-02" });
   expect(merge([previous], [], today, [replacement]).events).toMatchObject([{
-    id: previous.id, scanner_export_id: replacement.id, name: replacement.name, vendor_milestones: [booking],
+    id: previous.id, scanner_export_id: replacement.id, name: previous.name, vendor_milestones: [booking],
   }]);
 });
 
 it("keeps bookings on their original edition when another numbered edition appears", () => {
   const previous = scanner({ name: "Card Con 3", vendor_milestones: [booking] });
   const next = scanner({ id: "other-edition", name: "Card Con 4", start_date: "2027-02-01", end_date: "2027-02-02" });
-  expect(merge([previous], [], today, [next]).events).toEqual([next, previous]);
+  expect(merge([previous], [], today, [next]).events).toEqual([previous, next]);
 });
 
 it.each(["postponed", "cancelled"] as const)("puts retained booking dates on hold when a same-ID import is %s", (event_status) => {
@@ -193,7 +197,7 @@ it("preserves identity, original discovery and unrelated keys through correction
     JSON.stringify(events),
   );
 });
-it("replaces the Scanner portion and archives a find the new export covers", () => {
+it("matches an existing scraper find and keeps omitted curated rows active", () => {
   const fresh = scanner({
     id: "from-new-export",
     name: "Singapore Card Show World Edition",
@@ -201,10 +205,10 @@ it("replaces the Scanner portion and archives a find the new export covers", () 
   const other = find({ id: "another", name: "Fandom Expo" });
   const obsolete = scanner({ id: "obsolete", name: "Unrelated old listing" });
   expect(merge([obsolete, base, other], [], today, [fresh]).events).toEqual([
-    fresh, other, { ...obsolete, scanner_archived: true }, { ...base, scanner_archived: true },
+    obsolete, { ...scanner({ id: base.id }), verification: "unverified", scanner_export_id: fresh.id }, other,
   ]);
 });
-it("carries only planner outreach onto replacement Scanner records with the same ID", () => {
+it("adds an unmatched record and keeps an omitted record and curated contact on a matched record", () => {
   const outreach = mergeOutreach(null, {
     status: "quoted", method: "form", quoted_price: "$200", message_ref: "reply",
     next_action: "reply_to_organizer", follow_up_due_at: "2026-11-24",
@@ -213,14 +217,61 @@ it("carries only planner outreach onto replacement Scanner records with the same
   const imported = scanner({ vendor_cost: "New cost", contact: "new@example.com" });
   const foreign = scanner({ id: "different", outreach });
   const missing = scanner({ id: "removed", name: "Other tracked event", outreach });
-  const { events } = merge([previous, missing], [], today, [imported, foreign]);
+  const { events, scannerImport } = merge([previous, missing], [], today, [imported, foreign]);
   expect(events).toEqual([
-    { ...imported, outreach },
-    scanner({ id: "different" }),
+    previous,
     missing,
+    foreign,
   ]);
+  expect(scannerImport?.added).toEqual([foreign]);
   expect(merge([previous], [], today, [{ ...imported, outreach: null }]).events[0].outreach).toEqual(outreach);
   expect(imported.outreach).toBeUndefined();
+});
+
+it("fills empty fields and preserves populated arrays, objects, zero, false, and curated stages", () => {
+  const previous = { ...scanner({
+    contact: "  ", description: null, games: [], vendor_count: 0, priority_market: false,
+    source_urls: ["https://example.com/curated"], trip_budget: { nights: 3 },
+  }), vendor_stage: "applied", curated_notes: "Organizer confirmed by email", extra: {} };
+  const incoming = { ...scanner({
+    contact: "vendor@example.com", description: "New description", games: ["Pokémon"], vendor_count: 100,
+    priority_market: true, source_urls: ["https://example.com/export"], trip_budget: { nights: 5 },
+    vendor_milestones: [booking],
+  }), vendor_stage: "researching", curated_notes: null, extra: { available: true } };
+  const { events, scannerImport } = merge([previous], [], today, [incoming]);
+  expect(events).toEqual([{ ...previous, contact: incoming.contact, description: incoming.description,
+    games: incoming.games, vendor_milestones: [booking], extra: incoming.extra }]);
+  expect(scannerImport?.fieldsFilled).toBe(5);
+  expect(scannerImport?.conflicts.map(({ field }) => field)).toEqual(expect.arrayContaining([
+    "vendor_count", "priority_market", "source_urls", "trip_budget", "vendor_stage", "curated_notes",
+  ]));
+});
+
+it("keeps an estimated schedule valid when an export supplies confirmed dates", () => {
+  const previous = scanner({
+    start_date: null, end_date: null, estimated_month: "2026-12", date_status: "estimated", date_note: null,
+  });
+  const { events, scannerImport } = merge([previous], [], today, [scanner()]);
+  expect(events).toEqual([previous]);
+  expect(() => validate(events)).not.toThrow();
+  expect(scannerImport?.conflicts).toContainEqual(expect.objectContaining({
+    field: "start_date", reason: "incompatible with curated schedule",
+  }));
+});
+
+it("keeps a curated reference link from being imported as an unconfirmed official site", () => {
+  const reference = "https://example.com/roundup";
+  const previous = scanner({
+    website: null, source_urls: [reference], description: "Official website was not independently confirmed.",
+  });
+  const incoming = { ...previous, website: reference };
+  const { events, scannerImport } = merge([previous], [], today, [incoming]);
+  expect(events).toEqual([previous]);
+  expect(scannerImport?.conflicts).toEqual([expect.objectContaining({
+    field: "website", incoming: reference, reason: expect.stringContaining("reference"),
+  })]);
+  expect(merge([previous], [], today, [{ ...incoming, website: "https://example.org" }]).events[0].website)
+    .toBe("https://example.org");
 });
 
 it("preserves options and documents during scraper refresh, pruning and Scanner promotion", () => {
@@ -273,16 +324,24 @@ it("keeps seeded finds after their dates pass, including when a Scanner row repl
   expect(merge([saved], [], "2027-12-31").events).toEqual([saved]);
 
   const imported = scanner({ vendor_count: 320 });
-  const promoted = { ...imported, id: saved.id, scanner_export_id: imported.id, outreach };
+  const promoted = { ...imported, id: saved.id, scanner_export_id: imported.id, outreach, verification: saved.verification };
   expect(merge([saved], [], today, [imported]).events).toEqual([promoted]);
   expect(merge([promoted], [], today, [imported]).events).toEqual([promoted]);
   const rescheduled = { ...imported, start_date: "2027-02-01", end_date: "2027-02-02" };
-  expect(merge([promoted], [], today, [rescheduled]).events).toEqual([
-    { ...promoted, original_start_date: promoted.start_date, start_date: rescheduled.start_date, end_date: rescheduled.end_date },
-  ]);
+  expect(merge([promoted], [], today, [rescheduled]).events).toEqual([promoted]);
   expect(merge([promoted], [], today, [imported, { ...imported, id: saved.id }]).events).toEqual([
-    imported, { ...imported, id: saved.id, outreach },
+    promoted, imported,
   ]);
+});
+
+it("retains the original calendar UID when an import matches a rescheduled scraper find", () => {
+  const previous = find({ source: {
+    ...base.source!, previous_dates: [{ start_date: "2026-12-05", end_date: "2026-12-06" }],
+  } });
+  const { events } = merge([previous], [], today, [scanner()]);
+  expect(events).toMatchObject([{ id: previous.id, original_start_date: "2026-12-05" }]);
+  expect(events[0].source).toBeUndefined();
+  expect(ics(events).match(/^UID:.+$/m)).toEqual(ics([previous]).match(/^UID:.+$/m));
 });
 
 it("never assigns saved outreach to an ambiguous Scanner replacement", () => {
@@ -667,7 +726,7 @@ it("keeps shared and browser trip budgets attached to the planner ID after an ex
   expect(merge([previous], [], today, []).events).toEqual([previous]);
 });
 
-it("updates Urban's published rate by ID while keeping planner pricing edits and budget", () => {
+it("keeps Urban's curated published rate, planner pricing edits and budget", () => {
   const events = normalizeEvents(JSON.parse(readFileSync(new URL("../data/events.json", import.meta.url), "utf8")));
   const urban = events.find((event) => event.id === "urban")!;
   const [area2] = urban.vendor_options!;
@@ -685,8 +744,7 @@ it("updates Urban's published rate by ID while keeping planner pricing edits and
   const [refreshed] = merge([previous], [], today, [next]).events;
   expect(refreshed).toMatchObject({ id: urban.id, scanner_export_id: next.id, trip_budget,
     outreach: urban.outreach, vendor_milestones: urban.vendor_milestones, vendor_documents: docs });
-  expect(refreshed.vendor_options?.find(({ id }) => id === area2.id))
-    .toMatchObject({ id: "area-2", amount: 1700, usd_amount: 216.72, notes: area2.notes, eligibility: area2.eligibility });
+  expect(refreshed.vendor_options?.find(({ id }) => id === area2.id)).toEqual(area2);
   expect(refreshed.vendor_options?.find(({ id }) => id === quote.id)).toEqual(quote);
   const edit = normalizeVendorOption({ ...area2, amount: 1550, notes: "Device pricing edit" });
   const local = loadEntries({ getItem: () => JSON.stringify(backup({}, undefined, undefined, undefined,
@@ -695,7 +753,7 @@ it("updates Urban's published rate by ID while keeping planner pricing edits and
     .toEqual(edit);
 });
 
-it("keeps an omitted Scanner event addressable with only a browser budget and restores it on re-listing", () => {
+it("keeps an omitted Scanner event active and attached to its browser budget", () => {
   const events = normalizeEvents(JSON.parse(readFileSync(new URL("../data/events.json", import.meta.url), "utf8")));
   const spring = events.find((event) => event.id === "hktcs-spring")!;
   const other = scanner({ id: "other" });
@@ -706,12 +764,12 @@ it("keeps an omitted Scanner event addressable with only a browser budget and re
     { events: { [spring.id]: { nights: 3 } } }));
   const local = loadEntries({ getItem: () => stored });
   const refreshed = normalizeEvents(first.events);
-  expect(refreshed.filter((event) => !event.scanner_archived).map(({ id }) => id)).toEqual(["other"]);
+  expect(refreshed.filter((event) => !event.scanner_archived).map(({ id }) => id)).toEqual([spring.id, "other"]);
   const saved = refreshed.find((event) => event.id === spring.id && hasLocalPlanning(event.id, local));
-  expect(saved).toMatchObject({ id: spring.id, name: spring.name, scanner_archived: true });
+  expect(saved).toMatchObject({ id: spring.id, name: spring.name });
   expect(local.tripBudget.events[saved!.id]).toEqual({ nights: 3 });
   expect(merge(first.events, [], today, [other]).events).toEqual(first.events);
-  expect(merge(first.events, [], today, [other, spring]).events[1]).toEqual(spring);
+  expect(merge(first.events, [], today, [other, spring]).events[0]).toEqual(spring);
 });
 
 it("keeps a trip budget over scrape updates and pruning, and validates shared budgets", () => {

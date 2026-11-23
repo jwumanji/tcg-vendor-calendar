@@ -1,4 +1,3 @@
-import { merge } from "../scanner/merge";
 import { emptyEntry } from "./storage";
 import { describe, it, expect } from "vitest";
 import raw from "../data/events.json";
@@ -497,9 +496,10 @@ it("exports cancellation on the original calendar UID and includes event and dat
 
 it("keeps a single appointment's UID when its December dates move to March", () => {
   const before = { ...event, occurrences: undefined, start_date: "2026-12-12", end_date: "2026-12-13" };
-  const after = { ...before, event_status: "postponed" as const, start_date: "2027-03-13", end_date: "2027-03-14" };
+  const after = { ...before, event_status: "postponed" as const, start_date: "2027-03-13", end_date: "2027-03-14",
+    original_start_date: before.start_date };
   const original = ics([before]);
-  const updated = ics(merge([before], [], "2026-11-21", [after]).events);
+  const updated = ics([after]);
   expect(original).toContain("DTSTART;VALUE=DATE:20261212");
   expect(updated).toContain("DTSTART;VALUE=DATE:20270313");
   expect(updated.match(/^UID:.+$/gm)).toEqual(original.match(/^UID:.+$/gm));
@@ -507,10 +507,11 @@ it("keeps a single appointment's UID when its December dates move to March", () 
 
 it("keeps recurring appointments distinct and stable when a weekend moves or the export is filtered", () => {
   const before = { ...event, occurrences: ["2027-01-09", "2027-03-13"].map((date) => ({ start_date: date, end_date: date })) };
-  const after = { ...before, occurrences: [before.occurrences[0], { start_date: "2027-04-10", end_date: "2027-04-10" }] };
+  const updated = { ...before, occurrences: [before.occurrences[0], {
+    start_date: "2027-04-10", end_date: "2027-04-10", original_start_date: before.occurrences[1].start_date,
+  }] };
   const uids = (e: Event) => ics([e]).match(/^UID:.+$/gm)!;
   expect(new Set(uids(before)).size).toBe(2);
-  const [updated] = merge([before], [], "2026-11-21", [after]).events;
   expect(uids(updated)).toEqual(uids(before));
   expect(uids(matchingEvent(updated, { ...emptyFilters, from: "2027-04-01" }, {})!)).toEqual([uids(before)[1]]);
 });
@@ -519,9 +520,7 @@ it("keeps the legacy UID of a recurring weekend after the first weekend disappea
   const dates = ["2027-01-30", "2027-02-13", "2027-03-06"].map((date) => ({ start_date: date, end_date: date }));
   const before = { ...event, ...dates[0], occurrences: dates };
   const revised = { ...before, ...dates[1], occurrences: dates.slice(1) };
-  const [stored] = merge([before], [], "2026-11-21", [revised]).events;
-  expect(stored.occurrences?.map((r) => r.original_start_date)).toEqual(["2027-02-13", "2027-03-06"]);
-  const calendar = ics([stored]);
+  const calendar = ics([revised]);
   expect(calendar).not.toContain(`UID:${event.id}-2027-01-30@`);
   for (const date of dates.slice(1)) expect(calendar).toContain(`UID:${event.id}-${date.start_date}@tcg-vendor-calendar`);
 });

@@ -67,6 +67,26 @@ it.each(sources)(
       });
   },
 );
+it("reads the Singapore Card Show homepage hero and vendor link", async () => {
+  const source = sources.find(({ id }) => id === "sg-card-show")!;
+  const result = await scanSource(source, async () => fixture("sg-card-show-hero"), new Date("2026-11-24"));
+  expect(result.stats.status).toBe("OK");
+  expect(result.events).toMatchObject([{
+    name: "Singapore Card Show · World Edition",
+    start_date: "2026-12-12",
+    end_date: "2026-12-13",
+    venue: "Singapore Expo · Hall 4A & 4B",
+    visitors: 30000,
+    vendor_count: null,
+    vendor_application: "https://forms.gle/example",
+    previous_editions_count: 1,
+  }]);
+  const [legacy] = (await scanSource(source, async () => fixture(source.id), new Date("2026-11-24"))).events;
+  const sameBookingForm = { ...legacy, vendor_application: result.events[0].vendor_application };
+  const refreshed = merge([sameBookingForm], result.events, "2026-11-24");
+  expect(refreshed.added).toEqual([]);
+  expect(refreshed.events).toMatchObject([{ id: legacy.id, name: result.events[0].name }]);
+});
 it("reads games and venue from the Singapore edition's detail page", () => {
   expect(parseDetail(fixture("bandai-sg"))).toMatchObject({
     venue: "SANDS Expo Convention Centre",

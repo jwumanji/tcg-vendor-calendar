@@ -2,15 +2,12 @@ import {
   readFile,
   writeFile,
   rename,
-  open,
+  link,
   mkdir,
   rm,
 } from "node:fs/promises";
-import sharp from "sharp";
-import { constants } from "node:fs";
 import { ScheduleConflict, scheduleField, scheduleNotice, type Notice } from "./listing.ts";
 import type { Source } from "./types.ts";
-import { dirname, join, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { parseArgs } from "node:util";
 import { normalizeEvents, normalizeTripBudget, normalizeVendorPricing, validDate } from "../src/data.ts";
@@ -20,16 +17,18 @@ import { createClient } from "./http.ts";
 import { normalize } from "./normalize.ts";
 import { relevance } from "./relevance.ts";
 import { merge } from "./merge.ts";
+import { planLogos } from "./logos.ts";
 import { sources } from "./sources/index.ts";
 
 const json = (v: unknown) => JSON.stringify(v, null, 2) + "\n";
-async function write(path: string, content: string | Buffer, original?: string) {
+async function write(path: string, content: string | Buffer, options: { original?: string; create?: true } = {}) {
   const tmp = path + "." + randomUUID() + ".tmp";
   try {
     await writeFile(tmp, content);
-    if (original !== undefined && await readFile(path, "utf8") !== original)
+    if (options.original !== undefined && await readFile(path, "utf8") !== options.original)
       throw Error("Event data changed during refresh. Rerun the scanner to keep those edits.");
-    await rename(tmp, path);
+    if (options.create) await link(tmp, path);
+    else await rename(tmp, path);
   } finally {
     await rm(tmp, { force: true });
   }
@@ -75,37 +74,6 @@ export function validate(value: unknown): asserts value is Event[] {
     )
       throw Error(`Invalid event output: ${row.id}`);
   }
-}
-async function logoChanges(path: string, events: Event[]) {
-  const from = dirname(resolve(path));
-  const changed = [];
-  for (const logo of new Set(events.map((e) => e.logo))) {
-    if (!logo) continue;
-    if (!/^logos\/[\w.-]+\.webp$/i.test(logo))
-      throw Error(`Invalid Scanner logo: ${logo}; expected logos/<filename>.webp`);
-    const file = await open(join(from, logo), constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
-    let bytes: Buffer;
-    try {
-      const stat = await file.stat();
-      if (!stat.isFile() || stat.size > 8 * 1024 * 1024) throw Error(`Invalid logo file: ${logo}`);
-      bytes = await file.readFile();
-    } finally {
-      await file.close();
-    }
-    if (bytes.toString("ascii", 0, 4) !== "RIFF" || bytes.toString("ascii", 8, 12) !== "WEBP" ||
-        bytes.readUInt32LE(4) !== bytes.length - 8) throw Error(`Invalid WebP: ${logo}`);
-    // Decode every referenced raster before any writes. Keep valid originals
-    // byte-identical so an unchanged Scanner export does not churn the logos.
-    const raster = sharp(bytes, { animated: true, limitInputPixels: 16_000_000, failOn: "warning" });
-    await raster.raw().toBuffer();
-    const dest = join("public", logo);
-    const prev = await readFile(dest).catch((e: NodeJS.ErrnoException) => {
-      if (e.code !== "ENOENT") throw e;
-      return null;
-    });
-    if (!prev?.equals(bytes)) changed.push({ dest, bytes });
-  }
-  return changed;
 }
 function reason(error: unknown): string {
   if (!(error instanceof Error)) return String(error);
@@ -168,9 +136,10 @@ export async function scanSource(source: Source, get: (url: string) => Promise<s
     }
   } catch (error) {
     stats.status = "FAILED";
-    stats.reason = reason(error);
+    warnings.push(reason(error));
+    stats.reason = warnings.join(" | ");
   }
-  return { stats, events, notices };
+  return { stats, events, notices, warnings };
 }
 
 async function main() {
@@ -194,12 +163,9 @@ async function main() {
     const original = await readFile("data/events.json", "utf8");
     const events: unknown = JSON.parse(original);
     validate(events);
-    if (imported?.length === 0 && events.some((e) => !e.source && !e.scanner_archived))
-      throw Error("Empty Scanner export would replace a nonempty Scanner snapshot");
     return { original, events };
   }
   await readSnapshot();
-  const logos = path && imported ? await logoChanges(path, imported) : [];
   const now = new Date(),
     today = localDay(now),
     until = horizon(today);
@@ -219,6 +185,8 @@ async function main() {
     sources.map((source) => source.id),
     results.flatMap((r) => r.notices),
   );
+  const scannerImport = merged.scannerImport;
+  const logos = path && scannerImport ? await planLogos(path, scannerImport.rows) : undefined;
   validate(merged.events);
   const rows = results.map(({ stats }) => ({
     ...stats,
@@ -228,12 +196,24 @@ async function main() {
     ambiguous_listings: merged.ambiguous.filter((listing) => listing.source!.id === stats.source).length,
     already_known: merged.known[stats.source] ?? 0,
   }));
-  const added = merged.added.map((e) => ({
+  const added = [...(scannerImport?.added ?? []), ...merged.added].map((e) => ({
     name: e.name,
     date: e.start_date ?? e.estimated_month,
     city: e.city,
-    source: e.source!.id,
+    source: e.source?.id ?? "Scanner export",
   }));
+  const conflicts = [...(scannerImport?.conflicts ?? []), ...(logos?.conflicts ?? [])];
+  const importReport = scannerImport && {
+    new_count: scannerImport.added.length,
+    fields_filled: scannerImport.fieldsFilled + (logos?.fieldsFilled ?? 0),
+    conflict_count: conflicts.length,
+    conflicts,
+    logos_added: logos?.staged.size ?? 0,
+    logos_rejected: logos?.rejections.length ?? 0,
+    logo_rejections: logos?.rejections ?? [],
+  };
+  const warnings = results.flatMap(({ stats, warnings }) =>
+    warnings.map((message) => ({ source: stats.source, message })));
   const summary = {
     scanned_at: now.toISOString(),
     today,
@@ -245,16 +225,20 @@ async function main() {
     ambiguous_listings: merged.ambiguous.length,
     removed: merged.removed,
     new_events: added,
+    warnings,
+    import: importReport,
   };
   console.table(rows);
   for (const notice of merged.unmatched)
     console.warn(`Unmatched notice from ${notice.source!.id}: ${notice.name} (${notice.date_note})`);
   for (const e of added)
     console.log(`+ ${e.name} | ${e.date ?? "TBA"} | ${e.city} | ${e.source}`);
+  if (importReport)
+    console.log(`Scanner import: ${importReport.new_count} added, ${importReport.fields_filled} fields filled, ${importReport.conflict_count} conflicts, ${importReport.logos_added} logos added, ${importReport.logos_rejected} logo rejections.`);
   console.log(
-    `${added.length} new, ${merged.removed} removed, ${merged.events.filter((e) => !e.scanner_archived).length} active. ${logos.length} changed logos.`,
+    `${added.length} new, ${merged.removed} removed, ${merged.events.filter((e) => !e.scanner_archived).length} active, ${warnings.length} scraper warnings.`,
   );
-  if (allFailed) {
+  if (allFailed && !imported) {
     if (!dry) await write("scanner/last-run.json", json(summary));
     throw Error("All sources failed; refresh aborted");
   }
@@ -262,10 +246,12 @@ async function main() {
   // Compare records before formatting: an otherwise identical legacy export may omit the final newline.
   const changed = JSON.stringify(existing) !== JSON.stringify(merged.events);
   const meta = JSON.parse(await readFile("data/meta.json", "utf8"));
-  if (logos.length) await mkdir("public/logos", { recursive: true });
-  for (const logo of logos) await write(logo.dest, logo.bytes);
+  if (logos?.staged.size) {
+    await mkdir("public/logos", { recursive: true });
+    for (const [dest, bytes] of logos.staged) await write(dest, bytes, { create: true });
+  }
   if (changed) {
-    await write("data/events.json", json(merged.events), original);
+    await write("data/events.json", json(merged.events), { original });
     await write("data/meta.json", json({ ...meta, updatedAt: today }));
   }
   await write("scanner/last-run.json", json(summary));

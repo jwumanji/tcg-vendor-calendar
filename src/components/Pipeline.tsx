@@ -7,7 +7,6 @@ import { memo, useEffect, useRef, useState } from "react";
 import {
   Ban,
   BadgeCheck,
-  CalendarDays,
   ChevronDown,
   CircleDollarSign,
   ClipboardCheck,
@@ -26,11 +25,12 @@ import { holo } from "../holo";
 import {
   ClashCue,
   Logo,
-  Status,
   Place,
   NoteTag,
 } from "./EventIdentity";
 import { ApplyLink } from "./ApplyLink";
+import { EventDates } from "./EventFields";
+import { OutreachChip } from "./OutreachChip";
 
 /** Every stage has an icon as well as a label, so stages never rely on colour alone. */
 const stageIcons: Record<Stage, LucideIcon> = {
@@ -92,18 +92,7 @@ export function StagePicker({
     </span>
   );
 }
-export function Pipeline({
-  today,
-  now = Date.now(),
-  sort,
-  events,
-  entries,
-  scores,
-  open,
-  setGoing,
-  change,
-  browse,
-}: {
+type PipelineProps = {
   today: string;
   now?: number;
   sort: RowSort;
@@ -114,58 +103,68 @@ export function Pipeline({
   setGoing: SetGoing;
   change: (event: Event, stage: Stage) => void;
   browse?: () => void;
-}) {
+};
+
+export function Pipeline({ sort, events, ...props }: PipelineProps) {
   return (
     <>
       <p className="pipeline-explainer">
-        Track your decision and booth booking in the pipeline. Marking Going moves
-        an event from Not reviewed to Considering.
+        Track booth bookings by stage. Marking Going moves an event from Not reviewed to Considering.
       </p>
       <div className="pipeline">
-        {orderedStages(sort).map((stage) => {
-          const items = events.filter(
-            (e) => (entries[e.id] || emptyEntry).stage === stage,
-          );
-          return (
-            <section
-              className="pipeline-column"
-              data-stage={stage}
-              key={stage}
-            >
-              <h3>
-                <StageBadge stage={stage} /> <span>{items.length}</span>
-              </h3>
-              {items.length === 0 && (
-                <div className="pipeline-empty">
-                  {stage === "Considering" ? (
-                    <p>Mark an event Going to see it here.</p>
-                  ) : (
-                    <p>Set an event’s stage to {stage} to see it here.</p>
-                  )}
-                  {browse && <button className="text-button" onClick={browse}>Browse events</button>}
-                </div>
-              )}
-              {items.map((e) => (
-                <PipelineCard
-                  today={today}
-                  now={now}
-                  key={e.id}
-                  e={e}
-                  entries={entries}
-                  score={scores[e.id]}
-                  stage={stage}
-                  going={!!entries[e.id]?.going}
-                  setGoing={setGoing}
-                  hasNote={!!entries[e.id]?.note.trim()}
-                  open={open}
-                  change={change}
-                />
-              ))}
-            </section>
-          );
-        })}
+        {orderedStages(sort).map((stage) => (
+          <PipelineColumn key={stage} stage={stage}
+            items={events.filter((e) => (props.entries[e.id] || emptyEntry).stage === stage)}
+            {...props} />
+        ))}
       </div>
     </>
+  );
+}
+
+const pipelinePageSize = 6;
+
+function PipelineColumn({
+  stage, items, today, now = Date.now(), entries, scores, open, setGoing, change, browse,
+}: Omit<PipelineProps, "sort" | "events"> & { stage: Stage; items: Event[] }) {
+  const [page, setPage] = useState(0);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const currentPage = Math.min(page, Math.max(0, Math.ceil(items.length / pipelinePageSize) - 1));
+  const start = currentPage * pipelinePageSize;
+  const end = Math.min(start + pipelinePageSize, items.length);
+  function turnPage(next: number) {
+    setPage(next);
+    heading.current?.focus({ preventScroll: true });
+    heading.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }
+  return (
+    <section className="pipeline-column" data-stage={stage}>
+      <h3 ref={heading} tabIndex={-1}>
+        <StageBadge stage={stage} /> <span>{items.length}</span>
+      </h3>
+      {items.length === 0 && (
+        <div className="pipeline-empty">
+          <p>{stage === "Considering" ? "Mark an event Going to see it here." : `Set an event’s stage to ${stage} to see it here.`}</p>
+          {browse && <button className="text-button" onClick={browse}>Browse events</button>}
+        </div>
+      )}
+      {items.slice(start, end).map((e) => (
+        <PipelineCard today={today} now={now} key={e.id} e={e} entries={entries}
+          score={scores[e.id]} stage={stage} going={!!entries[e.id]?.going}
+          setGoing={setGoing} hasNote={!!entries[e.id]?.note.trim()} open={open} change={change} />
+      ))}
+      {items.length > pipelinePageSize && (
+        <nav className="pipeline-pagination" aria-label={stage + " pages"}>
+          <span role="status">{start + 1}–{end} of {items.length}</span>
+          {start > 0 && <button className="button" onClick={() => turnPage(currentPage - 1)}>Previous</button>}
+          {end < items.length && (
+            <button className="button" onClick={() => turnPage(currentPage + 1)}>
+              Show {Math.min(pipelinePageSize, items.length - end)} more
+            </button>
+          )}
+        </nav>
+      )}
+    </section>
   );
 }
 
@@ -201,6 +200,7 @@ const PipelineCard = memo(function PipelineCard({
 }) {
   const primary = games(e)[0];
   const application = vendorApplyAction(e, now);
+  const date = displayDateLabel(e, today);
   return (
     <article
       className={`pipeline-card holo status-${e.date_status}`}
@@ -217,27 +217,24 @@ const PipelineCard = memo(function PipelineCard({
             {e.name}
             <span className="sr-only">
               {" "}
-              · {displayDateLabel(e, today)}
+              · {date}
               {hasNote ? " · has notes" : ""}
             </span>
           </button>
         </h4>
       </div>
       <div className="pcard-meta">
-        <ClashCue score={score} entries={entries} />
-        <span className="pcard-line">
-          <CalendarDays size={14} aria-hidden="true" />
-          {displayDateLabel(e, today)}
+        <span className="pcard-line pcard-date">
+          <EventDates e={e} date={date} />
         </span>
         <span className="pcard-line">
           <Place e={e} />
         </span>
       </div>
-      <div className="pcard-foot">
-        <PriorityChip result={score} />
-      </div>
       <div className="pcard-tags">
-        <Status e={e} />
+        <PriorityChip result={score} />
+        <OutreachChip outreach={e.outreach} />
+        <ClashCue score={score} entries={entries} />
         <FindBadges e={e} />
         <span className="game-tag" data-game={gameKey(primary)}>
           {primary}
@@ -245,12 +242,12 @@ const PipelineCard = memo(function PipelineCard({
         {hasNote && <NoteTag />}
       </div>
       <div className="pcard-actions">
-        <GoingButton e={e} going={going} setGoing={setGoing} />
         <StagePicker
           name={e.name}
           entry={entries[e.id] || emptyEntry}
           onChange={(s) => change(e, s)}
         />
+        <GoingButton e={e} going={going} setGoing={setGoing} />
         {application && <ApplyLink action={application} name={e.name} compact />}
         {stage === "Too expensive" && (
           <button className="text-button" onClick={() => open(e)}>

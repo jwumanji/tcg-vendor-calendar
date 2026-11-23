@@ -11,7 +11,7 @@ import { ics, matches, matchingEvent, timelineGroups } from "../utils";
 import { emptyEntry, stages, type Entries } from "../storage";
 import { Detail } from "./Detail";
 import { EventCard } from "./EventCard";
-import { EventRows } from "./EventRows";
+import { EventRows, RowSortControl } from "./EventRows";
 import { CardSections } from "./ListSections";
 import { CalendarView } from "./CalendarView";
 import { Pipeline } from "./Pipeline";
@@ -116,13 +116,13 @@ function layouts(sort: RowSort, columns: OptionalColumn[] = [], list = events, r
     <CardSections groups={groups} sortKey={sort.key}>
       {(e, titleLevel) => (
         <EventCard key={e.id} e={e} entry={entries[e.id] || emptyEntry} score={results[e.id]}
-          today={today} now={Date.parse(today)} titleLevel={titleLevel} {...shared} entries={entries} />
+          today={today} now={Date.parse(today)} titleLevel={titleLevel} columns={columns} {...shared} entries={entries} />
       )}
     </CardSections>
   );
   const rows = (
-    <EventRows groups={groups} sort={sort} setSort={vi.fn()} columns={columns}
-      today={today} now={Date.parse(today)} scores={results} selectMode={false} {...shared} entries={entries} />
+    <EventRows groups={groups} sort={sort} columns={columns}
+      today={today} now={Date.parse(today)} scores={results} {...shared} entries={entries} />
   );
   return { grid: load(renderToStaticMarkup(grid)), rows: load(renderToStaticMarkup(rows)) };
 }
@@ -180,7 +180,7 @@ describe("Grid and Rows sections", () => {
     expect(estimate.date_status).toBe("tba");
     const { grid, rows } = layouts(defaultRowSort, [], [recurring, estimate]);
     expect(grid(".list-section-heading").text()).toBe("January 2027 · 2 events");
-    expect(grid(".card-when").map((_, el) => grid(el).text()).get())
+    expect(grid(".card-when .row-date-label").map((_, el) => grid(el).text()).get())
       .toEqual(["31 Jan 2027 – 1 Feb 2027", "Est. January 2027"]);
     expect(grid(".event-card").last().find(".badge.tba").text()).toContain("Dates not announced");
     expect(rows(".row-dates").first().text()).toBe("31 Jan 2027 – 1 Feb 2027 ● Confirmed");
@@ -218,10 +218,12 @@ it("shows outreach wording in Grid and Rows with an opt-in sortable column and n
     expect($(".priority-chip")).toHaveLength(list.length);
   }
   expect(rows(".row-outreach")).toHaveLength(0);
-  const { rows: withColumn } = layouts(sort, ["outreach"], list);
+  const { rows: withColumn, grid: withField } = layouts(sort, ["outreach"], list);
   expect(withColumn(".col-outreach").attr("aria-sort")).toBe("ascending");
   expect(withColumn(".row-outreach .outreach-chip")).toHaveLength(3);
-  expect(withColumn(".row-markers .outreach-chip")).toHaveLength(0);
+  expect(withColumn(".row-priority .outreach-chip")).toHaveLength(0);
+  expect(withField(".card-option-outreach .outreach-chip")).toHaveLength(3);
+  expect(withField(".card-tags .outreach-chip")).toHaveLength(0);
 });
 
 it.each([
@@ -315,10 +317,16 @@ it("shows the same schedule status and zero priority in Rows and Grid and exclud
   expect(matches(cancelled, { ...emptyFilters, status: "confirmed" }, {})).toBe(false);
 });
 
-it("identifies a hidden sort column and direction in Rows", () => {
-  const { rows } = layouts({ key: "scanner", direction: "desc" });
-  expect(rows(".rows-sort-note").text()).toBe("Sorted by Fit score (descending)");
-  expect(layouts({ key: "scanner", direction: "desc" }, ["scanner"]).rows(".rows-sort-note")).toHaveLength(0);
+it("shows the selected sort in the labelled control and in passive headers when the column is visible", () => {
+  const sort = { key: "scanner", direction: "desc" } as const;
+  const $ = load(renderToStaticMarkup(<RowSortControl sort={sort} setSort={vi.fn()} />));
+  expect($("label").text()).toBe("Sort by");
+  expect($("select option[selected]").text()).toBe("Fit score");
+  expect($("button[aria-pressed=true]")).toHaveLength(1);
+  expect(layouts(sort).rows("th[aria-sort]")).toHaveLength(0);
+  const { rows } = layouts(sort, ["scanner"]);
+  expect(rows("th[aria-sort=descending]").text()).toBe("Fit score");
+  expect(rows("thead th button")).toHaveLength(0);
 });
 
 it("labels cancelled calendar dates, undated postponements, pipeline cards and event details", () => {
@@ -333,8 +341,8 @@ it("labels cancelled calendar dates, undated postponements, pipeline cards and e
   expect(calendar(".calendar-event .badge.cancelled").first().text()).toBe("Cancelled");
   expect(calendar(".tba-links .badge.postponed").text()).toBe("Postponed");
   const pipeline = load(renderToStaticMarkup(<Pipeline today={today} sort={defaultRowSort} events={list} scores={results} change={vi.fn()} {...shared} />));
-  expect(pipeline(".pcard-tags .badge.cancelled")).toHaveLength(1);
-  expect(pipeline(".pcard-tags .badge.postponed")).toHaveLength(1);
+  expect(pipeline(".pcard-date .badge.cancelled")).toHaveLength(1);
+  expect(pipeline(".pcard-date .badge.postponed")).toHaveLength(1);
   const detail = load(renderToStaticMarkup(<Detail today={today} e={cancelled} score={results[cancelled.id]} entry={emptyEntry}
     saved setGoing={shared.setGoing} onStage={vi.fn()} onNote={vi.fn()} onOutreach={vi.fn()} onMilestone={vi.fn()} onRemoveMilestone={vi.fn()}
     setOverride={vi.fn()} openClash={vi.fn()} toast={null} />));
@@ -348,8 +356,8 @@ it("orders Rows, Pipeline columns and Timeline stage groups by the same descendi
   const entries = { [kowloon.id]: { ...emptyEntry, stage: "Contacted" as const } };
   const sorted = sortRows([event, kowloon], sort, entries, scores, today);
   const groups = groupSortedRows(sorted, sort.key, today);
-  const rows = load(renderToStaticMarkup(<EventRows groups={groups} sort={sort} setSort={vi.fn()} columns={[]}
-    today={today} scores={scores} selectMode={false} {...shared} entries={entries} />));
+  const rows = load(renderToStaticMarkup(<EventRows groups={groups} sort={sort} columns={[]}
+    today={today} scores={scores} {...shared} entries={entries} />));
   const pipeline = load(renderToStaticMarkup(<Pipeline today={today} sort={sort} events={sorted} scores={scores}
     change={vi.fn()} {...shared} entries={entries} />));
   expect(rows(".row-name").map((_, el) => rows(el).text()).get()).toEqual([kowloon.name, event.name]);
@@ -421,7 +429,23 @@ it("uses the upcoming Centrepoint weekend in visible dates and accessible titles
   const picks = load(renderToStaticMarkup(<TopPicks events={[series]} scores={scores} today={day} {...shared} />));
   for (const text of [pipeline(".pcard-line").first().text(), pipeline(".pcard-title button").text(),
     picks(".pick p").text(), picks(".pick h3 button").text()]) {
-    expect(text).toContain("13 Feb 2027 – 14 Feb 2027");
+    expect(text).toContain("13–14 Feb 2027");
     expect(text).not.toContain("Jan");
   }
+});
+
+it("shows the same date, status and action order across Grid, Rows and Pipeline", () => {
+  const e = { ...event, start_date: "2027-01-03", end_date: "2027-01-05", vendor_application: "https://example.com/apply" };
+  const { grid, rows } = layouts(defaultRowSort, ["scanner", "source"], [e]);
+  const pipeline = load(renderToStaticMarkup(<Pipeline today={today} sort={defaultRowSort} events={[e]}
+    scores={scores} change={vi.fn()} {...shared} />));
+  const fields = ".row-date-label, .badge.confirmed, .place, .priority-chip, .stage-picker, .going-button, .apply-cta";
+  for (const $ of [grid, rows, pipeline]) {
+    const record = $("[data-event-id]");
+    expect(record.find(fields).map((_, el) => $(el).attr("class")?.split(" ")[0]).get())
+      .toEqual(["row-date-label", "badge", "place", "priority-chip", "stage-picker", "going-button", "button"]);
+    expect(record.find(".row-date-label").text()).toBe("3–5 Jan 2027");
+  }
+  expect(grid(".card-option-scanner").text()).toBe(rows(".row-scanner").text());
+  expect(grid(".card-option-source").text()).toBe(rows(".row-source").text());
 });

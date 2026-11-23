@@ -21,10 +21,12 @@ import {
 } from "lucide-react";
 import type { BudgetDefaults, TripBudget as Budget, Event, VendorMilestone, VendorPricingPatch } from "../model";
 import {
+  dateLabel,
+  dateSortRange,
   displayDateLabel,
+  formatDateRange,
   safeUrl,
   ranges,
-  prettyDate,
   ics,
   download,
   gameKeyOf,
@@ -50,11 +52,44 @@ function meaningful(value?: string | number | null) {
   return text && !/^(?:unknown|tba|tbd|other|unspecified|[-—–])$/i.test(text) ? text : undefined;
 }
 
-const areaLabels: Record<string, string> = {
-  "SEA/HK": "Southeast Asia and Hong Kong",
-  "GCC (other)": "Other Gulf countries",
-  UAE: "United Arab Emirates",
-};
+// Keep provenance, conflicting dates and other context. Suppress only notes
+// whose full text matches a known date or the published schedule.
+function scheduleNote(event: Event, schedule: ReturnType<typeof ranges>) {
+  const note = meaningful(event.date_note);
+  if (!note || !schedule.length) return note;
+  const normalize = (value: string) => value.toLowerCase().replace(/[–—&/]|\bto\b/g, "-")
+    .replace(/[\s.,:;()]/g, "");
+  const formats = schedule.map(({ start_date, end_date }) => {
+    const year = start_date.slice(0, 4);
+    const start = new Date(start_date + "T12:00:00Z");
+    const end = new Date(end_date + "T12:00:00Z");
+    const date = formatDateRange(start_date, end_date);
+    const labels = [date, dateLabel({ ...event, start_date, end_date })];
+    if (year === end_date.slice(0, 4)) labels.push(`${year} dates: ${date.replaceAll(" " + year, "")}`);
+    const numeric = (value: string) => value.split("-").reverse().join("/");
+    labels.push(start_date === end_date ? start_date : `${start_date} / ${end_date}`);
+    labels.push(start_date === end_date ? numeric(start_date) : `${numeric(start_date)} – ${numeric(end_date)}`);
+    for (const month of ["short", "long"] as const) {
+      const firstMonth = start.toLocaleString("en-GB", { month, timeZone: "UTC" });
+      const lastMonth = end.toLocaleString("en-GB", { month, timeZone: "UTC" });
+      const firstDay = start.getUTCDate();
+      const lastDay = end.getUTCDate();
+      if (start_date === end_date) labels.push(`${firstMonth} ${firstDay}, ${year}`, `${firstDay} ${firstMonth} ${year}`);
+      else if (start_date.slice(0, 7) === end_date.slice(0, 7)) {
+        labels.push(`${firstMonth} ${firstDay}–${lastDay}, ${year}`, `${firstDay}–${lastDay} ${firstMonth} ${year}`);
+      }
+      labels.push(`${firstDay} ${firstMonth} ${year} – ${lastDay} ${lastMonth} ${end_date.slice(0, 4)}`);
+    }
+    return { year, date, labels };
+  });
+  const exact = formats.flatMap(({ labels }) => labels);
+  const year = formats[0].year;
+  if (formats.every((range) => range.year === year && range.date.endsWith(year))) {
+    exact.push(`${year} dates: ${formats.map(({ date }) => date.replaceAll(" " + year, "")).join(", ")}`);
+  }
+  return exact.some((label) => normalize(label) === normalize(note)) ? undefined : note;
+}
+
 function DetailDisclosure({ label, hint, defaultOpen, children, disclosureRef }: {
   label: string;
   hint: string;
@@ -226,7 +261,13 @@ export function Detail({
   const application = !canApply && routes.application && vendorApplyAction(e, now, routes.application, timing);
   const contactAction = routes.contact && routeAction(routes.contact);
   const priceAmount = price && formatVendorAmount(price.amount, price.currency);
-  const date = occurrence || displayDateLabel(e, today);
+  const schedule = [...ranges(e)].sort((a, b) => a.start_date.localeCompare(b.start_date));
+  const headerRange = occurrence
+    ? schedule.find((range) => dateLabel({ ...e, ...range }) === occurrence)
+    : dateSortRange(e, today);
+  const date = occurrence && headerRange
+    ? formatDateRange(headerRange.start_date, headerRange.end_date)
+    : occurrence || displayDateLabel(e, today);
   const fit = meaningful(e.fit) || meaningful(e.expected_size) ||
     (meaningful(e.size_tier) && `Show size ${e.size_tier}${e.size_tier_estimated ? " (estimated)" : ""}`);
   const access = meaningful(e.vendor_booths) || (routes.application ? "Vendor route published" : "Vendor access not published");
@@ -249,9 +290,9 @@ export function Detail({
   const hasOutreach = Boolean(outreach && (outreach.status !== "not_contacted" || outreach.contacted_at ||
     outreach.response_at || outreach.acknowledgement_at || outreach.quoted_price || outreach.notes));
   const showType = meaningful(e.event_type);
-  const area = meaningful(e.region_group);
-  const hasSchedule = Boolean(ranges(e).length || e.estimated_month || e.date_note || e.venue || e.city || e.country ||
-    showType || area || e.priority_market || e.vendor_milestones?.length || timing.referenceNotice);
+  const note = scheduleNote(e, schedule);
+  const hasSchedule = Boolean(schedule.length || note || e.venue || showType ||
+    e.vendor_milestones?.length || timing.referenceNotice);
   const sources = [...new Set([e.website, e.tickets ?? null, e.instagram, ...e.source_urls])]
     .filter((url): url is string => !!url && safeUrl(url));
   const about: [string, string | number | null | undefined][] = [
@@ -266,7 +307,9 @@ export function Detail({
     ["First year", e.first_year],
   ];
   const aboutRows = about.filter(([, value]) => meaningful(value));
-  const publishedDates = [...(e.occurrences ?? [])].sort((a, b) => a.start_date.localeCompare(b.start_date));
+  const recurring = Boolean(e.occurrences?.length);
+  const publishedDates = recurring ? schedule.filter(({ start_date, end_date }) =>
+    start_date !== headerRange?.start_date || end_date !== headerRange.end_date) : [];
   const nextDates = publishedDates.filter((date) => date.end_date >= today).slice(0, 3);
   const visibleDates = showAllDates ? publishedDates : nextDates;
   const money = <VendorMoney event={e} now={now} shared={sharedVendorPricing} local={localVendorPricing}
@@ -380,7 +423,7 @@ export function Detail({
       </section>
       <div className="detail-body event-information">
         <DetailDisclosure label="Outreach" hint={outreachStatusLabels[outreach?.status ?? "not_contacted"]}
-          defaultOpen={hasOutreach || (desktop && publishedDates.length === 0)} disclosureRef={outreachPanel}>
+          defaultOpen={hasOutreach || (desktop && !recurring)} disclosureRef={outreachPanel}>
           <OutreachSection today={outreachDay} outreach={outreach ?? undefined} knownOutreach={knownOutreach}
             routes={routes} editor={outreachEditor} eventContacts={[e.contact, e.vendor_application]}
             onSave={onOutreach} saved={saved} />
@@ -389,20 +432,18 @@ export function Detail({
           disclosureRef={moneyPanel} defaultOpen={desktop || moneyHasPricesOrDocs}>{money}</DetailDisclosure>}
         {hasBudget && <DetailDisclosure label="Budget / break-even" hint={budgetHint} defaultOpen={desktop || budgetHasCosts}>{trip}</DetailDisclosure>}
         {hasSchedule && (
-          <DetailDisclosure label="When and where" hint={date} disclosureRef={schedulePanel}
-            defaultOpen={desktop || Boolean(e.vendor_milestones?.length || publishedDates.length)}>
+          <DetailDisclosure label="When and where" hint="Schedule and venue details" disclosureRef={schedulePanel}
+            defaultOpen={desktop || recurring || Boolean(e.vendor_milestones?.length)}>
             <dl>
               {row("Venue", e.venue)}
               {row("Show type", showType)}
-              {row("Area", area && (areaLabels[area] ?? area))}
-              {row("Key market", e.priority_market ? "Yes" : "No")}
-              {row("Date note", e.date_note)}
+              {row("Date note", note)}
               {row("Vendor notice", timing.referenceNotice)}
             </dl>
             {publishedDates.length > 0 && (
               <div className="detail-occurrences">
                 <div className="published-dates-heading">
-                  <h3>Published dates</h3>
+                  <h3>{headerRange ? "Other published dates" : "Published dates"}</h3>
                   {publishedDates.length > nextDates.length && (
                     <button className="text-button" aria-expanded={showAllDates} aria-controls="published-event-dates"
                       onClick={() => setShowAllDates(!showAllDates)}>
@@ -412,7 +453,7 @@ export function Detail({
                 </div>
                 <div className="occurrences" id="published-event-dates">
                   {visibleDates.length ? visibleDates.map((r) => (
-                    <span key={r.start_date}>{prettyDate(r.start_date)}{r.end_date !== r.start_date && ` – ${prettyDate(r.end_date)}`}</span>
+                    <span key={r.start_date}>{formatDateRange(r.start_date, r.end_date)}</span>
                   )) : <p>No upcoming dates.</p>}
                 </div>
               </div>

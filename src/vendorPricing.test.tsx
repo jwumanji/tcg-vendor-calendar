@@ -227,7 +227,7 @@ it("renders the same applicable price cue in Grid and Rows", () => {
   const shared = { entries: {}, today: "2026-11-21", now, setGoing: vi.fn(), setStage: vi.fn(), open: vi.fn() };
   const grid = load(renderToStaticMarkup(<EventCard e={zub} entry={emptyEntry} score={score} {...shared} />));
   const rows = load(renderToStaticMarkup(<EventRows groups={new Map([["", [zub]]])} columns={[]}
-    sort={{ key: "dates", direction: "asc" }} setSort={vi.fn()} scores={{ [zub.id]: score }} selectMode={false} {...shared} />));
+    sort={{ key: "dates", direction: "asc" }} scores={{ [zub.id]: score }} {...shared} />));
   expect(grid(".vendor-price-cue").text()).toBe("Booth quote · USD 216.91");
   expect(rows(".vendor-price-cue").text()).toBe(grid(".vendor-price-cue").text());
 });

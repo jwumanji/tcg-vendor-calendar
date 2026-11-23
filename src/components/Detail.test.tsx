@@ -71,25 +71,45 @@ it("leads a sparse find with missing facts and keeps editors reachable without e
   expect($(".planning").parent().text()).toContain("Set up trip budget");
 });
 
-it("shows the next three recurring dates in order and keeps the full published schedule accessible", () => {
+it("lists three other upcoming occurrences without repeating the header date", () => {
   const recurring = event("r-tradeting");
   const $ = render({ ...recurring, occurrences: [...recurring.occurrences!].reverse() }, { today: "2027-02-01" });
-  const dates = $("#published-event-dates");
-  expect(dates.children().map((_, el) => $(el).text()).get()).toEqual([
-    "13 Mar 2027 – 14 Mar 2027", "24 Apr 2027 – 25 Apr 2027", "22 May 2027 – 23 May 2027",
+  expect($(".detail-date").text()).toBe("13–14 Mar 2027");
+  expect($("#published-event-dates").children().map((_, el) => $(el).text()).get()).toEqual([
+    "24–25 Apr 2027", "22–23 May 2027", "19–20 Jun 2027",
   ]);
   const toggle = $("button[aria-controls=published-event-dates]");
   expect(toggle.attr("aria-expanded")).toBe("false");
-  expect(toggle.text()).toBe("Show all 10");
-  expect($(".detail-row").filter((_, el) => $(el).find("dt").text() === "Key market").find("dd").text()).toBe("Yes");
-  expect($(".event-information").text()).not.toMatch(/start_date|end_date|on the Page/i);
-  expect($(".event-information .detail-row").text()).toContain("AreaSoutheast Asia and Hong Kong");
+  expect(toggle.text()).toBe("Show all 9");
+  expect($(".event-information").text()).not.toMatch(/13–14 Mar 2027|start_date|end_date|Key market|Area|on the Page/i);
 });
 
-it("keeps show type and area visible in the reference panel when dates and venues are unknown", () => {
+it("keeps the show type visible when dates and venues are unknown", () => {
   const $ = render({ ...sparse, event_type: "Trade show", region_group: "SEA/HK" });
   expect($(".detail-row").text()).toContain("Show typeTrade show");
-  expect($(".detail-row").text()).toContain("AreaSoutheast Asia and Hong Kong");
+  expect($(".detail-row dt").text()).not.toMatch(/Area|Key market/);
+});
+
+it("hides exact date notes and keeps a source discrepancy or additional timing", () => {
+  const award = event("r-awardx");
+  const date = "1–3 Jan 2027";
+  const $ = render(award);
+  expect($(".event-layout").text().split(date)).toHaveLength(2);
+  expect($("#published-event-dates")).toHaveLength(0);
+  expect($(".detail-row dt").text()).not.toContain("Date note");
+  expect(render({ ...award, date_note: "January 1–3, 2027" })(".detail-row dt").text()).not.toContain("Date note");
+  for (const date_note of ["2–3 Jan 2027", "1–3 Jan 2027?", "1–3 Jan 2027 (暫定)", "1–3 Jan 2027, doors open at 10:00"]) {
+    expect(render({ ...award, date_note })(".detail-row").text()).toContain("Date note" + date_note);
+  }
+});
+
+it("excludes the date opened from the Calendar from the other occurrences", () => {
+  const e = event("r-tradeting");
+  const occurrence = dateLabel({ ...e, ...e.occurrences![1] });
+  const $ = render(e, { occurrence });
+  expect($(".detail-date").text()).toBe("13–14 Mar 2027");
+  expect($("#published-event-dates").text()).toContain("2–3 Jan 2027");
+  expect($("#published-event-dates").text()).not.toContain("13–14 Mar 2027");
 });
 
 it("assigns the mobile artwork below the decision and keeps Going and the primary action inline", () => {

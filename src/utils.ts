@@ -174,6 +174,14 @@ export function prettyDate(d: string) {
     year: "numeric",
   });
 }
+export function formatDateRange(start: string, end?: string | null) {
+  const first = prettyDate(start);
+  if (!end || start === end) return first;
+  const last = prettyDate(end);
+  return start.slice(0, 7) === end.slice(0, 7)
+    ? `${first.split(" ")[0]}–${last}`
+    : `${first} – ${last}`;
+}
 export function occurrenceOn(e: Event, day: string) {
   const range = e.occurrences?.find((r) => r.start_date <= day && day <= r.end_date);
   if (!range) return undefined;
@@ -492,7 +500,10 @@ export function dateSortRange(e: Event, today: string) {
 export function displayDateLabel(e: Event, today: string) {
   if (e.date_status === "tba" && e.estimated_month) return "Est. " + monthLabel(e.estimated_month);
   const range = dateSortRange(e, today);
-  return dateLabel(range ? { ...e, ...range } : e);
+  const { start_date, end_date } = range ?? e;
+  return e.date_status !== "estimated" && start_date
+    ? formatDateRange(start_date, end_date)
+    : dateLabel(e);
 }
 export function dateSortKey(e: Event, today: string) {
   if (e.date_status !== "confirmed")

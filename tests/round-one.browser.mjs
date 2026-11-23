@@ -137,7 +137,10 @@ test("discloses hidden stages, 2026 events and past Timeline dates", async t => 
 test("limits reminders to List and restores first-run and reminder preferences from a backup", async t => {
   const page = await open(t, iPhone);
   const tip = page.getByRole("complementary", { name: "Planning quick start" });
-  assert.match(await tip.innerText(), /Score.*Going.*Stage/s);
+  assert.match(await tip.innerText(), /Mark events Going to build your shortlist/);
+  assert.ok((await tip.boundingBox()).height <= 844 * 0.15);
+  await button(page, "Find events").click();
+  assert.equal(await page.getByLabel("Search events").evaluate(el => document.activeElement === el), true);
   assert.ok((await button(page, "Got it").boundingBox()).height >= 44);
   assert.ok((await page.getByLabel("Search events").boundingBox()).y <= 420);
   const summaries = page.locator(".reminder-summary");
@@ -264,12 +267,12 @@ async function listFields(page) {
   return page.locator("main:not([hidden]) [data-event-id]").evaluateAll(nodes => nodes.slice(0, 5).map(node => {
     const read = selector => node.querySelector(selector);
     const name = read(".row-name, .stretched-button").firstChild.textContent.trim();
-    const status = read(".row-dates .badge, .card-tags .badge");
+    const status = read(".row-dates .badge, .card-when .badge");
     const going = read(".going-button");
     return {
       id: node.dataset.eventId,
       name,
-      dates: read(".row-date-label, .card-when span")?.textContent ?? null,
+      dates: read(".row-date-label")?.textContent ?? null,
       place: read(".place").textContent.trim(),
       status: status.textContent.trim(),
       game: [...node.querySelectorAll(".game-tag, .game-tag-more")].map(tag => tag.textContent.trim()),
@@ -285,6 +288,8 @@ test("keeps Grid and Rows in parity through filters, sort changes and reload", a
   const page = await open(t);
   const sort = page.getByLabel("Sort by", { exact: true });
   assert.equal(await sort.count(), 1);
+  assert.equal(await page.locator(".row-sort-control label").innerText(), "Sort by");
+  assert.equal(await page.locator(".event-rows thead button").count(), 0);
   assert.equal(await page.getByRole("group", { name: "Quick sort" }).count(), 0);
   await sort.selectOption("name");
   assert.equal(await page.getByRole("columnheader", { name: "Event" }).getAttribute("aria-sort"), "ascending");
@@ -351,7 +356,7 @@ test("renders opaque sticky chrome and uses thumbnails within the mobile transfe
   assert.equal(await eventRows(page).evaluateAll(rows => rows.filter(row => {
     const games = row.querySelector(".row-games").getBoundingClientRect();
     const score = row.querySelector(".row-priority .priority-chip").getBoundingClientRect();
-    return games.right > score.left;
+    return games.left < score.right && games.right > score.left;
   }).length), 0);
   await button(page, "Grid").click();
   await page.locator(".event-card .image-face").first().scrollIntoViewIfNeeded();
@@ -377,13 +382,116 @@ test("fits the recurring event detail in 1,700 desktop pixels and preserves the 
 
   const dates = page.locator("#published-event-dates > span");
   assert.equal(await dates.count(), 3);
-  const toggle = button(page, "Show all 10");
+  assert.equal(await page.locator(".detail-date").innerText(), "2–3 Jan 2027");
+  assert.doesNotMatch(await dates.allTextContents().then(items => items.join(" ")), /2–3 Jan 2027/);
+  const toggle = button(page, "Show all 9");
   assert.equal(await toggle.getAttribute("aria-expanded"), "false");
   await toggle.click();
   const collapse = button(page, "Show fewer dates");
   assert.equal(await collapse.getAttribute("aria-expanded"), "true");
-  assert.equal(await dates.count(), 10);
+  assert.equal(await dates.count(), 9);
   await collapse.click();
   assert.equal(await dates.count(), 3);
   assert.doesNotMatch(await page.locator(".event-layout").innerText(), /change the pipeline stage in decide|start_date|end_date|on the page/i);
+});
+
+
+test("keeps Pipeline pages bounded and preserves the empty stage hint at both review sizes", async t => {
+  for (const [options, height] of [[iPhone, 844], [desktop, 1000]]) {
+    const page = await open(t, options);
+    await button(page, "Pipeline").click();
+    const column = page.locator('.pipeline-column[data-stage="Not reviewed"]');
+    const cards = column.locator(".pipeline-card");
+    const ids = () => cards.evaluateAll(nodes => nodes.map(node => node.dataset.eventId));
+    const first = await ids();
+    assert.ok(first.length >= 6 && first.length <= 8);
+    assert.ok(await page.locator("html").evaluate(el => el.scrollHeight) < 3 * height);
+    assert.match(await page.locator('.pipeline-column[data-stage="Considering"] .pipeline-empty').textContent(),
+      /Mark an event Going to see it here/);
+    const more = column.getByRole("button", { name: /^Show [1-8] more$/ });
+    await more.click();
+    const next = await ids();
+    assert.equal(next.length, first.length);
+    assert.ok(next.every(id => !first.includes(id)));
+    assert.equal(await column.locator("h3").evaluate(el => document.activeElement === el), true);
+    assert.ok(await page.locator("html").evaluate(el => el.scrollHeight) < 3 * height);
+    await button(column, "Previous").click();
+    assert.deepEqual(await ids(), first);
+    await more.click();
+    await page.getByLabel("Search events").fill(award);
+    assert.deepEqual(await ids(), ["r-awardx"]);
+    assert.equal(await more.count(), 0);
+    await page.getByLabel("Search events").clear();
+    assert.deepEqual(await ids(), first);
+  }
+});
+
+test("starts desktop with compact reminders and at least three full Rows events visible", async t => {
+  const page = await open(t);
+  await page.evaluate(() => document.fonts.ready);
+  const states = await page.locator(".reminder-summary").evaluateAll(nodes => nodes.map(node => node.getAttribute("aria-expanded")));
+  assert.deepEqual(states, ["false", "false"]);
+  assert.ok(await eventRows(page).evaluateAll(nodes =>
+    nodes.filter(node => node.getBoundingClientRect().bottom <= innerHeight).length) >= 3);
+});
+
+test("keeps wrapped counts and compact touch actions aligned in both mobile layouts", async t => {
+  const page = await open(t, iPhone);
+  await page.evaluate(() => document.fonts.ready);
+  const scroller = page.locator(".quick-filters");
+  assert.match(await scroller.evaluate(el => getComputedStyle(el).maskImage), /linear-gradient/);
+  await stage(page, award).selectOption("Passed");
+  const hidden = listCount(page).locator(".visibility-option");
+  assert.equal(await hidden.count(), 2);
+  for (const item of await hidden.all()) {
+    assert.doesNotMatch(await item.textContent(), /·/);
+    const text = await item.locator("span").boundingBox();
+    const toggle = await item.locator("button").boundingBox();
+    assert.equal(Math.round(text.y + text.height / 2), Math.round(toggle.y + toggle.height / 2));
+  }
+  await button(page, "Undo").click();
+  for (const [layout, selector] of [["Rows", "tr"], ["Grid", ".event-card"]]) {
+    await button(page, layout).click();
+    const events = page.locator(selector + "[data-event-id]");
+    const heights = await events.evaluateAll(nodes => nodes.map(node => node.offsetHeight).sort((a, b) => a - b));
+    assert.ok(heights[Math.floor(heights.length / 2)] <= 180, layout + " median card height");
+    for (const id of ["r-awardx", "scan-suntec-asia-comic-expo-005-202701"]) {
+      const event = page.locator(`${selector}[data-event-id="${id}"]`);
+      const actions = await event.evaluate(node =>
+        [...node.querySelectorAll(".stage-picker, .going-button, .apply-cta")].map(el => {
+          const { y, width, height } = el.getBoundingClientRect();
+          return { center: y + height / 2, width, height };
+        }));
+      assert.ok(actions.length >= 2);
+      assert.ok(actions.every(({ width, height }) => width >= 44 && height >= 44));
+      assert.ok(actions.every(({ center }) => Math.abs(center - actions[0].center) <= 1));
+    }
+    assert.equal(await page.locator("html").evaluate(el => el.scrollWidth), 390);
+  }
+});
+
+test("shares optional fields and bulk selection across mobile Grid and Rows", async t => {
+  const page = await open(t, iPhone);
+  await page.getByLabel("Search events").fill("Singapore");
+  await button(page, "Grid").click();
+  await button(page, "Columns").click();
+  await page.getByRole("checkbox", { name: "Fit score" }).check();
+  await page.getByRole("checkbox", { name: "Source" }).check();
+  assert.ok(await page.locator(".card-option-scanner").count() > 2);
+  assert.equal(await page.locator(".card-option-source").count(), await page.locator(".card-option-scanner").count());
+  await button(page, "Bulk select").click();
+  const cards = page.locator(".event-card");
+  await cards.nth(0).getByRole("checkbox").check();
+  await cards.nth(2).locator(".stretched-button").click({ modifiers: ["Shift"] });
+  assert.equal(await page.locator(".event-card[data-selected=true]").count(), 3);
+  await button(page, "Rows").click();
+  assert.equal(await eventRows(page).locator(".row-scanner").count(), await eventRows(page).count());
+  assert.equal(await page.locator("tr[data-selected=true]").count(), 3);
+  await page.getByRole("checkbox", { name: "Select all visible" }).check();
+  assert.equal(await page.locator("tr[data-selected=true]").count(), await eventRows(page).count());
+  await button(page, "Mark Going").click();
+  assert.equal(await page.locator("tr[data-going=true]").count(), await eventRows(page).count());
+  assert.equal(await page.locator("tr[data-selected=true]").count(), 0);
+  await button(page, "Undo").click();
+  assert.equal(await page.locator("tr[data-going=true]").count(), 0);
 });

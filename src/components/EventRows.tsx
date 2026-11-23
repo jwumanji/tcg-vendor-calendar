@@ -1,22 +1,19 @@
-import { scheduleStatus } from "../utils";
-import { Fragment, useMemo, useState, useRef, type KeyboardEvent } from "react";
-import { ArrowDown, ArrowUp, ChevronsUpDown, X, Columns3 } from "lucide-react";
+import { useId, useState, useRef, type KeyboardEvent } from "react";
+import { ArrowDown, ArrowUp, Columns3 } from "lucide-react";
 import type { Event } from "../model";
 import type { ScoreResult } from "../scoring";
 import { emptyEntry, type DisplayEntry, type Stage } from "../storage";
 import { vendorApplyAction } from "../eventDecision";
-import { displayDateLabel, upcoming } from "../utils";
+import { displayDateLabel, scheduleStatus, upcoming } from "../utils";
 import {
   ROW_SORT_LABELS,
   optionalColumns,
   type OptionalColumn,
   nextRowSort,
-  selectAllVisible,
-  selectRange,
   type RowKey,
   type RowSort,
 } from "../rows";
-import { Logo, Place, NoteTag, ClashCue, GameTags, Status } from "./EventIdentity";
+import { Logo, Place, NoteTag, ClashCue, GameTags } from "./EventIdentity";
 import { GoingButton, type SetGoing } from "./GoingButton";
 import { StagePicker } from "./Pipeline";
 import { ApplyLink } from "./ApplyLink";
@@ -24,18 +21,18 @@ import { PriorityChip } from "./PriorityChip";
 import { OutreachChip } from "./OutreachChip";
 import { VendorPriceCue } from "./VendorPriceCue";
 import { SectionHeading } from "./ListSections";
-import { SourceChip } from "./FindSource";
+import { EventDates, OptionalEventField } from "./EventFields";
+import { SelectAllEvents, SelectEvent, type EventSelection } from "./EventSelection";
 
 export function EventRows({
   groups,
   columns,
   sort,
-  setSort,
   entries,
   scores,
   today,
   now = Date.now(),
-  selectMode,
+  selection,
   setGoing,
   setStage,
   open,
@@ -43,82 +40,24 @@ export function EventRows({
   groups: ReadonlyMap<string, Event[]>;
   columns: OptionalColumn[];
   sort: RowSort;
-  setSort: (sort: RowSort) => void;
   entries: Record<string, DisplayEntry>;
   scores: Record<string, ScoreResult>;
   today: string;
   now?: number;
-  selectMode: boolean;
+  selection?: EventSelection;
   setGoing: SetGoing;
   setStage: (id: string, stage: Stage) => void;
   open: (e: Event) => void;
 }) {
-  const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const showOutreachColumn = columns.includes("outreach");
-  const sortedColumnVisible = ["name", "dates", "country", "priority", "stage", ...columns].includes(sort.key) ||
-    (sort.key === "going" && !selectMode);
-  const anchor = useRef<string | null>(null);
-  const ids = useMemo(
-    () => Array.from(groups.values()).flatMap((items) => items.map((e) => e.id)),
-    [groups],
-  );
-  const visibleSelection = ids.filter((id) => selected.has(id));
-  const count = visibleSelection.length;
-  const all = count > 0 && count === ids.length;
-  function select(id: string, shift: boolean) {
-    const start = shift ? anchor.current : null;
-    setSelected((current) => selectRange(ids, current, id, start));
-    if (!shift || !ids.includes(anchor.current || "")) anchor.current = id;
-  }
-  function selectAll(checked: boolean) {
-    setSelected(selectAllVisible(ids, checked));
-    anchor.current = null;
-  }
-  function apply(going: boolean) {
-    setGoing(visibleSelection, going);
-    selectAll(false);
-  }
-  function selectAllCheckbox() {
-    return (
-      <label className="select-all">
-        <input
-          type="checkbox"
-          aria-label="Select all visible"
-          checked={all}
-          ref={(input) => {
-            if (input) input.indeterminate = count > 0 && !all;
-          }}
-          onChange={(ev) => selectAll(ev.target.checked)}
-        />
-        <span>Select all visible</span>
-      </label>
-    );
-  }
+  const ids = Array.from(groups.values()).flatMap((items) => items.map((e) => e.id));
   function header(key: RowKey) {
     const active = sort.key === key;
-    const Icon = !active
-      ? ChevronsUpDown
-      : sort.direction === "asc"
-        ? ArrowUp
-        : ArrowDown;
+    const Icon = sort.direction === "asc" ? ArrowUp : ArrowDown;
     return (
-      <th
-        role="columnheader"
-        className={`col-${key}`}
-        scope="col"
-        aria-sort={
-          active
-            ? sort.direction === "asc"
-              ? "ascending"
-              : "descending"
-            : undefined
-        }
-      >
-        <span className="row-mobile-header">{ROW_SORT_LABELS[key]}</span>
-        <button onClick={() => setSort(nextRowSort(sort, key))}>
-          {ROW_SORT_LABELS[key]}
-          <Icon size={12} aria-hidden="true" />
-        </button>
+      <th key={key} role="columnheader" className={`col-${key}`} scope="col"
+        aria-sort={active ? (sort.direction === "asc" ? "ascending" : "descending") : undefined}>
+        <span>{ROW_SORT_LABELS[key]}{active && <Icon size={12} aria-hidden="true" />}</span>
       </th>
     );
   }
@@ -131,11 +70,12 @@ export function EventRows({
     )
       return;
     const name = ev.target.classList.contains("row-name");
-    if (!selectMode && ev.key.toLowerCase() === "g") {
+    if (!selection && ev.key.toLowerCase() === "g") {
       ev.preventDefault();
       if (!ev.repeat) setGoing([e.id], !entries[e.id]?.going);
       return;
     }
+    if (!name && !ev.target.classList.contains("going-button")) return;
     const index = ids.indexOf(e.id);
     const target = {
       ArrowUp: index - 1,
@@ -153,226 +93,145 @@ export function EventRows({
     buttons?.[target]?.focus();
   }
   return (
-    <>
-      <span role="status" aria-live="polite" className="sr-only">
-        {selectMode ? `${count} events selected` : ""}
-      </span>
-      {selectMode && (
-        <div className="bulk-bar" role="group" aria-label="Bulk selection">
-          <strong>{count} selected</strong>
-
-          <button
-            className="button primary"
-            disabled={!count}
-            onClick={() => apply(true)}
-          >
-            Mark Going
-          </button>
-          <button
-            className="button"
-            disabled={!count}
-            onClick={() => apply(false)}
-          >
-            Unmark
-          </button>
-          <button
-            className="button"
-            aria-label="Clear selection"
-            disabled={!count}
-            onClick={() => selectAll(false)}
-          >
-            <X size={16} />
-          </button>
-        </div>
-      )}
-      {selectMode && (
-        <div className="mobile-select-all">{selectAllCheckbox()}</div>
-      )}
-      {!sortedColumnVisible && (
-        <p className="rows-sort-note">Sorted by {ROW_SORT_LABELS[sort.key]} ({sort.direction === "asc" ? "ascending" : "descending"})</p>
-      )}
-      <div className="rows-wrap">
-        {/* Mobile rows use CSS grid and block cells. Explicit native roles retain
-            the table structure in WebKit. Each heading exposes one label per layout. */}
-        <table className="event-rows" data-selecting={selectMode} role="table">
-          <caption className="sr-only">
-            Event opportunities. Sort by column. Use the arrow keys, Home or End
-            on event names to move between rows. Enter or Space activates the focused control.
-            Outside bulk selection, G toggles Going.
-          </caption>
-          <thead role="rowgroup">
-            <tr role="row">
-              {!selectMode && header("going")}
-              {selectMode && (
-                <th role="columnheader" className="col-select" scope="col">
-                  {selectAllCheckbox()}
-                </th>
-              )}
-              {header("name")}
-              {header("dates")}
-              {header("country")}
-              <th scope="col" role="columnheader" className="col-games">
-                Games
+    <div className="rows-wrap">
+      {/* Mobile rows use CSS grid and block cells. Explicit native roles retain
+          the table structure in WebKit. The headers describe the current sort. */}
+      <table className="event-rows" data-selecting={Boolean(selection)} role="table">
+        <caption className="sr-only">
+          Event opportunities. Use the arrow keys, Home or End
+          on event names to move between rows. Enter or Space activates the focused control.
+          Outside bulk selection, G toggles Going.
+        </caption>
+        <thead role="rowgroup">
+          <tr role="row">
+            {selection && (
+              <th role="columnheader" className="col-select" scope="col">
+                <SelectAllEvents selection={selection} />
               </th>
-              {header("priority")}
-              {header("stage")}
-              {columns.map((key) => (
-                <Fragment key={key}>{header(key)}</Fragment>
-              ))}
-            </tr>
-          </thead>
-          {Array.from(groups, ([key, items]) => (
-            <tbody key={key} role="rowgroup">
-              {key && (
-                <tr role="row" className="month-divider">
-                  <th scope="rowgroup" colSpan={7 + columns.length}>
-                    <SectionHeading groupKey={key} sortKey={sort.key} items={items} />
-                  </th>
-                </tr>
-              )}
-              {items.map((e) => {
-                const entry = entries[e.id] || emptyEntry;
-                const past = !upcoming(e, today);
-                const dates = displayDateLabel(e, today);
-                const status = scheduleStatus(e);
-                const application = vendorApplyAction(e, now);
-                return (
-                  <tr
-                    key={e.id}
-                    data-event-id={e.id}
-                    role="row"
-                    data-going={entry.going}
-                    data-selected={selectMode && selected.has(e.id)}
-                    data-event-status={e.event_status}
-                    data-past={past}
-                    onKeyDown={(ev) => navigate(ev, e)}
-                    onClick={(ev) => {
-                      if (
-                        (ev.target as Element).closest("a,button,input,label,.stage-control")
-                      )
-                        return;
-                      ev.currentTarget
-                        .querySelector<HTMLButtonElement>(".row-name")
-                        ?.focus({ preventScroll: true });
-                      if (selectMode) select(e.id, ev.shiftKey);
-                      else open(e);
-                    }}
-                  >
-                    {!selectMode && (
-                      <td role="cell" className="row-going">
-                        <GoingButton
-                          e={e}
-                          going={entry.going}
-                          setGoing={setGoing}
-                          compact
-                        />
-                      </td>
-                    )}
-                    {selectMode && (
-                      <td role="cell" className="row-select">
-                        <label>
-                          <input
-                            type="checkbox"
-                            aria-label={`Select ${e.name}`}
-                            checked={selected.has(e.id)}
-                            onChange={(ev) =>
-                              select(
-                                e.id,
-                                (ev.nativeEvent as MouseEvent).shiftKey,
-                              )
-                            }
-                          />
-                        </label>
-                      </td>
-                    )}
-                    <td role="cell" className="row-identity">
+            )}
+            {header("name")}
+            {header("dates")}
+            {header("country")}
+            {header("priority")}
+            <th scope="col" role="columnheader" className="col-games">Games</th>
+            {columns.map(header)}
+            {header("stage")}
+            {header("going")}
+            <th scope="col" role="columnheader" className="col-apply">Apply</th>
+          </tr>
+        </thead>
+        {Array.from(groups, ([key, items]) => (
+          <tbody key={key} role="rowgroup">
+            {key && (
+              <tr role="row" className="month-divider">
+                <th scope="rowgroup" colSpan={8 + columns.length + Number(Boolean(selection))}>
+                  <SectionHeading groupKey={key} sortKey={sort.key} items={items} />
+                </th>
+              </tr>
+            )}
+            {items.map((e) => {
+              const entry = entries[e.id] || emptyEntry;
+              const past = !upcoming(e, today);
+              const dates = displayDateLabel(e, today);
+              const status = scheduleStatus(e);
+              const application = vendorApplyAction(e, now);
+              return (
+                <tr
+                  key={e.id}
+                  data-event-id={e.id}
+                  role="row"
+                  data-going={entry.going}
+                  data-apply={Boolean(application)}
+                  data-selected={selection?.selected.has(e.id)}
+                  data-event-status={e.event_status}
+                  data-past={past}
+                  onKeyDown={(ev) => navigate(ev, e)}
+                  onClick={(ev) => {
+                    if (
+                      (ev.target as Element).closest("a,button,input,label,.stage-control")
+                    )
+                      return;
+                    ev.currentTarget
+                      .querySelector<HTMLButtonElement>(".row-name")
+                      ?.focus({ preventScroll: true });
+                    if (selection) selection.toggle(e.id, ev.shiftKey);
+                    else open(e);
+                  }}
+                >
+                  {selection && (
+                    <td role="cell" className="row-select">
+                      <SelectEvent e={e} selection={selection} />
+                    </td>
+                  )}
+                  <td role="cell" className="row-identity">
+                    <div>
+                      <Logo e={e} size="row" />
                       <div>
-                        <Logo e={e} size="row" />
-                        <div>
-                          <button
-                            className="row-name"
-                            aria-pressed={
-                              selectMode ? selected.has(e.id) : undefined
-                            }
-                            onClick={(ev) =>
-                              selectMode ? select(e.id, ev.shiftKey) : open(e)
-                            }
-                            title={e.name}
-                          >
-                            {e.name}
-                          </button>
-                          <div className="row-markers">
-                            {selectMode && entry.going && (
-                              <span className="going-marker">Going</span>
-                            )}
-                            {e.is_new_find && (
-                              <span className="source-chip new-find">
-                                New find
-                              </span>
-                            )}
-                            {entry.note.trim() && <NoteTag compact />}
-                            {past && <span>Past</span>}
-                            <ClashCue score={scores[e.id]} entries={entries} />
-                            {!showOutreachColumn && <OutreachChip outreach={e.outreach} />}
-                            <VendorPriceCue event={e} now={now} />
-                            {application && <ApplyLink action={application} name={e.name} compact />}
-                          </div>
+                        <button
+                          className="row-name"
+                          aria-pressed={selection?.selected.has(e.id)}
+                          onClick={(ev) =>
+                            selection ? selection.toggle(e.id, ev.shiftKey) : open(e)
+                          }
+                          title={e.name}
+                        >
+                          {e.name}
+                        </button>
+                        <div className="row-markers">
+                          {e.is_new_find && (
+                            <span className="source-chip new-find">
+                              New find
+                            </span>
+                          )}
+                          {entry.note.trim() && <NoteTag compact />}
+                          {past && <span>Past</span>}
+                          <ClashCue score={scores[e.id]} entries={entries} />
+                          <VendorPriceCue event={e} now={now} />
                         </div>
                       </div>
+                    </div>
+                  </td>
+                  <td
+                    role="cell"
+                    className="row-dates"
+                    data-status={e.date_status}
+                    title={status + " · " + dates}
+                  >
+                    <EventDates e={e} date={dates} />
+                  </td>
+                  <td role="cell" className="row-place">
+                    <Place e={e} />
+                  </td>
+                  <td role="cell" className="row-priority">
+                    <PriorityChip result={scores[e.id]} />
+                    {!showOutreachColumn && <OutreachChip outreach={e.outreach} />}
+                  </td>
+                  <td role="cell" className="row-games">
+                    <div><GameTags event={e} /></div>
+                  </td>
+                  {columns.map((field) => (
+                    <td role="cell" className={`row-${field}`} key={field}
+                      title={field === "notes" ? entry.note : undefined}>
+                      <OptionalEventField field={field} e={e} entry={entry} selecting={Boolean(selection)} />
                     </td>
-                    <td
-                      role="cell"
-                      className="row-dates"
-                      data-status={e.date_status}
-                      title={status + " · " + dates}
-                    >
-                      {(dates !== "Dates not announced" || e.event_status) &&
-                        <><span className="row-date-label">{dates}</span>{" "}</>}
-                      <Status e={e} />
-                    </td>
-                    <td role="cell" className="row-place">
-                      <Place e={e} />
-                    </td>
-                    <td role="cell" className="row-games">
-                      <div>
-                        <GameTags event={e} />
-                      </div>
-                    </td>
-                    <td role="cell" className="row-priority">
-                      <PriorityChip result={scores[e.id]} />
-                    </td>
-                    <td role="cell" className="row-stage">
-                      <StagePicker name={e.name} entry={entry} onChange={(stage) => setStage(e.id, stage)} />
-                    </td>
-                    {columns.includes("scanner") && (
-                      <td role="cell" className="row-scanner">
-                        <span className="row-mobile-header" aria-hidden="true">Fit score · </span>
-                        {e.vendor_score ?? "—"}
-                      </td>
-                    )}
-                    {columns.includes("source") && (
-                      <td role="cell" className="row-source">
-                        <SourceChip e={e} link={!selectMode} />
-                      </td>
-                    )}
-                    {columns.includes("notes") && (
-                      <td role="cell" className="row-notes" title={entry.note}>
-                        {entry.note || "—"}
-                      </td>
-                    )}
-                    {showOutreachColumn && (
-                      <td role="cell" className="row-outreach">
-                        <OutreachChip outreach={e.outreach} />
-                      </td>
-                    )}
-                  </tr>
-                );
-              })}
-            </tbody>
-          ))}
-        </table>
-      </div>
-    </>
+                  ))}
+                  <td role="cell" className="row-stage">
+                    <StagePicker name={e.name} entry={entry} onChange={(stage) => setStage(e.id, stage)} />
+                  </td>
+                  <td role="cell" className="row-going">
+                    {!selection && <GoingButton e={e} going={entry.going} setGoing={setGoing} compact />}
+                    {selection && entry.going && <span className="going-marker">Going</span>}
+                  </td>
+                  <td role="cell" className="row-apply">
+                    {application && <ApplyLink action={application} name={e.name} compact />}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        ))}
+      </table>
+    </div>
   );
 }
 
@@ -437,11 +296,12 @@ export function RowSortControl({
   sort: RowSort;
   setSort: (sort: RowSort) => void;
 }) {
+  const sortId = useId();
   const Direction = sort.direction === "asc" ? ArrowUp : ArrowDown;
   return (
     <div className="row-sort-control">
-      <select aria-label="Sort by" value={sort.key}
-        onChange={(ev) => setSort(nextRowSort(sort, ev.target.value as RowKey))}>
+      <label htmlFor={sortId}>Sort by</label>
+      <select id={sortId} value={sort.key} onChange={(ev) => setSort(nextRowSort(sort, ev.target.value as RowKey))}>
         {Object.entries(ROW_SORT_LABELS).map(([key, label]) => (
           <option key={key} value={key}>{label}</option>
         ))}

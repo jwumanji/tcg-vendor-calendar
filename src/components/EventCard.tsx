@@ -1,19 +1,17 @@
 import { GoingButton, type SetGoing } from "./GoingButton";
 import { PriorityChip } from "./PriorityChip";
 import { OutreachChip } from "./OutreachChip";
-import { FindBadges } from "./FindSource";
 import type { ScoreResult } from "../scoring";
 import { memo } from "react";
-import { CalendarDays } from "lucide-react";
 import type { Event } from "../model";
+import type { OptionalColumn } from "../rows";
 import type { DisplayEntry, Entries, Stage } from "../storage";
 import { vendorApplyAction } from "../eventDecision";
-import { displayDateLabel, primaryGameKey } from "../utils";
+import { displayDateLabel, primaryGameKey, upcoming } from "../utils";
 import { holo } from "../holo";
 import {
   ClashCue,
   Logo,
-  Status,
   Place,
   NoteTag,
   GameTags,
@@ -21,6 +19,8 @@ import {
 import { StagePicker } from "./Pipeline";
 import { ApplyLink } from "./ApplyLink";
 import { VendorPriceCue } from "./VendorPriceCue";
+import { EventDates, OptionalEventField } from "./EventFields";
+import { SelectEvent, type EventSelection } from "./EventSelection";
 export const EventCard = memo(function EventCard({
   e,
   entry,
@@ -32,6 +32,8 @@ export const EventCard = memo(function EventCard({
   now = Date.now(),
   occurrence,
   titleLevel = 3,
+  columns = [],
+  selection,
   open,
 }: {
   e: Event;
@@ -44,6 +46,8 @@ export const EventCard = memo(function EventCard({
   now?: number;
   occurrence?: string;
   titleLevel?: 3 | 4;
+  columns?: OptionalColumn[];
+  selection?: EventSelection;
   open: (e: Event, occurrence?: string) => void;
 }) {
   const Title = titleLevel === 4 ? "h4" : "h3";
@@ -55,6 +59,7 @@ export const EventCard = memo(function EventCard({
       data-game={primaryGameKey(e)}
       data-event-status={e.event_status}
       data-going={entry.going}
+      data-selected={selection?.selected.has(e.id)}
       data-event-id={e.id}
       {...holo}
     >
@@ -62,41 +67,37 @@ export const EventCard = memo(function EventCard({
       <div className="card-details">
         <div className="card-heading">
           <Title className="card-title">
-            <button className="stretched-button" onClick={() => open(e, occurrence)}>
+            <button className="stretched-button"
+              aria-pressed={selection?.selected.has(e.id)}
+              onClick={(ev) => selection ? selection.toggle(e.id, ev.shiftKey) : open(e, occurrence)}>
               {e.name}
-              <span className="sr-only">
-                {" "}
-                · {date} · {entry.stage}
-              </span>
+              <span className="sr-only"> · {date} · {entry.stage}</span>
             </button>
           </Title>
-          <GoingButton e={e} going={entry.going} setGoing={setGoing} />
+          {selection && <div className="card-select"><SelectEvent e={e} selection={selection} /></div>}
         </div>
-        <div className="card-art">
-          {(date !== "Dates not announced" || e.event_status) && (
-            <div className="card-when">
-              <CalendarDays size={16} aria-hidden="true" />
-              <span>{date}</span>
-            </div>
-          )}
-          <div className="card-location">
-            <Place e={e} />
-          </div>
-          <div className="card-art-foot">
-            <PriorityChip result={score} />
-          </div>
-        </div>
+        <div className="card-when"><EventDates e={e} date={date} /></div>
+        <div className="card-location"><Place e={e} /></div>
         <div className="card-tags">
-          <ClashCue score={score} entries={entries} />
-          <Status e={e} />
-          <OutreachChip outreach={e.outreach} />
-          <VendorPriceCue event={e} now={now} />
-          <FindBadges e={e} />
+          <PriorityChip result={score} />
+          {!columns.includes("outreach") && <OutreachChip outreach={e.outreach} />}
           <GameTags event={e} />
+          <ClashCue score={score} entries={entries} />
+          {e.is_new_find && <span className="source-chip new-find">New find</span>}
           {entry.note.trim() && <NoteTag />}
+          {!upcoming(e, today) && <span className="source-chip">Past</span>}
+          <VendorPriceCue event={e} now={now} />
         </div>
+        {columns.map((field) => (
+          <div className={`card-option card-option-${field}`} key={field}>
+            {field === "notes" && <strong>Notes · </strong>}
+            <OptionalEventField field={field} e={e} entry={entry} selecting={Boolean(selection)} />
+          </div>
+        ))}
         <div className="card-actions">
           <StagePicker name={e.name} entry={entry} onChange={(stage) => setStage(e.id, stage)} />
+          {!selection && <GoingButton e={e} going={entry.going} setGoing={setGoing} />}
+          {selection && entry.going && <span className="going-marker">Going</span>}
           {application && <ApplyLink action={application} name={e.name} compact />}
         </div>
       </div>

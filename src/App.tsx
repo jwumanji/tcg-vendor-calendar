@@ -10,6 +10,7 @@ import { normalizeColumns, normalizeListView, loadSort, SORT_STORAGE_KEY, groupS
 import { CalendarView } from "./components/CalendarView";
 import { CardSections } from "./components/ListSections";
 import { EventCard } from "./components/EventCard";
+import { EventBulkBar, useEventSelection } from "./components/EventSelection";
 import { BrandLockup, BrandMark } from "./components/Brand";
 import { EmptyState } from "./components/EmptyState";
 import { EventExports } from "./components/EventExports";
@@ -72,6 +73,7 @@ import {
   matchingEvent,
   goingEvents,
   monthLabel,
+  formatDateRange,
   prettyDate,
 } from "./utils";
 import "./style.css";
@@ -247,10 +249,9 @@ export default function App() {
       : defaultTitle;
   }, [onEventPage, selected]);
   const [view, setView] = useState(listContext?.view ?? "List");
-  const compactReminders = useMediaQuery("(max-width: 720px)");
   const filterSheet = useMediaQuery("(max-width: 640px)");
-  const deadlinesExpanded = listPreferences.deadlinesExpanded ?? !compactReminders;
-  const followUpsExpanded = listPreferences.followUpsExpanded ?? !compactReminders;
+  const deadlinesExpanded = listPreferences.deadlinesExpanded === true;
+  const followUpsExpanded = listPreferences.followUpsExpanded === true;
   const showPast = listPreferences.showPast === true;
   const [month, setMonth] = useState(listContext?.month ?? initialMonth);
   const [filterOpen, setFilterOpen] = useState(listContext?.filterOpen ?? false);
@@ -505,6 +506,8 @@ export default function App() {
     () => sortRows(viewEvents, sort, entries, scores, today),
     [viewEvents, sort, entries, scores, today],
   );
+  const eventSelection = useEventSelection(sorted, setGoing);
+  const selection = view === "List" && selectMode ? eventSelection : undefined;
   function card(e: Event, occurrence?: string, titleLevel?: 3 | 4) {
     return (
       <EventCard
@@ -519,6 +522,8 @@ export default function App() {
         now={now}
         occurrence={occurrence}
         titleLevel={titleLevel}
+        columns={view === "List" ? columns : undefined}
+        selection={selection}
         open={open}
       />
     );
@@ -569,12 +574,8 @@ export default function App() {
       <span>{viewEvents.length} {viewEvents.length === 1 ? "event" : "events"}</span>
       {visibilityControls.filter((control) => control.hidden > 0 || control.shown).map((control) => (
         <span key={control.reason} className="visibility-option">
-          <span aria-hidden="true"> · </span>
           {control.hidden > 0 && (
-            <>
-              <span id={`hidden-${control.reason}`}>{control.hidden} hidden ({control.reason})</span>
-              <span aria-hidden="true"> · </span>
-            </>
+            <span id={`hidden-${control.reason}`}>{control.hidden} hidden ({control.reason})</span>
           )}
           <button className="visibility-toggle"
             aria-describedby={control.hidden > 0 ? `hidden-${control.reason}` : undefined} onClick={control.toggle}>
@@ -642,6 +643,7 @@ export default function App() {
                 onClick={(ev) => {
                   setView(v);
                   setSelectMode(false);
+                  eventSelection.selectAll(false);
                   ev.currentTarget.scrollIntoView({
                     block: "nearest",
                     inline: "nearest",
@@ -657,12 +659,6 @@ export default function App() {
               </button>
             ))}
           </nav>
-          {view === "List" && !listPreferences.firstRunDismissed && (
-            <FirstRunTip dismiss={() => {
-              applyListPreferences({ firstRunDismissed: true });
-              searchInput.current?.focus();
-            }} />
-          )}
           <div className="toolbar">
             <label className="search">
               <Search size={18} />
@@ -710,6 +706,15 @@ export default function App() {
               <Settings2 size={16} /> <span>Tools</span>
             </button>
           </div>
+          {view === "List" && !listPreferences.firstRunDismissed && (
+            <FirstRunTip
+              search={() => searchInput.current?.focus()}
+              dismiss={() => {
+                applyListPreferences({ firstRunDismissed: true });
+                searchInput.current?.focus();
+              }}
+            />
+          )}
           {view === "List" && (
             <>
               <UpcomingMilestones events={activeEvents} open={open} focusFallback={workspaceHeading}
@@ -829,6 +834,7 @@ export default function App() {
             />
           ) : view === "Pipeline" ? (
             <Pipeline
+              key={JSON.stringify([filters, sort, showPassed, show2026])}
               today={today}
               now={now}
               sort={sort}
@@ -881,55 +887,40 @@ export default function App() {
               <div className="list-heading">
                 {eventCount}
                 {sortControl}
-                {showRows && (
-                  <>
+                {view === "List" && (
+                  <div className="list-actions">
                     <RowColumns columns={columns} change={setColumns} />
                     <button
                       className="button select-mode"
                       aria-pressed={selectMode}
-                      onClick={() => setSelectMode(!selectMode)}
+                      onClick={() => {
+                        eventSelection.selectAll(false);
+                        setSelectMode(!selectMode);
+                      }}
                     >
                       <ListChecks size={16} /> Bulk select
                     </button>
-                  </>
-                )}
-                {view === "List" && (
-                  <div
-                    className="list-switch"
-                    role="group"
-                    aria-label="List layout"
-                  >
-                    <button
-                      aria-pressed={listView === "grid"}
-                      onClick={() => {
-                        setListView("grid");
-                        setSelectMode(false);
-                      }}
-                    >
-                      <LayoutGrid size={16} />
-                      Grid
-                    </button>
-                    <button
-                      aria-pressed={listView === "rows"}
-                      onClick={() => setListView("rows")}
-                    >
-                      <List size={16} />
-                      Rows
-                    </button>
+                    <div className="list-switch" role="group" aria-label="List layout">
+                      <button aria-pressed={listView === "grid"} onClick={() => setListView("grid")}>
+                        <LayoutGrid size={16} /> Grid
+                      </button>
+                      <button aria-pressed={listView === "rows"} onClick={() => setListView("rows")}>
+                        <List size={16} /> Rows
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
+              {selection && sorted.length > 0 && <EventBulkBar selection={selection} rows={showRows} />}
               {showRows ? (
                 sorted.length > 0 && (
                   <EventRows
                     columns={columns}
                     groups={listGroups}
-                    key={String(selectMode)}
-                    selectMode={selectMode}
+                    selection={selection}
                     setGoing={setGoing}
                     setStage={setStage}
                     sort={sort}
-                    setSort={setSort}
                     entries={entries}
                     scores={scores}
                     today={today}
@@ -954,10 +945,7 @@ export default function App() {
                           </span>
                           {ranges(e).map((r) => (
                             <span key={r.start_date}>
-                              {prettyDate(r.start_date)}
-                              {r.start_date !== r.end_date
-                                ? " – " + prettyDate(r.end_date)
-                                : ""}
+                              {formatDateRange(r.start_date, r.end_date)}
                             </span>
                           ))}
                         </div>

@@ -10,6 +10,8 @@ import { normalizeColumns, normalizeListView, loadSort, SORT_STORAGE_KEY, groupS
 import { CalendarView } from "./components/CalendarView";
 import { CardSections } from "./components/ListSections";
 import { EventCard } from "./components/EventCard";
+import { CompareEvents, CompareTray } from "./components/CompareEvents";
+import { canCompare, resolveComparePins, selectCompareOccurrence, toggleComparePin, type ComparePin } from "./compare";
 import { EventBulkBar, useEventSelection } from "./components/EventSelection";
 import { BrandLockup, BrandMark } from "./components/Brand";
 import { EmptyState } from "./components/EmptyState";
@@ -197,6 +199,10 @@ export default function App() {
   const { scores } = priority;
   const [toolsOpen, setToolsOpen] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
+  const [comparePins, setComparePins] = useState<ComparePin[]>([]);
+  const [compareOpen, setCompareOpen] = useState(false);
+  const compareTrigger = useRef<HTMLButtonElement>(null);
+  const focusCompareTrigger = useCallback(() => compareTrigger.current, []);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [listView, setListView] = useState(() =>
     normalizeListView(stored("tcg-list-view")),
@@ -508,6 +514,12 @@ export default function App() {
   );
   const eventSelection = useEventSelection(sorted, setGoing);
   const selection = view === "List" && selectMode ? eventSelection : undefined;
+  const pinnedEvents = useMemo(() => resolveComparePins(comparePins, allEvents, events, sorted, today),
+    [comparePins, allEvents, events, sorted, today]);
+  const compareSelection = useMemo(() => ({
+    pins: comparePins,
+    toggle: (event: Event) => setComparePins((pins) => toggleComparePin(pins, event, today)),
+  }), [comparePins, today]);
   function card(e: Event, occurrence?: string, titleLevel?: 3 | 4) {
     return (
       <EventCard
@@ -524,6 +536,7 @@ export default function App() {
         titleLevel={titleLevel}
         columns={view === "List" ? columns : undefined}
         selection={selection}
+        comparison={view === "List" ? compareSelection : undefined}
         open={open}
       />
     );
@@ -911,6 +924,10 @@ export default function App() {
                   </div>
                 )}
               </div>
+              {view === "List" && (
+                <CompareTray pins={pinnedEvents} trigger={compareTrigger} open={() => setCompareOpen(true)}
+                  remove={(id) => setComparePins((pins) => pins.filter((pin) => pin.id !== id))} />
+              )}
               {selection && sorted.length > 0 && <EventBulkBar selection={selection} rows={showRows} />}
               {showRows ? (
                 sorted.length > 0 && (
@@ -918,6 +935,7 @@ export default function App() {
                     columns={columns}
                     groups={listGroups}
                     selection={selection}
+                    comparison={compareSelection}
                     setGoing={setGoing}
                     setStage={setStage}
                     sort={sort}
@@ -988,6 +1006,12 @@ export default function App() {
           </small>
         </footer>
       </main>
+      {!onEventPage && view === "List" && compareOpen && canCompare(pinnedEvents) && (
+        <CompareEvents pins={pinnedEvents} entries={entries} scores={scores} budgets={tripBudget.events}
+          defaults={tripBudget.defaults} homeBase={priority.homeBase} today={today} now={now}
+          onOccurrence={(id, occurrence) => setComparePins((pins) => selectCompareOccurrence(pins, id, occurrence))}
+          returnFocus={focusCompareTrigger} close={() => setCompareOpen(false)} />
+      )}
       {!onEventPage && filterOpen && filterSheet && (
         <Modal title="Filters" titleId="filter-title" closeLabel="Close filters"
           id="filters" className="filter-sheet" returnFocus={focusFilterTrigger} close={() => setFilterOpen(false)}>

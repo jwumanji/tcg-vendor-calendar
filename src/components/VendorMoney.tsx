@@ -5,7 +5,7 @@ import {
   vendorEligibilities, vendorRateStatuses, type Event, type VendorDocument, type VendorOption, type VendorPricingPatch,
 } from "../model";
 import { prettyDate, safeUrl } from "../utils";
-import { applicableVendorPrice, formatVendorAmount, formatVendorUsd, legacyVendorPrice, missingPriceMessage, optionRateStatus, snapshotCurrencies } from "../vendorPricing";
+import { applicableVendorPrice, formatVendorAmount, formatVendorUsd, legacyVendorPrice, missingPriceMessage, optionRateStatus, snapshotCurrencies, vendorPriceBasisLabels } from "../vendorPricing";
 import { Modal } from "./Modal";
 
 type Editing = { type: "option"; item?: VendorOption } | { type: "document"; item?: VendorDocument };
@@ -20,7 +20,6 @@ const rateLabels: Record<VendorOption["rate_status"], string> = {
   expired: "Expired rate",
   unavailable: "Rate unavailable",
 };
-const pricingLabels = { quote: "Organizer quote", published: "Published price", listed: "Listed price · estimated USD" };
 function Source({ source, label }: { source: string; label?: string }) {
   return safeUrl(source) ? <a href={source} target="_blank" rel="noreferrer">{label ?? source}</a> : <span>{source}</span>;
 }
@@ -87,7 +86,7 @@ export function VendorMoney({ event, now, shared, local, onSave, onRemove, terms
           <>
             <span className="money-summary-label">Applicable booth price</span>
             <strong>{formatVendorAmount(price.amount, price.currency)} <span>· {formatVendorUsd(price.usd)}</span></strong>
-            <p>{price.basis !== "listed" && <>{price.option.name}{price.option.vat_rate !== undefined && " incl. VAT"} · </>}{pricingLabels[price.basis]}</p>
+            <p>{price.basis !== "listed" && <>{price.option.name}{price.option.vat_rate !== undefined && " incl. VAT"} · </>}{vendorPriceBasisLabels[price.basis]}{price.basis === "listed" && " · estimated USD"}</p>
           </>
         ) : <p>{missingPriceMessage(event, now)}</p>}
       </div>
@@ -152,7 +151,7 @@ export function VendorMoney({ event, now, shared, local, onSave, onRemove, terms
           <details className="money-sources">
             <summary>Price sources and FX</summary>
             <ul>
-              {sources.map(([source, basis]) => <li key={source}><Source source={source} label={pricingLabels[basis]} /></li>)}
+              {sources.map(([source, basis]) => <li key={source}><Source source={source} label={vendorPriceBasisLabels[basis]} /></li>)}
               {conversions.map(({ currency, fx_rate, fx_as_of, fx_source, id }) => (
                 <li key={id}>1 USD = {fx_rate} {currency} · {prettyDate(fx_as_of)} · <Source source={fx_source} label="FX source" /></li>
               ))}

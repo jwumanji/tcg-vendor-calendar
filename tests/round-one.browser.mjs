@@ -495,3 +495,124 @@ test("shares optional fields and bulk selection across mobile Grid and Rows", as
   await button(page, "Undo").click();
   assert.equal(await page.locator("tr[data-going=true]").count(), 0);
 });
+
+const pinButton = (page, id) => page.locator(`[data-event-id="${id}"] .compare-toggle`);
+const compareDialog = page => page.getByRole("dialog", { name: "Compare events" });
+const compareValues = (page, field) => compareDialog(page).getByRole("row")
+  .filter({ has: page.getByRole("rowheader", { name: field, exact: true }) }).getByRole("cell");
+
+test("keeps comparison pins through filters, layout changes and bulk Going with a four-event limit", async t => {
+  const page = await open(t);
+  const compare = button(page, "Compare");
+  const tray = page.getByRole("region", { name: "Compare events" });
+  const ids = ["r-awardx", "r-tradeting", "r-sunday", "r-kip"];
+  assert.equal(await compare.isDisabled(), true);
+  await pinButton(page, ids[0]).press("Space");
+  assert.equal(await pinButton(page, ids[0]).getAttribute("aria-pressed"), "true");
+  assert.equal(await compare.isDisabled(), true);
+  assert.equal(await pinButton(page, ids[0]).evaluate(el => document.activeElement === el), true);
+  await pinButton(page, ids[0]).press("g");
+  assert.equal(await page.locator(`tr[data-event-id="${ids[0]}"]`).getAttribute("data-going"), "false");
+  await pinButton(page, ids[1]).click();
+  assert.equal(await compare.isEnabled(), true);
+  await button(page, "Grid").click();
+  assert.equal(await pinButton(page, ids[1]).getAttribute("aria-pressed"), "true");
+  await pinButton(page, ids[2]).click();
+  await button(page, "Rows").click();
+  await button(page, "Bulk select").click();
+  await pinButton(page, ids[3]).click();
+  assert.equal(await page.locator("tr[data-selected=true]").count(), 0);
+  assert.equal(await pinButton(page, "urban").getAttribute("aria-disabled"), "true");
+  await pinButton(page, "urban").press("Space");
+  assert.equal(await tray.locator(".compare-pin").count(), 4);
+  assert.equal(await pinButton(page, "urban").getAttribute("aria-pressed"), "false");
+  await page.locator('tr[data-event-id="urban"] input[type="checkbox"]').check();
+  await button(page, "Mark Going").click();
+  assert.equal(await page.locator('tr[data-event-id="urban"]').getAttribute("data-going"), "true");
+  assert.equal(await tray.locator(".compare-pin").count(), 4);
+  await page.getByLabel("Search events").fill("no matching show 37g2");
+  assert.equal(await eventRows(page).count(), 0);
+  assert.equal(await tray.getByText("Outside current results").count(), 4);
+  await compare.press("Enter");
+  const dialog = compareDialog(page);
+  await dialog.waitFor();
+  assert.deepEqual((await dialog.getByRole("columnheader").allTextContents()).slice(1), [
+    award, "THE TRADE T!NG", "THE SUNDAY CARD SHOW by CollectFUN!", "KIP N COLLECT #3 and #4",
+  ]);
+  const columns = await dialog.getByRole("columnheader").evaluateAll(cells => cells.map(cell => cell.getBoundingClientRect()));
+  assert.ok(columns[1].right <= columns[2].left + 1);
+  const close = dialog.getByRole("button", { name: "Close comparison" });
+  assert.equal(await close.evaluate(el => document.activeElement === el), true);
+  await page.keyboard.press("Shift+Tab");
+  assert.match(await page.evaluate(() => document.activeElement?.tagName), /SELECT|A/);
+  await page.keyboard.press("Tab");
+  assert.equal(await close.evaluate(el => document.activeElement === el), true);
+  await page.keyboard.press("Escape");
+  await dialog.waitFor({ state: "hidden" });
+  assert.equal(await compare.evaluate(el => document.activeElement === el), true);
+  await compare.click();
+  await close.click();
+  assert.equal(await compare.evaluate(el => document.activeElement === el), true);
+  await tray.getByRole("button", { name: `Remove ${award} from comparison` }).press("Enter");
+  assert.equal(await tray.locator(".compare-pin").count(), 3);
+  assert.match(await page.evaluate(() => document.activeElement?.getAttribute("aria-label")), /Remove THE TRADE/);
+  await page.reload();
+  assert.equal(await tray.locator(".compare-pin").count(), 0);
+});
+
+test("stacks comparison rows at 390px and recalculates a confirmed clash after changing weekends", async t => {
+  const page = await open(t, iPhone);
+  for (const layout of ["Rows", "Grid"]) {
+    await button(page, layout).click();
+    const targetSize = await pinButton(page, "r-tradeting").evaluate(el => [el.offsetWidth, el.offsetHeight]);
+    assert.ok(targetSize.every(size => size >= 44));
+    assert.equal(await page.locator("html").evaluate(el => el.scrollWidth), 390);
+  }
+  await pinButton(page, "r-awardx").tap();
+  await pinButton(page, "r-tradeting").tap();
+  await button(page, "Compare").tap();
+  const dialog = compareDialog(page);
+  const weekend = dialog.getByLabel("Published weekend for THE TRADE T!NG");
+  assert.equal(await weekend.inputValue(), "2027-01-02");
+  assert.match(await compareValues(page, "Confirmed overlap").first().innerText(), /THE TRADE T!NG[\s\S]*2–3 Jan 2027/);
+  assert.match(await compareValues(page, "Eligible table fee").first().innerText(), /No booth price recorded/);
+  await weekend.selectOption("2027-03-13");
+  assert.match(await compareValues(page, "Confirmed overlap").first().innerText(), /No confirmed overlap/);
+  const firstDate = await compareValues(page, "Dates and certainty").first().boundingBox();
+  const secondDate = await compareValues(page, "Dates and certainty").nth(1).boundingBox();
+  assert.ok(secondDate.y >= firstDate.y + firstDate.height - 1);
+  assert.ok(await dialog.locator(".compare-mobile-name").first().isVisible());
+  assert.equal(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth), true);
+  assert.equal(await page.locator("html").evaluate(el => el.scrollWidth), 390);
+  for (const control of [weekend, dialog.getByRole("button", { name: "Close comparison" })]) {
+    const targetSize = await control.evaluate(el => [el.offsetWidth, el.offsetHeight]);
+    assert.ok(targetSize.every(size => size >= 44));
+  }
+  await dialog.getByRole("button", { name: "Close comparison" }).tap();
+  await button(page, "Rows").tap();
+  await button(page, "Compare").tap();
+  assert.equal(await weekend.inputValue(), "2027-03-13");
+});
+
+test("shows the same quote and effective stage in comparison and Detail", async t => {
+  const page = await open(t);
+  const color = "Color Fiesta #18: Bon Appétit";
+  await stage(page, color).selectOption("Considering");
+  await pinButton(page, "color18").click();
+  await pinButton(page, "urban").click();
+  await button(page, "Compare").click();
+  const price = await compareValues(page, "Eligible table fee").first().locator("strong").innerText();
+  const basis = await compareValues(page, "Eligible table fee").first().locator("small").first().innerText();
+  const effectiveStage = await compareValues(page, "Pipeline stage").first().locator("div").innerText();
+  assert.equal(price, "VND 15,000,000");
+  assert.equal(basis, "Organizer quote");
+  assert.equal(effectiveStage, "Considering");
+  await page.keyboard.press("Escape");
+  await button(page, color).click();
+  assert.equal(await stage(page, color).inputValue(), effectiveStage);
+  assert.ok((await page.locator(".money-summary").textContent()).includes(price));
+  assert.ok((await page.locator(".money-summary").textContent()).includes(basis));
+  await button(page, "← Back to events").click();
+  assert.equal(await pinButton(page, "color18").getAttribute("aria-pressed"), "true");
+  assert.equal(await pinButton(page, "urban").getAttribute("aria-pressed"), "true");
+});

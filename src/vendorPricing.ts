@@ -92,6 +92,8 @@ export type ApplicableVendorPrice =
   | { basis: VendorOption["basis"]; amount: number; currency: string; usd: number; option: VendorOption }
   | { basis: "listed"; amount: number; currency: string; usd: number; note: string; conditions: string };
 
+export const vendorPriceBasisLabels = { quote: "Organizer quote", published: "Published price", listed: "Listed price" };
+
 const payable = (option: VendorOption) => option.amount_incl_vat ?? option.amount;
 
 export function snapshotUsd(amount: number, currency: string) {

@@ -1,6 +1,6 @@
 import { normalizeBudgetAmount, normalizeTripBudget, validDate } from "./data";
 import { estimateTravel, resolveHomeBase } from "./homeBase";
-import { budgetCategories, type BudgetAmount, type BudgetDefaults, type Event, type TripBudget } from "./model";
+import { budgetCategories, type BudgetAmount, type BudgetDefaults, type Event, type EventDateRange, type TripBudget } from "./model";
 import { dateLabel, dateSortRange } from "./utils";
 import { applicableVendorPrice, snapshotFx, snapshotUsd } from "./vendorPricing";
 
@@ -22,10 +22,11 @@ export function convertBudgetAmount({ amount, currency }: BudgetAmount) {
   return Number.isFinite(vnd) ? { usd, vnd } : null;
 }
 
-export function sellingDays(event: Event, today: string, occurrence?: string) {
+export function sellingDays(event: Event, today: string, occurrence?: string | EventDateRange) {
   if (event.event_status || event.date_status !== "confirmed") return null;
-  const shownOccurrence = occurrence && event.occurrences?.find((range) =>
-    dateLabel({ ...event, ...range }) === occurrence);
+  const shownOccurrence = typeof occurrence === "string"
+    ? event.occurrences?.find((range) => dateLabel({ ...event, ...range }) === occurrence)
+    : occurrence;
   const range = shownOccurrence || (event.occurrences?.length ? dateSortRange(event, today) : event);
   if (!range || !validDate(range.start_date) || !validDate(range.end_date) || range.end_date < range.start_date)
     return null;
@@ -51,7 +52,7 @@ export function walkAwayPrice(event: Event, now: number, custom?: BudgetAmount) 
 }
 
 export function calculateTripBudget(
-  event: Event, now: number, today: string, homeBase?: string, occurrence?: string,
+  event: Event, now: number, today: string, homeBase?: string, occurrence?: string | EventDateRange,
   budget: TripBudget = event.trip_budget ?? {}, defaults: BudgetDefaults = {},
 ) {
   const tableFee = applicableVendorPrice(event, now);
@@ -85,6 +86,13 @@ export function calculateTripBudget(
     totalOverflow: !finite,
     perDay: total && days ? { usd: total.usd / days, vnd: total.vnd / days } : null,
   };
+}
+
+export function pendingTripTotal(event: Event, result: ReturnType<typeof calculateTripBudget>) {
+  if (event.event_status === "cancelled") return "Trip total is unavailable for a cancelled event.";
+  if (result.totalOverflow) return "Costs exceed the supported total.";
+  if (!result.tableFee) return "Total pending an applicable table fee.";
+  return "Total pending conversion of all entered costs.";
 }
 
 export function readBudgetMoney(fields: FormData, name: string, currency = "VND") {

@@ -23,6 +23,8 @@ import { VendorPriceCue } from "./VendorPriceCue";
 import { SectionHeading } from "./ListSections";
 import { EventDates, OptionalEventField } from "./EventFields";
 import { SelectAllEvents, SelectEvent, type EventSelection } from "./EventSelection";
+import { CompareToggle } from "./CompareToggle";
+import type { CompareSelection } from "../compare";
 
 export function EventRows({
   groups,
@@ -33,6 +35,7 @@ export function EventRows({
   today,
   now = Date.now(),
   selection,
+  comparison,
   setGoing,
   setStage,
   open,
@@ -45,6 +48,7 @@ export function EventRows({
   today: string;
   now?: number;
   selection?: EventSelection;
+  comparison?: CompareSelection;
   setGoing: SetGoing;
   setStage: (id: string, stage: Stage) => void;
   open: (e: Event) => void;
@@ -64,6 +68,7 @@ export function EventRows({
   function navigate(ev: KeyboardEvent<HTMLTableRowElement>, e: Event) {
     if (
       !(ev.target instanceof HTMLButtonElement) ||
+      ev.target.classList.contains("compare-toggle") ||
       ev.altKey ||
       ev.metaKey ||
       ev.ctrlKey
@@ -118,13 +123,14 @@ export function EventRows({
             {header("stage")}
             {header("going")}
             <th scope="col" role="columnheader" className="col-apply">Apply</th>
+            {comparison && <th scope="col" role="columnheader" className="col-compare">Pin</th>}
           </tr>
         </thead>
         {Array.from(groups, ([key, items]) => (
           <tbody key={key} role="rowgroup">
             {key && (
               <tr role="row" className="month-divider">
-                <th scope="rowgroup" colSpan={8 + columns.length + Number(Boolean(selection))}>
+                <th scope="rowgroup" colSpan={8 + columns.length + Number(Boolean(selection)) + Number(Boolean(comparison))}>
                   <SectionHeading groupKey={key} sortKey={sort.key} items={items} />
                 </th>
               </tr>
@@ -225,6 +231,9 @@ export function EventRows({
                   <td role="cell" className="row-apply">
                     {application && <ApplyLink action={application} name={e.name} compact />}
                   </td>
+                  {comparison && <td role="cell" className="row-compare">
+                    <CompareToggle event={e} selection={comparison} />
+                  </td>}
                 </tr>
               );
             })}

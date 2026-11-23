@@ -4,7 +4,7 @@ import { emptyOutreach, type Event, type Outreach } from "./model";
 import { followUp } from "./outreach";
 import type { ScoreResult } from "./scoring";
 import type { Entries, Stage } from "./storage";
-import { dateLabel, deadlineDate, goingEvents, ranges, safeUrl, upcoming } from "./utils";
+import { dateLabel, deadlineDate, goingEvents, overlappingDateRange, ranges, safeUrl, upcoming } from "./utils";
 
 const saigonCalendar = new Intl.DateTimeFormat("en", {
   timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit", day: "2-digit",
@@ -28,9 +28,8 @@ export function goingConflicts(event: Event, eligibleEvents: Event[], entries: E
     if (other.id === event.id || other.date_status !== "confirmed" || other.event_status) return [];
     const overlaps = new Set(ranges(other).flatMap((otherRange) =>
       dates.flatMap((range) => {
-        const start_date = range.start_date > otherRange.start_date ? range.start_date : otherRange.start_date;
-        const end_date = range.end_date < otherRange.end_date ? range.end_date : otherRange.end_date;
-        return start_date <= end_date ? [dateLabel({ ...event, start_date, end_date })] : [];
+        const overlap = overlappingDateRange(range, otherRange);
+        return overlap ? [dateLabel({ ...event, ...overlap })] : [];
       })));
     return [...overlaps].map((date) => ({ id: other.id, name: other.name, date }));
   });

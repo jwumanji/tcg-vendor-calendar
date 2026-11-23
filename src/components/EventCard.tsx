@@ -21,6 +21,8 @@ import { ApplyLink } from "./ApplyLink";
 import { VendorPriceCue } from "./VendorPriceCue";
 import { EventDates, OptionalEventField } from "./EventFields";
 import { SelectEvent, type EventSelection } from "./EventSelection";
+import { CompareToggle } from "./CompareToggle";
+import type { CompareSelection } from "../compare";
 export const EventCard = memo(function EventCard({
   e,
   entry,
@@ -34,6 +36,7 @@ export const EventCard = memo(function EventCard({
   titleLevel = 3,
   columns = [],
   selection,
+  comparison,
   open,
 }: {
   e: Event;
@@ -48,6 +51,7 @@ export const EventCard = memo(function EventCard({
   titleLevel?: 3 | 4;
   columns?: OptionalColumn[];
   selection?: EventSelection;
+  comparison?: CompareSelection;
   open: (e: Event, occurrence?: string) => void;
 }) {
   const Title = titleLevel === 4 ? "h4" : "h3";
@@ -74,7 +78,10 @@ export const EventCard = memo(function EventCard({
               <span className="sr-only"> · {date} · {entry.stage}</span>
             </button>
           </Title>
-          {selection && <div className="card-select"><SelectEvent e={e} selection={selection} /></div>}
+          {(selection || comparison) && <div className="card-utilities">
+            {selection && <div className="card-select"><SelectEvent e={e} selection={selection} /></div>}
+            {comparison && <CompareToggle event={e} selection={comparison} />}
+          </div>}
         </div>
         <div className="card-when"><EventDates e={e} date={date} /></div>
         <div className="card-location"><Place e={e} /></div>

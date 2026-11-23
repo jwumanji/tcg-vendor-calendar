@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { findHomeBase, resolveHomeBase } from "../homeBase";
 import { type BudgetAmount, type BudgetDefaults, type Event, type TripBudget as Budget } from "../model";
-import { budgetLabels, budgetOrigin, calculateTripBudget, convertBudgetAmount, readBudgetMoney, readTripBudgetForm, walkAwayPrice } from "../tripBudget";
-import { budgetFxDate, formatVendorAmount, formatVendorUsd, missingPriceMessage, snapshotCurrencies, snapshotFx } from "../vendorPricing";
+import { budgetLabels, budgetOrigin, calculateTripBudget, convertBudgetAmount, pendingTripTotal, readBudgetMoney, readTripBudgetForm, walkAwayPrice } from "../tripBudget";
+import { budgetFxDate, formatVendorAmount, formatVendorUsd, missingPriceMessage, snapshotCurrencies, snapshotFx, vendorPriceBasisLabels } from "../vendorPricing";
 import { Modal } from "./Modal";
 
-const basisLabels = { quote: "Organizer quote", published: "Published price", listed: "Listed price" };
 const vndNumber = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 
 function Converted({ value }: { value: { usd: number; vnd: number } }) {
@@ -65,7 +64,7 @@ export function TripBudget({
           {tableFee ? (
             <>
               <CostValue value={tableFee} showVnd />
-              <small>{basisLabels[tableFee.basis]}{tableFee.basis !== "listed" &&
+              <small>{vendorPriceBasisLabels[tableFee.basis]}{tableFee.basis !== "listed" &&
                 tableFee.option.amount_incl_vat !== undefined && " · incl. VAT"}</small>
             </>
           ) : missingPriceMessage(event, now)}
@@ -74,7 +73,7 @@ export function TripBudget({
           {ceiling ? (
             <>
               <CostValue value={ceiling} showVnd />
-              <small>{basis === "custom" ? "Your ceiling" : basis && `${basisLabels[basis]} ceiling`}</small>
+              <small>{basis === "custom" ? "Your ceiling" : basis && `${vendorPriceBasisLabels[basis]} ceiling`}</small>
               {quote && (above === true
                 ? <strong className="trip-budget-above" role="alert">Above walk-away: the quote exceeds your ceiling.</strong>
                 : <small>{above === null ? "Quote comparison needs a snapshot FX rate." : "Quote is within your walk-away fee."}</small>)}
@@ -108,10 +107,7 @@ export function TripBudget({
             {total ? <strong><Converted value={total} /></strong> : (
               <>
                 {subtotal && <strong><Converted value={subtotal} /><small>Known costs subtotal</small></strong>}
-                <small>{event.event_status === "cancelled" ? "Trip total is unavailable for a cancelled event."
-                  : result.totalOverflow ? "Costs exceed the supported total."
-                  : !tableFee ? "Total pending an applicable table fee."
-                  : "Total pending conversion of all entered costs."}</small>
+                <small>{pendingTripTotal(event, result)}</small>
               </>
             )}
           </BudgetRow>

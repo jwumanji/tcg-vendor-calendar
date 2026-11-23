@@ -138,6 +138,8 @@ export interface BudgetDefaults {
   meals?: BudgetAmount;
 }
 
+export type EventDateRange = { start_date: string; end_date: string; original_start_date?: string };
+
 export interface Event {
   id: string;
   /** Last known listing kept so device-only plans can still be opened. */
@@ -155,7 +157,7 @@ export interface Event {
   date_note: string | null;
   estimated_month: string | null;
   original_start_date?: string;
-  occurrences?: { start_date: string; end_date: string; original_start_date?: string }[];
+  occurrences?: EventDateRange[];
   /** Display-only intersection with active filters. Published dates remain available for export. */
   visible_ranges?: { start_date: string; end_date: string }[];
   city: string | null;

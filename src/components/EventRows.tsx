@@ -11,7 +11,6 @@ import {
   optionalColumns,
   type OptionalColumn,
   nextRowSort,
-  rowDateLabel,
   selectAllVisible,
   selectRange,
   type RowKey,
@@ -234,7 +233,7 @@ export function EventRows({
               {items.map((e) => {
                 const entry = entries[e.id] || emptyEntry;
                 const past = !upcoming(e, today);
-                const dates = rowDateLabel(e, today);
+                const dates = displayDateLabel(e, today);
                 const status = scheduleStatus(e);
                 const application = vendorApplyAction(e, now);
                 return (
@@ -324,11 +323,11 @@ export function EventRows({
                     <td
                       role="cell"
                       className="row-dates"
-                      data-event-date={displayDateLabel(e, today)}
                       data-status={e.date_status}
                       title={status + " · " + dates}
                     >
-                      {dates !== "Dates not announced" && <><span className="row-date-label">{dates}</span>{" "}</>}
+                      {(dates !== "Dates not announced" || e.event_status) &&
+                        <><span className="row-date-label">{dates}</span>{" "}</>}
                       <Status e={e} />
                     </td>
                     <td role="cell" className="row-place">
@@ -450,7 +449,7 @@ export function RowSortControl({
       <button
         className="button"
         onClick={() => setSort(nextRowSort(sort, sort.key))}
-        aria-label={`Sort ${sort.direction === "asc" ? "descending" : "ascending"}`}
+        aria-label="Sort descending"
         aria-pressed={sort.direction === "desc"}
       >
         <Direction size={15} />

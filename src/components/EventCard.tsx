@@ -73,10 +73,12 @@ export const EventCard = memo(function EventCard({
           <GoingButton e={e} going={entry.going} setGoing={setGoing} />
         </div>
         <div className="card-art">
-          <div className="card-when" data-event-date={date}>
-            <CalendarDays size={16} aria-hidden="true" />
-            <span>{date}</span>
-          </div>
+          {(date !== "Dates not announced" || e.event_status) && (
+            <div className="card-when">
+              <CalendarDays size={16} aria-hidden="true" />
+              <span>{date}</span>
+            </div>
+          )}
           <div className="card-location">
             <Place e={e} />
           </div>

@@ -120,13 +120,18 @@ it.each(["Passed", "Too expensive"] as const)("undoes %s through saved entries a
   expect(undoStagePatch(restored, undo, later)).toBe(restored);
 });
 
-it("restores the suggested stage after undoing the first explicit decision", () => {
-  const { entries, undo } = changeStage({}, "event", "Passed", "2026-11-24T00:00:00.000Z");
-  const restored = undoStagePatch(entries, undo, "2026-11-24T00:00:05.000Z");
-  expect(restored.event).toEqual(emptyEntry);
-  expect(withSuggestedStages(restored, { event: "Contacted" }).event).toMatchObject({
+it("keeps the first stage Undo through backup merges and restores stage suggestions", () => {
+  const changedAt = "2026-11-24T00:00:00.000Z";
+  const { entries, undo } = changeStage({}, "event", "Passed", changedAt);
+  const restored = undoStagePatch(entries, undo, changedAt);
+  const exported = validateBackup(JSON.parse(JSON.stringify(backup(restored)))).entries;
+  expect(importEntries(entries, exported, "merge")).toEqual(restored);
+  expect(importEntries(exported, entries, "merge")).toEqual(restored);
+  expect(withSuggestedStages(exported, { event: "Contacted" }).event).toMatchObject({
     stage: "Contacted", stageSuggested: true,
   });
+  const explicit = changeStage(exported, "event", "Not reviewed", "2026-11-24T00:00:05.000Z").entries;
+  expect(withSuggestedStages(explicit, { event: "Contacted" }).event.stage).toBe("Not reviewed");
 });
 
 describe("decision stage suggestions", () => {
@@ -226,7 +231,7 @@ describe("decision stage suggestions", () => {
     const undoneAt = "2026-11-16T10:00:01.000Z";
     const undone = undoGoingPatch(marked, patch, now, undoneAt);
     const displayed = withSuggestedStages(undone, { id: "Contacted", reset: "Contacted" });
-    expect(displayed.id).toMatchObject({ stage: "Contacted", stageUpdatedAt: null });
+    expect(displayed.id).toMatchObject({ stage: "Contacted", stageUpdatedAt: undoneAt, stageSuggested: true });
     expect(displayed.reset).toMatchObject({ stage: "Not reviewed", stageUpdatedAt: undoneAt });
   });
 });
@@ -622,7 +627,8 @@ it("undoes only changed Going values and stages synced by that action", () => {
     going: false,
     stage: "Not reviewed",
     note: "Edited after marking",
-    stageUpdatedAt: null,
+    stageUpdatedAt: now,
+    stageInferred: true,
   });
   expect(undone.paid).toEqual({ ...before.paid, goingUpdatedAt: now });
   expect(undone.already).toBe(before.already);

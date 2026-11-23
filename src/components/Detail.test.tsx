@@ -71,8 +71,9 @@ it("leads a sparse find with missing facts and keeps editors reachable without e
   expect($(".planning").parent().text()).toContain("Set up trip budget");
 });
 
-it("shows the next three recurring dates and keeps the full published schedule accessible", () => {
-  const $ = render(event("r-tradeting"), { today: "2027-02-01" });
+it("shows the next three recurring dates in order and keeps the full published schedule accessible", () => {
+  const recurring = event("r-tradeting");
+  const $ = render({ ...recurring, occurrences: [...recurring.occurrences!].reverse() }, { today: "2027-02-01" });
   const dates = $("#published-event-dates");
   expect(dates.children().map((_, el) => $(el).text()).get()).toEqual([
     "13 Mar 2027 – 14 Mar 2027", "24 Apr 2027 – 25 Apr 2027", "22 May 2027 – 23 May 2027",
@@ -83,6 +84,12 @@ it("shows the next three recurring dates and keeps the full published schedule a
   expect($(".detail-row").filter((_, el) => $(el).find("dt").text() === "Key market").find("dd").text()).toBe("Yes");
   expect($(".event-information").text()).not.toMatch(/start_date|end_date|on the Page/i);
   expect($(".event-information .detail-row").text()).toContain("AreaSoutheast Asia and Hong Kong");
+});
+
+it("keeps show type and area visible in the reference panel when dates and venues are unknown", () => {
+  const $ = render({ ...sparse, event_type: "Trade show", region_group: "SEA/HK" });
+  expect($(".detail-row").text()).toContain("Show typeTrade show");
+  expect($(".detail-row").text()).toContain("AreaSoutheast Asia and Hong Kong");
 });
 
 it("assigns the mobile artwork below the decision and keeps Going and the primary action inline", () => {

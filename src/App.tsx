@@ -150,6 +150,22 @@ export default function App() {
   const workspaceHeading = useRef<HTMLHeadingElement>(null);
   const searchInput = useRef<HTMLInputElement>(null);
   const undoButton = useRef<HTMLButtonElement>(null);
+  const trackUndoFocus = useCallback((button: HTMLButtonElement | null) => {
+    undoButton.current = button;
+    if (!button) return;
+    return () => {
+      undoButton.current = null;
+      if (document.activeElement !== button) return;
+      requestAnimationFrame(() => {
+        if (document.activeElement !== document.body) return;
+        const picker = undo?.kind === "stage" && document.querySelector<HTMLElement>(
+          `main:not([hidden]) [data-event-id="${CSS.escape(undo.patch.id)}"] .stage-picker`,
+        );
+        if (picker) picker.focus();
+        else (document.querySelector<HTMLElement>(".event-page h1") ?? workspaceHeading.current)?.focus({ preventScroll: true });
+      });
+    };
+  }, [undo]);
   const setStage = useCallback((id: string, stage: Stage) => {
     const focused = document.activeElement;
     const name = shippedEvents.find((e) => e.id === id)?.name ?? id;
@@ -210,10 +226,10 @@ export default function App() {
     }
     return preferences;
   });
-  function applyListPreferences(preferences: ListPreferences) {
-    setListPreferences((current) => ({ ...current, ...preferences }));
+  function applyListPreferences(preferences: ListPreferences, mode: "merge" | "replace" = "merge") {
+    setListPreferences((current) => mode === "replace" ? preferences : { ...current, ...preferences });
     for (const key of listPreferenceNames) {
-      if (preferences[key] === undefined) continue;
+      if (mode === "merge" && preferences[key] === undefined) continue;
       const error = saveValue(LIST_PREFERENCE_KEYS[key], preferences[key]);
       if (error) setStorageError(error);
     }
@@ -285,9 +301,8 @@ export default function App() {
     const matches = matchEvents(events, timelineFilters);
     const filtered = showPassed ? matches : matches.filter(passesStage);
     const viewEvents = filtered.filter(inView);
-    const matchesBeforePastFilter = (source: Event[]) =>
-      matchEvents(source, filters).filter((e) => inView(e) && (showPassed || passesStage(e)));
-    const withoutPastFilter = timelineFilters === filters ? viewEvents : matchesBeforePastFilter(events);
+    const visibleMatches = (source: Event[], activeFilters: typeof filters) =>
+      matchEvents(source, activeFilters).filter((e) => inView(e) && (showPassed || passesStage(e)));
     const countHidden = (before: Event[], after: Event[]) => {
       const shown = new Map(after.map((e) => [e.id, ranges(e).length]));
       return before.filter((e) => (shown.get(e.id) ?? -1) < ranges(e).length).length;
@@ -297,8 +312,8 @@ export default function App() {
       viewEvents,
       hidden: {
         passed: showPassed ? 0 : matches.filter(inView).length - viewEvents.length,
-        earlier: show2026 ? 0 : countHidden(matchesBeforePastFilter(activeEvents), withoutPastFilter),
-        past: timelineFilters === filters ? 0 : countHidden(withoutPastFilter, viewEvents),
+        earlier: show2026 ? 0 : countHidden(visibleMatches(activeEvents, timelineFilters), viewEvents),
+        past: timelineFilters === filters ? 0 : countHidden(visibleMatches(events, filters), viewEvents),
       },
     };
   }, [activeEvents, events, filters, timelineFilters, entries, scores, today, show2026, showPassed, view]);
@@ -480,14 +495,7 @@ export default function App() {
               : `Removed ${undo.patch.length} from Going`}
           </span>
           <span aria-hidden="true"> · </span>
-          <button ref={undoButton} onClick={() => {
-            undoChange();
-            if (undo.kind !== "stage") return;
-            requestAnimationFrame(() => {
-              const id = CSS.escape(undo.patch.id);
-              document.querySelector<HTMLElement>(`main:not([hidden]) [data-event-id="${id}"] .stage-picker`)?.focus();
-            });
-          }}>Undo</button>
+          <button ref={trackUndoFocus} onClick={undoChange}>Undo</button>
         </>
       )}
     </div>
@@ -528,6 +536,11 @@ export default function App() {
   );
   const filterTrigger = useRef<HTMLButtonElement>(null);
   const filterPanel = useRef<HTMLElement>(null);
+  const activeFilterCount = chips.length + Number(showPassed);
+  function resetFilters() {
+    setFilters(emptyFilters);
+    setShowPassed(false);
+  }
   const focusFilterTrigger = useCallback(() => filterTrigger.current, []);
   useLayoutEffect(() => {
     if (!filterOpen || filterSheet || onEventPage) return;
@@ -542,7 +555,7 @@ export default function App() {
   );
   const sortControl = <RowSortControl sort={sort} setSort={setSort} />;
   const visibilityControls = [
-    { hidden: hidden.passed, reason: "passed", showLabel: "Show", hideLabel: "Hide passed", shown: showPassed,
+    { hidden: hidden.passed, reason: "passed", showLabel: "Show passed", hideLabel: "Hide passed", shown: showPassed,
       toggle: () => setShowPassed(!showPassed) },
     { hidden: hidden.earlier, reason: "2026", showLabel: "Show 2026", hideLabel: "Hide 2026", shown: show2026,
       toggle: () => setShow2026(!show2026) },
@@ -563,7 +576,7 @@ export default function App() {
               <span aria-hidden="true"> · </span>
             </>
           )}
-          <button className="visibility-toggle" aria-pressed={control.shown}
+          <button className="visibility-toggle"
             aria-describedby={control.hidden > 0 ? `hidden-${control.reason}` : undefined} onClick={control.toggle}>
             {control.shown ? control.hideLabel : control.showLabel}
           </button>
@@ -573,8 +586,8 @@ export default function App() {
   );
   const countries = useMemo(() => countryOptions(events), [events]);
   const filterContents = filterOpen && (
-    <FilterContents countries={countries} filters={filters} set={set} reset={() => setFilters(emptyFilters)}
-      activeCount={chips.length} showPassed={showPassed} setShowPassed={setShowPassed} matchCount={viewEvents.length}
+    <FilterContents countries={countries} filters={filters} set={set} reset={resetFilters}
+      activeCount={activeFilterCount} showPassed={showPassed} setShowPassed={setShowPassed} matchCount={viewEvents.length}
       compact={filterSheet} close={() => setFilterOpen(false)} />
   );
   const noResults = (
@@ -583,7 +596,7 @@ export default function App() {
       title="No matching events"
       action={
         chips.length > 0 ? (
-          <button className="button" onClick={() => setFilters(emptyFilters)}>
+          <button className="button" onClick={resetFilters}>
             <RotateCcw size={16} aria-hidden="true" /> Clear all filters
           </button>
         ) : undefined
@@ -669,7 +682,7 @@ export default function App() {
               aria-haspopup={filterSheet ? "dialog" : undefined}
               ref={filterTrigger}
             >
-              <SlidersHorizontal size={16} /> Filters{chips.length > 0 && ` · ${chips.length}`}
+              <SlidersHorizontal size={16} /> Filters{activeFilterCount > 0 && ` · ${activeFilterCount}`}
             </button>
             <button
               className="button finds-toggle"
@@ -785,7 +798,7 @@ export default function App() {
               ))}
               <button
                 className="clear"
-                onClick={() => setFilters(emptyFilters)}
+                onClick={resetFilters}
               >
                 Clear all
               </button>

@@ -33,6 +33,7 @@ export interface Entry {
   note: string;
   noteUpdatedAt: string | null;
   stageUpdatedAt: string | null;
+  stageInferred?: true;
 }
 export type Entries = Record<string, Entry>;
 export type DisplayEntry = Entry & { stageSuggested?: true };
@@ -53,24 +54,43 @@ export const emptyEntry: Entry = {
   stageUpdatedAt: null,
 };
 
-export type StageUndo = Pick<Entry, "stage" | "stageUpdatedAt"> & { id: string; changedAt: string };
+type StageDecision = Pick<Entry, "stage" | "stageUpdatedAt" | "stageInferred">;
+export type StageUndo = StageDecision & { id: string; changedAt: string };
+
+function allowsStageSuggestion({ stage, stageUpdatedAt, stageInferred }: StageDecision) {
+  return stage === emptyEntry.stage && (stageUpdatedAt === null || stageInferred === true);
+}
+
+function nextStageTimestamp(previous: string | null, now: string) {
+  return previous === null || now > previous ? now : new Date(Date.parse(previous) + 1).toISOString();
+}
+
+function restoreStage(previous: StageDecision, changedAt: string, now: string): StageDecision {
+  return {
+    stage: previous.stage,
+    stageUpdatedAt: nextStageTimestamp(changedAt, now),
+    stageInferred: allowsStageSuggestion(previous) ? true : undefined,
+  };
+}
 
 export function changeStage(entries: Entries, id: string, stage: Stage, now: string) {
   const entry = entries[id] ?? emptyEntry;
-  const undo: StageUndo = { id, stage: entry.stage, stageUpdatedAt: entry.stageUpdatedAt, changedAt: now };
+  const { stage: previousStage, stageUpdatedAt, stageInferred } = entry;
+  const changedAt = nextStageTimestamp(stageUpdatedAt, now);
+  const undo: StageUndo = { id, stage: previousStage, stageUpdatedAt, stageInferred, changedAt };
   return {
-    entries: { ...entries, [id]: { ...entry, stage, stageUpdatedAt: now } },
+    entries: { ...entries, [id]: { ...entry, stage, stageUpdatedAt: changedAt, stageInferred: undefined } },
     undo,
   };
 }
 
 export function undoStagePatch(entries: Entries, patch: StageUndo, now: string): Entries {
-  const { id, stage, stageUpdatedAt, changedAt } = patch;
+  const { id, changedAt } = patch;
   const entry = entries[id];
   if (!entry || entry.stageUpdatedAt !== changedAt) return entries;
   return {
     ...entries,
-    [id]: { ...entry, stage, stageUpdatedAt: stageUpdatedAt === null ? null : now },
+    [id]: { ...entry, ...restoreStage(patch, changedAt, now) },
   };
 }
 
@@ -97,8 +117,7 @@ export function stageSuggestions(events: readonly Event[]): StageSuggestions {
 }
 
 function decisionStage(entry: Entry, suggestion?: Stage): Stage {
-  return entry.stage === emptyEntry.stage && entry.stageUpdatedAt === null && suggestion
-    ? suggestion : entry.stage;
+  return allowsStageSuggestion(entry) && suggestion ? suggestion : entry.stage;
 }
 
 /** Suggestions stay derived so new evidence can update an untouched entry. */
@@ -129,7 +148,7 @@ export function applyGoing(
       goingUpdatedAt: now,
       ...(going &&
         decisionStage(entry, suggestions?.[id]) === emptyEntry.stage && {
-          stage: "Considering", stageUpdatedAt: now,
+          stage: "Considering", stageUpdatedAt: nextStageTimestamp(entry.stageUpdatedAt, now), stageInferred: undefined,
         }),
     };
   }
@@ -138,7 +157,7 @@ export function applyGoing(
 type GoingInverse = {
   id: string;
   going: boolean;
-  syncedStage?: Pick<Entry, "stage" | "stageUpdatedAt">;
+  syncedStage?: StageDecision & { changedAt: string };
 };
 export function inverseGoingPatch(
   before: Entries,
@@ -153,8 +172,13 @@ export function inverseGoingPatch(
       patch.push({
         id,
         going: previous.going,
-        ...(previous.stage !== changed.stage && {
-          syncedStage: { stage: previous.stage, stageUpdatedAt: previous.stageUpdatedAt },
+        ...(previous.stage !== changed.stage && changed.stageUpdatedAt && {
+          syncedStage: {
+            stage: previous.stage,
+            stageUpdatedAt: previous.stageUpdatedAt,
+            stageInferred: previous.stageInferred,
+            changedAt: changed.stageUpdatedAt,
+          },
         }),
       });
   }
@@ -176,10 +200,7 @@ export function undoGoingPatch(
       goingUpdatedAt: now,
       ...(syncedStage &&
         entry.stage === "Considering" &&
-        entry.stageUpdatedAt === changedAt && {
-          stage: syncedStage.stage,
-          stageUpdatedAt: syncedStage.stageUpdatedAt === null ? null : now,
-        }),
+        entry.stageUpdatedAt === syncedStage.changedAt && restoreStage(syncedStage, syncedStage.changedAt, now)),
     };
   }
   return next;
@@ -279,6 +300,8 @@ export function validateBackup(value: unknown): Backup {
       throw new Error(
         `Invalid entry ${id}: stageUpdatedAt must be null or an ISO UTC timestamp.`,
       );
+    if (e.stageInferred !== undefined && (e.stageInferred !== true || stage !== emptyEntry.stage))
+      throw new Error(`Invalid entry ${id}: invalid inferred stage.`);
     if (e.going !== undefined && typeof e.going !== "boolean")
       throw new Error(`Invalid entry ${id}: going must be a boolean.`);
     if (e.goingUpdatedAt != null && !timestamp(e.goingUpdatedAt))
@@ -290,6 +313,7 @@ export function validateBackup(value: unknown): Backup {
       note: e.note,
       noteUpdatedAt: e.noteUpdatedAt,
       stageUpdatedAt: e.stageUpdatedAt,
+      ...(e.stageInferred === true && { stageInferred: true }),
     };
   }
   const result: Backup = { version: 1, exportedAt: value.exportedAt, entries };
@@ -410,13 +434,14 @@ export function importEntries(
       continue;
     }
     const going = (next.goingUpdatedAt || "") > (old.goingUpdatedAt || "");
-    const stage = (next.stageUpdatedAt || "") > (old.stageUpdatedAt || "");
+    const stage = (next.stageUpdatedAt || "") > (old.stageUpdatedAt || "") ? next : old;
     const note = (next.noteUpdatedAt || "") > (old.noteUpdatedAt || "");
     result[id] = {
       going: going ? next.going : old.going,
       goingUpdatedAt: going ? next.goingUpdatedAt : old.goingUpdatedAt,
-      stage: stage ? next.stage : old.stage,
-      stageUpdatedAt: stage ? next.stageUpdatedAt : old.stageUpdatedAt,
+      stage: stage.stage,
+      stageUpdatedAt: stage.stageUpdatedAt,
+      ...(stage.stageInferred && { stageInferred: true }),
       note: note ? next.note : old.note,
       noteUpdatedAt: note ? next.noteUpdatedAt : old.noteUpdatedAt,
     };
@@ -677,7 +702,8 @@ export function stashBeforeReplace(
 }
 export function saveValue(key: string, value: unknown): string {
   try {
-    localStorage.setItem(key, JSON.stringify(value));
+    if (value === undefined) localStorage.removeItem(key);
+    else localStorage.setItem(key, JSON.stringify(value));
     return "";
   } catch {
     return "Could not save on this device. Storage is unavailable or full. Export a JSON backup to keep your changes.";

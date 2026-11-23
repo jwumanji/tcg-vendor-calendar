@@ -30,11 +30,18 @@ beforeEach(() => {
         echo 'Location: https://vercel.com/login?next=deployment' >> "$headers"
         echo -n 302; exit 0 ;;
       protected-deep-link:https://immutable.vercel.app/) ;;
+      protected-401-html:https://immutable.vercel.app/|public-401-html:https://alias/)
+        echo '<title>Authentication Required</title><a href="https://vercel.com/sso-api?url=deployment">Log in</a>' > "$body"
+        echo -n 401; exit 0 ;;
+      protected-401-header:https://immutable.vercel.app/)
+        echo 'X-Vercel-Error: UNAUTHORIZED' >> "$headers"
+        echo -n 401; exit 0 ;;
       protected*:https://immutable.vercel.app/)
         echo 'Location: https://vercel.com/sso-api?url=deployment' >> "$headers"
         case "$SCENARIO" in
           protected-401) echo -n 401 ;;
           protected-403) echo -n 403 ;;
+          protected-307) echo -n 307 ;;
           *) echo -n 302 ;;
         esac
         exit 0 ;;
@@ -45,6 +52,9 @@ beforeEach(() => {
         echo 'Location: https://vercel.com/docs' >> "$headers"
         echo -n 302; exit 0 ;;
       bare-403:https://immutable.vercel.app/) echo -n 403; exit 0 ;;
+      generic-401:https://immutable.vercel.app/)
+        echo '<title>Authentication Required</title>' > "$body"
+        echo -n 401; exit 0 ;;
       public-sso:https://alias/*)
         echo 'Location: https://vercel.com/login?next=deployment' >> "$headers"
         echo -n 302; exit 0 ;;
@@ -70,6 +80,7 @@ beforeEach(() => {
         if [[ ! -f "$marker" ]]; then touch "$marker"; sed -i 's/current/stale/g' "$body"; fi ;;
       bad-fallback:*/some/deep/link) echo 'fallback' > "$body" ;;
       missing-header:*/some/deep/link) : > "$headers" ;;
+      embedded-only-noindex:https://custom/some/deep/link) echo 'X-Robots-Tag: noindexifembedded' > "$headers" ;;
     esac
     echo -n 200
   `, { mode: 0o755 });
@@ -79,13 +90,14 @@ afterEach(() => rmSync(dir, { recursive: true, force: true }));
 it.each([
   ["html-asset", 1], ["wrong-js", 1], ["wrong-css", 1], ["stale-bytes", 1],
   ["protected-302", 0], ["protected-401", 0], ["protected-403", 0], ["protected-propagate", 0],
+  ["protected-307", 0], ["protected-401-html", 0], ["protected-401-header", 0], ["public-401-html", 1],
   ["protected-deep-link", 0],
   ["protected-wrong-alias", 1], ["protected-wrong-custom", 1], ["protected-unreachable", 1],
   ["protected-stale-assets", 1], ["public-401", 1], ["public-sso", 1],
-  ["wrong-redirect", 1], ["unrelated-vercel-redirect", 1], ["bare-403", 1],
+  ["wrong-redirect", 1], ["unrelated-vercel-redirect", 1], ["bare-403", 1], ["generic-401", 1],
   ["stale-immutable", 1], ["stale-public-only", 1], ["missing-js", 1], ["missing-css", 1],
   ["bad-cert", 1], ["refused", 1], ["propagate", 0], ["unreachable", 1], ["stale-alias", 1],
-  ["stale-custom", 1], ["bad-fallback", 1], ["missing-header", 1],
+  ["stale-custom", 1], ["bad-fallback", 1], ["missing-header", 1], ["embedded-only-noindex", 1],
 ])("checks the current build on both public aliases: %s", (scenario, status) => {
   const result = spawnSync("bash", [script, "https://immutable.vercel.app", "https://alias", "https://custom"], {
     cwd: dir, encoding: "utf8",

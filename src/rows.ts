@@ -5,8 +5,6 @@ import {
   compareText,
   scheduleStatus,
   dateSortKey,
-  dateSortRange,
-  prettyDate,
 } from "./utils";
 
 export const ROW_SORT_LABELS = {
@@ -79,29 +77,6 @@ export function nextRowSort(sort: RowSort, key: RowKey): RowSort {
         : "asc",
   };
 }
-export function rowDateLabel(e: Event, today: string) {
-  if (e.date_status !== "confirmed") {
-    return e.estimated_month
-      ? "Est. " +
-          new Date(e.estimated_month + "-01T12:00:00").toLocaleDateString(
-            "en-GB",
-            { month: "short", year: "numeric" },
-          )
-      : "Dates not announced";
-  }
-  const range = dateSortRange(e, today);
-  if (!range) return "Dates not announced";
-  const { start_date: start, end_date: end } = range;
-  if (start === end) return prettyDate(start);
-  const left =
-    start.slice(0, 7) === end.slice(0, 7)
-      ? String(Number(start.slice(-2)))
-      : start.slice(0, 4) === end.slice(0, 4)
-        ? prettyDate(start).slice(0, -5)
-        : prettyDate(start);
-  return left + "–" + prettyDate(end);
-}
-
 export function sortRows(
   events: Event[],
   sort: RowSort,

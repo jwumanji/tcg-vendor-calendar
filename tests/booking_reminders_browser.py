@@ -245,7 +245,7 @@ class PlannerBrowser(TestCase):
         page.get_by_role("button", name="Grid", exact=True).click()
         expect(passed).to_have_count(0)
         expect(costly).to_have_count(0)
-        page.get_by_role("button", name="Show", exact=True).click()
+        page.get_by_role("button", name="Show passed", exact=True).click()
         expect(passed).to_have_value("Passed")
         expect(costly).to_have_value("Too expensive")
 
@@ -298,10 +298,11 @@ class PlannerBrowser(TestCase):
                     page.keyboard.press("Enter")
                     expect(cards).to_have_count(6)
                     expect(queue.get_by_role("button", name="Show fewer follow-ups")).to_have_attribute("aria-expanded", "true")
-                    acknowledgement = queue.get_by_role("button", name=re.compile(r"HKTDC.*Organizer nudge due"))
-                    expect(acknowledgement).to_contain_text("Last exchange · Automatic acknowledgement · 20 Nov 2026")
-                    expect(acknowledgement).to_contain_text("22:01:26 UTC")
-                    expect(acknowledgement).not_to_contain_text("1a1f5d493ba2a84d")
+                    acknowledgement = page.get_by_role("button", name=re.compile(r"HKTDC.*Organizer nudge due"))
+                    expect(acknowledgement).to_have_accessible_description(re.compile(
+                        r"Last exchange · Automatic acknowledgement · 20 Nov 2026.*22:01:26 UTC"
+                    ))
+                    expect(cards.filter(has=acknowledgement)).not_to_contain_text("1a1f5d493ba2a84d")
                     notes = cards.first.locator(".outreach-follow-up-notes")
                     expect(notes).to_have_css("-webkit-line-clamp", "2")
                     self.assertLessEqual(queue.evaluate("(el) => el.scrollWidth"), queue.evaluate("(el) => el.clientWidth"))

@@ -13,12 +13,24 @@ identity=$(build_id dist/index.html)
 [[ -n "$identity" ]] || { echo 'ERROR: no build identity in dist/index.html' >&2; exit 1; }
 scratch=$(mktemp -d)
 trap 'rm -rf -- "$scratch"' EXIT
+vercel_protected() {
+  local code="$1"
+  if [[ "$code" =~ ^(30[12378]|401|403)$ ]] &&
+     grep -Eqi '^location:[[:blank:]]*https://(www\.)?vercel\.com/(sso-api|sso|login)/?([?#]|[[:space:]]*$)' "$scratch/headers"; then
+    return 0
+  fi
+  # Vercel can send a 401 challenge without a Location header.
+  [[ "$code" == 401 ]] && {
+    grep -Eqi '^x-vercel-error:[[:blank:]]*UNAUTHORIZED[[:space:]]*$' "$scratch/headers" ||
+      { grep -Fq '<title>Authentication Required</title>' "$scratch/body" &&
+        grep -Fq 'https://vercel.com/sso-api?' "$scratch/body"; }
+  }
+}
 fetch() {
   local url="$1" code rc
-  if code=$(curl -sS --max-time 25 -o "$scratch/body" -D "$scratch/headers" -w '%{http_code}' "$url"); then
+  if code=$(curl -q -sS --max-time 25 -o "$scratch/body" -D "$scratch/headers" -w '%{http_code}' "$url"); then
     [[ "$code" == 200 ]] && return 0
-    if [[ "${2:-}" == immutable && "$code" =~ ^(302|401|403)$ ]] &&
-       grep -Eqi '^location:[[:blank:]]*https://(www\.)?vercel\.com/(sso-api|sso|login)([/?#]|[[:space:]]*$)' "$scratch/headers"; then
+    if [[ "${2:-}" == immutable ]] && vercel_protected "$code"; then
       echo "$url (HTTP $code, Vercel sign-in): protected, skipped"
       return 3
     fi
@@ -31,7 +43,7 @@ fetch() {
 }
 check_document() {
   fetch "$@" || return $?
-  if ! grep -qi '^x-robots-tag:.*noindex' "$scratch/headers" ||
+  if ! grep -Eqi '^x-robots-tag:[[:blank:]]*(.*[,[:blank:]])?noindex([,[:space:]]|$)' "$scratch/headers" ||
      [[ "$(build_id "$scratch/body")" != "$identity" || "$(assets "$scratch/body")" != "$expected" ]]; then
     echo "Smoke check failed: $1 (expected current build and noindex)" >&2
     return 1

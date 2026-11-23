@@ -19,7 +19,7 @@ export const FACTOR_META = {
   scale: {
     label: "Scale",
     description:
-      "Attendance and vendor counts, with venue and size tier as proxies.",
+      "Attendance and vendor counts, with venue and show size as estimates.",
   },
   track: {
     label: "Track record",
@@ -33,7 +33,7 @@ export const FACTOR_META = {
   market: {
     label: "Market",
     description:
-      "How closely the host country matches the vendor’s priority markets.",
+      "How closely the host country matches the vendor’s key markets.",
   },
   commercial: {
     label: "Commercial potential",
@@ -227,7 +227,7 @@ function scale(e: Event): Evidence {
       [`Show size ${e.size_tier} (estimated)`],
       "Estimated show size used as a proxy.",
     );
-  return missing("No count, recognized hall or size tier.");
+  return missing("No attendance or vendor count, known venue, or show size.");
 }
 
 const fold = (s: string) =>

@@ -50,7 +50,7 @@ export function BackupControls({
   priority: PriorityPreferences;
   applyPriority: (value: PriorityPreferences) => void;
   listPreferences: ListPreferences;
-  applyListPreferences: (value: ListPreferences) => void;
+  applyListPreferences: (value: ListPreferences, mode: "merge" | "replace") => void;
   apply: (entries: Entries, outreach: OutreachPatches, milestones: MilestoneEdits, vendorPricing: VendorPricingEdits, tripBudget: BudgetSettings) => void;
 }) {
   const [preview, setPreview] = useState<Backup | null>(null);
@@ -187,6 +187,11 @@ export function BackupControls({
               ? "Imported budgets take precedence for matching events."
               : "Imported budgets replace the trip budgets and defaults saved on this device."}</p>
           )}
+          {preview.listPreferences && (
+            <p>{mode === "merge"
+              ? "Imported list preferences take precedence for matching settings."
+              : "Imported list preferences replace your current settings. Missing settings return to their defaults."}</p>
+          )}
           {preview.priority && (
             <p>
               Imported score weights will apply to all events.{" "}
@@ -218,13 +223,14 @@ export function BackupControls({
                   applyPriority(
                     importPriority(priority, preview.priority, mode),
                   );
-                  if (preview.listPreferences) applyListPreferences(preview.listPreferences);
+                  if (preview.listPreferences) applyListPreferences(preview.listPreferences, mode);
                   const summary = [
                     `${Object.keys(preview.entries).length} entries`,
                     preview.outreach && outreachSummary,
                     preview.milestones && milestoneSummary,
                     preview.vendorPricing && pricingSummary,
                     preview.tripBudget && budgetSummary,
+                    preview.listPreferences && "list preferences",
                   ].filter(Boolean).join(" · ");
                   setStatus(`Imported ${summary} (${mode}).`);
                   setError("");

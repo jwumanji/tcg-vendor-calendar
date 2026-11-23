@@ -248,8 +248,10 @@ export function Detail({
     : budgetResult.subtotal ? `Known costs · ${formatVendorAmount(budgetResult.subtotal.vnd, "VND")}` : "Trip costs and walk-away fee";
   const hasOutreach = Boolean(outreach && (outreach.status !== "not_contacted" || outreach.contacted_at ||
     outreach.response_at || outreach.acknowledgement_at || outreach.quoted_price || outreach.notes));
+  const showType = meaningful(e.event_type);
+  const area = meaningful(e.region_group);
   const hasSchedule = Boolean(ranges(e).length || e.estimated_month || e.date_note || e.venue || e.city || e.country ||
-    e.vendor_milestones?.length || timing.referenceNotice);
+    showType || area || e.priority_market || e.vendor_milestones?.length || timing.referenceNotice);
   const sources = [...new Set([e.website, e.tickets ?? null, e.instagram, ...e.source_urls])]
     .filter((url): url is string => !!url && safeUrl(url));
   const about: [string, string | number | null | undefined][] = [
@@ -264,7 +266,7 @@ export function Detail({
     ["First year", e.first_year],
   ];
   const aboutRows = about.filter(([, value]) => meaningful(value));
-  const publishedDates = e.occurrences ?? [];
+  const publishedDates = [...(e.occurrences ?? [])].sort((a, b) => a.start_date.localeCompare(b.start_date));
   const nextDates = publishedDates.filter((date) => date.end_date >= today).slice(0, 3);
   const visibleDates = showAllDates ? publishedDates : nextDates;
   const money = <VendorMoney event={e} now={now} shared={sharedVendorPricing} local={localVendorPricing}
@@ -391,8 +393,8 @@ export function Detail({
             defaultOpen={desktop || Boolean(e.vendor_milestones?.length || publishedDates.length)}>
             <dl>
               {row("Venue", e.venue)}
-              {row("Show type", meaningful(e.event_type))}
-              {row("Area", e.region_group && (areaLabels[e.region_group] ?? e.region_group))}
+              {row("Show type", showType)}
+              {row("Area", area && (areaLabels[area] ?? area))}
               {row("Key market", e.priority_market ? "Yes" : "No")}
               {row("Date note", e.date_note)}
               {row("Vendor notice", timing.referenceNotice)}

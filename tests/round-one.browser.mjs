@@ -86,12 +86,25 @@ test("offers stage Undo from Grid, Pipeline and the detail route", async t => {
   await choose("Too expensive");
 });
 
+test("returns keyboard focus to the List when a hidden event's Undo expires", async t => {
+  const page = await open(t);
+  await page.clock.install({ time: auditTime });
+  await stage(page, award).focus();
+  await stage(page, award).selectOption("Passed");
+  const undo = button(page, "Undo");
+  await page.waitForFunction(() => document.activeElement === document.querySelector(".going-toast button"));
+  await page.clock.fastForward(8100);
+  await page.waitForFunction(() => document.activeElement?.id === "workspace-title");
+  assert.equal(await undo.count(), 0);
+  assert.equal(await stage(page, award).count(), 0);
+});
+
 test("discloses hidden stages, 2026 events and past Timeline dates", async t => {
   const page = await open(t);
   const originalCount = await eventRows(page).count();
   await stage(page, award).selectOption("Passed");
   assert.match(await listCount(page).innerText(), /1 hidden \(passed\)/);
-  await button(page, "Show").click();
+  await button(page, "Show passed").click();
   assert.equal(await eventRows(page).count(), originalCount);
   assert.equal(await stage(page, award).inputValue(), "Passed");
   assert.equal(await stage(page, award).locator("..").getAttribute("data-stage"), "Passed");
@@ -105,11 +118,15 @@ test("discloses hidden stages, 2026 events and past Timeline dates", async t => 
   await page.clock.setFixedTime(new Date("2027-02-01T03:00:00Z"));
   await page.reload();
   await button(page, "Timeline").click();
-  assert.match(await listCount(page).innerText(), /\d+ hidden \(2026\)/);
+  assert.equal(await button(page, "Show 2026").count(), 0);
   assert.match(await listCount(page).innerText(), /\d+ hidden \(past\)/);
   assert.equal(await page.getByRole("heading", { name: /^January 2027/ }).count(), 0);
   await button(page, "Show past").click();
   assert.equal(await page.getByRole("heading", { name: /^January 2027/ }).count(), 1);
+  assert.match(await listCount(page).innerText(), /\d+ hidden \(2026\)/);
+  await button(page, "Show 2026").click();
+  assert.ok(await page.getByRole("heading", { name: /2026/ }).count() > 0);
+  await button(page, "Hide 2026").click();
   await page.reload();
   await button(page, "Timeline").click();
   assert.equal(await page.getByRole("heading", { name: /^January 2027/ }).count(), 1);
@@ -169,6 +186,28 @@ test("limits reminders to List and restores first-run and reminder preferences f
   await restored.reload();
   assert.equal(await button(restored, "Got it").count(), 0);
   assert.equal(await restored.locator(".reminder-summary").first().getAttribute("aria-expanded"), "true");
+
+  await button(restored, "Tools").click();
+  const upload = async contents => {
+    await restored.locator('input[type="file"]').setInputFiles({
+      name: "backup.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(contents)),
+    });
+    await restored.getByLabel("Import mode").selectOption("replace");
+    await button(restored, "Confirm import").click();
+  };
+  const { listPreferences, ...olderBackup } = backup;
+  await upload(olderBackup);
+  assert.equal(await restored.evaluate(() => localStorage.getItem("tcg-first-run-dismissed")), "true");
+  await upload({ ...olderBackup, listPreferences: {} });
+  assert.equal(await restored.evaluate(() => localStorage.getItem("tcg-first-run-dismissed")), null);
+  const savedBeforeReplace = await restored.evaluate(() =>
+    Object.keys(localStorage).filter(key => key.startsWith("tcg-pipeline-v1-before-replace-"))
+      .map(key => JSON.parse(localStorage.getItem(key)).listPreferences),
+  );
+  assert.deepEqual(savedBeforeReplace.at(-1), listPreferences);
+  await button(restored, "Close tools").click();
+  assert.equal(await button(restored, "Got it").count(), 1);
+  assert.equal(await restored.locator(".reminder-summary").first().getAttribute("aria-expanded"), "false");
 });
 
 test("opens a full-height mobile filter sheet with sticky actions, large targets and focus restoration", async t => {
@@ -210,6 +249,15 @@ test("opens a full-height mobile filter sheet with sticky actions, large targets
   await trigger.click();
   await button(sheet, "Close filters").click();
   assert.equal(await trigger.evaluate(el => document.activeElement === el), true);
+  await trigger.click();
+  await sheet.locator("summary").getByText("Score and stage").click();
+  await sheet.getByRole("checkbox", { name: "Show passed / too expensive" }).check();
+  await button(sheet, "Reset filters").click();
+  assert.equal(await show.evaluate(el => document.activeElement === el), true);
+  assert.equal(await sheet.getByRole("checkbox", { name: /^Singapore / }).isChecked(), false);
+  assert.equal(await sheet.getByRole("checkbox", { name: "Show passed / too expensive" }).isChecked(), false);
+  await show.click();
+  assert.equal(await trigger.innerText(), "Filters");
 });
 
 async function listFields(page) {
@@ -221,7 +269,7 @@ async function listFields(page) {
     return {
       id: node.dataset.eventId,
       name,
-      dates: read("[data-event-date]").dataset.eventDate,
+      dates: read(".row-date-label, .card-when span")?.textContent ?? null,
       place: read(".place").textContent.trim(),
       status: status.textContent.trim(),
       game: [...node.querySelectorAll(".game-tag, .game-tag-more")].map(tag => tag.textContent.trim()),
@@ -249,7 +297,7 @@ test("keeps Grid and Rows in parity through filters, sort changes and reload", a
   await button(page, "Grid").click();
   assert.deepEqual(await listFields(page), rows);
   assert.equal(await sort.inputValue(), "name");
-  assert.equal(await button(page, "Sort ascending").getAttribute("aria-pressed"), "true");
+  assert.equal(await button(page, "Sort descending").getAttribute("aria-pressed"), "true");
   await page.reload();
   assert.equal(await sort.inputValue(), "name");
   assert.deepEqual(await listFields(page), rows);
@@ -300,6 +348,11 @@ test("renders opaque sticky chrome and uses thumbnails within the mobile transfe
   const logos = transfers.filter(entry => entry.name.includes("/logos/"));
   assert.ok(logos.length > 40 && logos.every(entry => entry.name.endsWith("-thumb.webp")));
   assert.equal(await page.locator("tr img.image-face:not([width]), tr img.image-face:not([height])").count(), 0);
+  assert.equal(await eventRows(page).evaluateAll(rows => rows.filter(row => {
+    const games = row.querySelector(".row-games").getBoundingClientRect();
+    const score = row.querySelector(".row-priority .priority-chip").getBoundingClientRect();
+    return games.right > score.left;
+  }).length), 0);
   await button(page, "Grid").click();
   await page.locator(".event-card .image-face").first().scrollIntoViewIfNeeded();
   await page.waitForFunction(() => document.querySelector(".event-card .image-face")?.currentSrc.endsWith("-480.webp"));

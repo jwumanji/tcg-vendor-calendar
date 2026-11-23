@@ -183,8 +183,8 @@ describe("Grid and Rows sections", () => {
     expect(grid(".card-when").map((_, el) => grid(el).text()).get())
       .toEqual(["31 Jan 2027 – 1 Feb 2027", "Est. January 2027"]);
     expect(grid(".event-card").last().find(".badge.tba").text()).toContain("Dates not announced");
-    expect(rows(".row-dates").first().text()).toBe("31 Jan–1 Feb 2027 ● Confirmed");
-    expect(rows(".row-dates[data-status=tba]").text()).toBe("Est. Jan 2027 ◇ Dates not announced");
+    expect(rows(".row-dates").first().text()).toBe("31 Jan 2027 – 1 Feb 2027 ● Confirmed");
+    expect(rows(".row-dates[data-status=tba]").text()).toBe("Est. January 2027 ◇ Dates not announced");
   });
 });
 

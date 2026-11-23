@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { useRef, type CSSProperties } from "react";
 import { RotateCcw } from "lucide-react";
 import type { Filters } from "../model";
 import { stages } from "../storage";
@@ -27,6 +27,7 @@ export function FilterContents({ countries, filters, set, reset, activeCount,
   compact: boolean;
   close: () => void;
 }) {
+  const showResults = useRef<HTMLButtonElement>(null);
   return (
     <>
       <div className="filter-grid">
@@ -207,12 +208,16 @@ export function FilterContents({ countries, filters, set, reset, activeCount,
         <button
           className="button"
           disabled={activeCount === 0}
-          onClick={() => reset}
+          onClick={() => {
+            reset();
+            showResults.current?.focus();
+          }}
         >
           <RotateCcw size={16} aria-hidden="true" /> Reset filters
         </button>
         <button
           className="button primary"
+          ref={showResults}
           onClick={close}
         >
           Show {matchCount}{" "}

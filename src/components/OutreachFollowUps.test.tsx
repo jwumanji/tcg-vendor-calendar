@@ -17,6 +17,9 @@ it("labels Japan Expo's action as Justin's reply and includes the organizer's la
   expect($("#outreach-follow-ups-title").text()).toContain("Outreach follow-ups");
   expect(card.find("strong").text()).toBe("Japan Expo Thailand 2027");
   expect(card.find(".outreach-follow-up-action").text()).toBe("Your reply is due");
+  const trigger = card.find("button");
+  expect(trigger.text()).not.toContain("Organizer reply");
+  expect(card.find("#" + trigger.attr("aria-describedby")).text()).toContain("Organizer reply");
   expect(card.text()).toContain("Organizer reply · 19 Nov 2026");
   expect(card.text()).toContain("what business and products GrailFox will sell");
   expect(card.text()).toContain("Booth quote pending");

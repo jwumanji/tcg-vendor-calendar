@@ -48,7 +48,7 @@ export function OutreachFollowUps({ events, today, open, focusFallback, bannerEx
   const list = useRef<HTMLUListElement>(null);
   const restoreFocus = useRef(false);
   const returnFocus = useCallback(() =>
-    list.current?.querySelector<HTMLButtonElement>(".outreach-follow-up-card") ?? focusFallback?.current ?? null,
+    list.current?.querySelector<HTMLButtonElement>(".outreach-follow-up-trigger") ?? focusFallback?.current ?? null,
   [focusFallback]);
   const trackFocus = useCallback((node: HTMLElement | null) => {
     if (!node) return;
@@ -75,26 +75,25 @@ export function OutreachFollowUps({ events, today, open, focusFallback, bannerEx
         {visible.map(({ event, outreach, kind, due }) => {
           const exchange = lastExchange(outreach, kind);
           return (
-            <li key={event.id} ref={trackFocus}>
-              <button type="button" className="outreach-follow-up-card" onClick={() => open(event, returnFocus)}
-                aria-labelledby={`outreach-event-${event.id} outreach-action-${event.id}`}
+            <li key={event.id} className="outreach-follow-up-card" ref={trackFocus}>
+              <button type="button" className="outreach-follow-up-trigger" onClick={() => open(event, returnFocus)}
                 aria-describedby={`outreach-exchange-${event.id}`}>
-                <strong id={`outreach-event-${event.id}`}>{event.name}</strong>
+                <strong>{event.name}</strong>
                 <ArrowUpRight className="outreach-follow-up-arrow" size={16} aria-hidden="true" />
-                <span id={`outreach-action-${event.id}`} className="outreach-follow-up-action">
+                <span className="outreach-follow-up-action">
                   {kind === "reply" ? <Reply size={15} aria-hidden="true" /> : <Bell size={15} aria-hidden="true" />}
                   {followUpLabels[kind]}
                 </span>
-                <span id={`outreach-exchange-${event.id}`} className="outreach-follow-up-exchange">
-                  <span>
-                    Due <OutreachDate date={due} /> · {kind === "reply"
-                      ? "The organizer is waiting for your reply."
-                      : "Awaiting a human reply."}
-                  </span>
-                  <span>Last exchange · {exchange.label}{exchange.date && <> · <OutreachDate date={exchange.date} /></>}</span>
-                  {outreach.notes && <span className="outreach-follow-up-notes">{outreach.notes}</span>}
-                </span>
               </button>
+              <span id={`outreach-exchange-${event.id}`} className="outreach-follow-up-exchange">
+                <span>
+                  Due <OutreachDate date={due} /> · {kind === "reply"
+                    ? "The organizer is waiting for your reply."
+                    : "Awaiting a human reply."}
+                </span>
+                <span>Last exchange · {exchange.label}{exchange.date && <> · <OutreachDate date={exchange.date} /></>}</span>
+                {outreach.notes && <span className="outreach-follow-up-notes">{outreach.notes}</span>}
+              </span>
             </li>
           );
         })}

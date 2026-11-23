@@ -59,7 +59,12 @@ export function GameTags({ event }: { event: Event }) {
           <span>{game}</span>
         </span>
       ))}
-      {more.length > 0 && <span className="game-tag-more" title={more.join(", ")}>+{more.length}</span>}
+      {more.length > 0 && (
+        <span className="game-tag-more" title={more.join(", ")}>
+          <span aria-hidden="true">+{more.length}</span>
+          <span className="sr-only">Other games: {more.join(", ")}</span>
+        </span>
+      )}
     </>
   );
 }

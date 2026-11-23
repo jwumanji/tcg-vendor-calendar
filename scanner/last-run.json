@@ -1,51 +1,63 @@
 {
-  "scanned_at": "2026-11-18T10:04:54.096Z",
-  "today": "2026-11-18",
-  "through": "2028-05-18",
+  "scanned_at": "2026-11-23T18:46:20.222Z",
+  "today": "2026-11-24",
+  "through": "2028-05-24",
   "sources": [
     {
       "source": "sg-card-show",
       "fetched": 1,
       "relevant": 1,
-      "new": 1,
-      "already_known": 0,
+      "new": 0,
+      "already_known": 1,
       "dropped_as_junk": 0,
       "outside_window": 0,
       "status": "OK",
-      "reason": ""
+      "reason": "",
+      "notices_applied": 0,
+      "notices_unmatched": 0,
+      "ambiguous_listings": 0
     },
     {
       "source": "afa",
       "fetched": 1,
       "relevant": 1,
-      "new": 1,
-      "already_known": 0,
+      "new": 0,
+      "already_known": 1,
       "dropped_as_junk": 0,
       "outside_window": 0,
       "status": "OK",
-      "reason": ""
+      "reason": "",
+      "notices_applied": 0,
+      "notices_unmatched": 0,
+      "ambiguous_listings": 0
     },
     {
       "source": "sgcc",
       "fetched": 1,
       "relevant": 1,
-      "new": 1,
-      "already_known": 0,
+      "new": 0,
+      "already_known": 1,
       "dropped_as_junk": 0,
       "outside_window": 0,
       "status": "OK",
-      "reason": ""
+      "reason": "",
+      "notices_applied": 0,
+      "notices_unmatched": 0,
+      "ambiguous_listings": 0
     },
     {
       "source": "bandai",
       "fetched": 10,
-      "relevant": 5,
-      "new": 5,
-      "already_known": 0,
+      "relevant": 4,
+      "new": 0,
+      "already_known": 4,
       "dropped_as_junk": 3,
-      "outside_window": 2,
+      "outside_window": 3,
       "status": "OK",
-      "reason": ""
+      "reason": "",
+      "notices_applied": 0,
+      "notices_unmatched": 0,
+      "ambiguous_listings": 0
     },
     {
       "source": "magic",
@@ -56,29 +68,38 @@
       "dropped_as_junk": 1,
       "outside_window": 0,
       "status": "OK",
-      "reason": ""
+      "reason": "",
+      "notices_applied": 0,
+      "notices_unmatched": 0,
+      "ambiguous_listings": 0
     },
     {
       "source": "supanova",
       "fetched": 6,
       "relevant": 6,
-      "new": 6,
-      "already_known": 0,
+      "new": 0,
+      "already_known": 6,
       "dropped_as_junk": 0,
       "outside_window": 0,
       "status": "OK",
-      "reason": ""
+      "reason": "",
+      "notices_applied": 0,
+      "notices_unmatched": 0,
+      "ambiguous_listings": 0
     },
     {
       "source": "oz-comic-con",
       "fetched": 1,
       "relevant": 1,
-      "new": 1,
-      "already_known": 0,
+      "new": 0,
+      "already_known": 1,
       "dropped_as_junk": 0,
       "outside_window": 0,
       "status": "OK",
-      "reason": ""
+      "reason": "",
+      "notices_applied": 0,
+      "notices_unmatched": 0,
+      "ambiguous_listings": 0
     },
     {
       "source": "jump-festa",
@@ -89,7 +110,10 @@
       "dropped_as_junk": 1,
       "outside_window": 0,
       "status": "OK",
-      "reason": ""
+      "reason": "",
+      "notices_applied": 0,
+      "notices_unmatched": 0,
+      "ambiguous_listings": 0
     },
     {
       "source": "sg-expo",
@@ -100,135 +124,1298 @@
       "dropped_as_junk": 10,
       "outside_window": 0,
       "status": "OK",
-      "reason": ""
+      "reason": "",
+      "notices_applied": 0,
+      "notices_unmatched": 0,
+      "ambiguous_listings": 0
     },
     {
       "source": "suntec",
-      "fetched": 53,
+      "fetched": 46,
       "relevant": 3,
-      "new": 1,
-      "already_known": 2,
-      "dropped_as_junk": 50,
-      "outside_window": 0,
-      "status": "OK",
-      "reason": ""
-    },
-    {
-      "source": "hkcec",
-      "fetched": 45,
-      "relevant": 2,
-      "new": 1,
-      "already_known": 1,
+      "new": 0,
+      "already_known": 3,
       "dropped_as_junk": 43,
       "outside_window": 0,
       "status": "OK",
-      "reason": ""
+      "reason": "",
+      "notices_applied": 0,
+      "notices_unmatched": 0,
+      "ambiguous_listings": 0
+    },
+    {
+      "source": "hkcec",
+      "fetched": 42,
+      "relevant": 2,
+      "new": 0,
+      "already_known": 2,
+      "dropped_as_junk": 40,
+      "outside_window": 0,
+      "status": "OK",
+      "reason": "",
+      "notices_applied": 0,
+      "notices_unmatched": 0,
+      "ambiguous_listings": 0
     }
   ],
-  "new_count": 17,
+  "new_count": 21,
+  "notices_applied": 0,
+  "notices_unmatched": 0,
+  "ambiguous_listings": 0,
   "removed": 0,
   "new_events": [
     {
-      "name": "BANDAI CARD GAMES Fest 26-27 in Bangkok",
-      "date": "2026-11-21",
-      "city": "Bangkok",
-      "source": "bandai"
-    },
-    {
-      "name": "Anime Festival Asia Singapore 2026",
-      "date": "2026-11-27",
+      "name": "Kyo Cards Con (KCC) — 2027 season",
+      "date": "2027-02",
       "city": "Singapore",
-      "source": "afa"
+      "source": "Scanner export"
     },
     {
-      "name": "BANDAI CARD GAMES Fest 26-27 in Hong Kong",
-      "date": "2026-11-28",
+      "name": "NEXUS Tradeshow (Suntec, March edition)",
+      "date": "2027-03-27",
+      "city": "Singapore",
+      "source": "Scanner export"
+    },
+    {
+      "name": "Singapore International Cardshow (SGIC) — next edition",
+      "date": "2027-09",
+      "city": "Singapore",
+      "source": "Scanner export"
+    },
+    {
+      "name": "OFF-CENTER Tradeshow",
+      "date": "2027-01-08",
+      "city": "Singapore",
+      "source": "Scanner export"
+    },
+    {
+      "name": "The Playground Tradeshow (Collector's Playground)",
+      "date": "2027-01-16",
+      "city": "Singapore",
+      "source": "Scanner export"
+    },
+    {
+      "name": "The Singapore TCG Tradefair (Tampines Hub)",
+      "date": "2027-05-15",
+      "city": "Singapore",
+      "source": "Scanner export"
+    },
+    {
+      "name": "TCGBID Bidding Card Show",
+      "date": null,
       "city": "Hong Kong",
-      "source": "bandai"
+      "source": "Scanner export"
     },
     {
-      "name": "Singapore Comic Con",
-      "date": "2026-12-04",
-      "city": "Singapore",
-      "source": "sgcc"
+      "name": "FIRM TCG Trading Card Day",
+      "date": null,
+      "city": "Hong Kong",
+      "source": "Scanner export"
     },
     {
-      "name": "BANDAI CARD GAMES Fest 26-27 in Singapore",
-      "date": "2026-12-05",
-      "city": "Singapore",
-      "source": "bandai"
-    },
-    {
-      "name": "Amazing Toy Show 2026",
-      "date": "2026-12-11",
-      "city": "Wan Chai",
-      "source": "hkcec"
-    },
-    {
-      "name": "BANDAI CARD GAMES Fest 26-27 in Kuala Lumpur",
-      "date": "2026-12-12",
+      "name": "SEACC (South East Asia Collectors Convention)",
+      "date": null,
       "city": "Kuala Lumpur",
-      "source": "bandai"
+      "source": "Scanner export"
     },
     {
-      "name": "Singapore Card Show 2026",
-      "date": "2026-12-12",
+      "name": "Geek Con Asia",
+      "date": null,
+      "city": "Petaling Jaya",
+      "source": "Scanner export"
+    },
+    {
+      "name": "Nijigen Expo",
+      "date": null,
+      "city": "Kuala Lumpur",
+      "source": "Scanner export"
+    },
+    {
+      "name": "Japan Expo Malaysia",
+      "date": null,
+      "city": "Kuala Lumpur",
+      "source": "Scanner export"
+    },
+    {
+      "name": "Card Kampung",
+      "date": null,
       "city": "Singapore",
-      "source": "sg-card-show"
+      "source": "Scanner export"
     },
     {
-      "name": "BANDAI CARD GAMES Fest 26-27 in Taipei",
-      "date": "2026-12-19",
-      "city": "Taipei",
-      "source": "bandai"
-    },
-    {
-      "name": "Asia Comic Expo 005",
-      "date": "2027-01-23",
+      "name": "Card Fest Asia (Singapore)",
+      "date": null,
       "city": "Singapore",
-      "source": "suntec"
+      "source": "Scanner export"
     },
     {
-      "name": "Supanova Comic Con & Gaming – Gold Coast",
-      "date": "2027-04-10",
-      "city": "Gold Coast",
-      "source": "supanova"
+      "name": "ArteTCG Tradeshow",
+      "date": null,
+      "city": "Singapore",
+      "source": "Scanner export"
     },
     {
-      "name": "Supanova Comic Con & Gaming – Melbourne",
-      "date": "2027-04-16",
-      "city": "Melbourne",
-      "source": "supanova"
+      "name": "SG Collectibles & Card Show (SCCS)",
+      "date": null,
+      "city": "Singapore",
+      "source": "Scanner export"
     },
     {
-      "name": "Supanova Comic Con & Gaming – Sydney",
-      "date": "2027-06-18",
-      "city": "Sydney",
-      "source": "supanova"
+      "name": "Asia Cards & Collectibles Expo (ACCE)",
+      "date": null,
+      "city": "Singapore",
+      "source": "Scanner export"
     },
     {
-      "name": "Supanova Comic Con & Gaming – Perth",
-      "date": "2027-06-25",
-      "city": "Perth",
-      "source": "supanova"
+      "name": "CardEX Card Show",
+      "date": null,
+      "city": "Singapore",
+      "source": "Scanner export"
     },
     {
-      "name": "Oz Comic-Con Sydney",
-      "date": "2027-09-18",
-      "city": "Sydney",
-      "source": "oz-comic-con"
+      "name": "CoveCon",
+      "date": null,
+      "city": "Singapore",
+      "source": "Scanner export"
     },
     {
-      "name": "Supanova Comic Con & Gaming – Adelaide",
-      "date": "2027-10-29",
-      "city": "Adelaide",
-      "source": "supanova"
+      "name": "Nan Yang Card Show",
+      "date": null,
+      "city": "Singapore",
+      "source": "Scanner export"
     },
     {
-      "name": "Supanova Comic Con & Gaming – Brisbane",
-      "date": "2027-11-05",
-      "city": "Brisbane",
-      "source": "supanova"
+      "name": "Grail Card Show Saigon",
+      "date": null,
+      "city": "Ho Chi Minh City",
+      "source": "Scanner export"
     }
-  ]
+  ],
+  "warnings": [],
+  "import": {
+    "new_count": 21,
+    "fields_filled": 6,
+    "conflict_count": 62,
+    "conflicts": [
+      {
+        "event_id": "urban",
+        "export_id": "urban",
+        "field": "vendor_application",
+        "curated": "https://docs.google.com/forms/d/e/1FAIpQLSeulGNKHBEi5UgHtx-IBqt6NyjihmQAyrXSBOYCKF953o62Jg/viewform",
+        "incoming": "Google Form on urbanops.hk; Cardlover WhatsApp +852 5926 9384, cardloverhk1111@gmail.com",
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "jet-2027",
+        "export_id": "jet-2027",
+        "field": "vendor_application",
+        "curated": "https://www.japanexpothailand.com/how-to-exhibit/; info@gyucreative.com, +66 2 658 0557",
+        "incoming": "info@gyucreative.com, +66 2 658 0557",
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "bkk-card-show",
+        "export_id": "bkk-card-show",
+        "field": "vendor_deadline",
+        "curated": "Table reservations open 1 Dec 2026 at 12:00 Bangkok / Saigon time. Tables are offered by zone.",
+        "incoming": "Not published (zone-based, book early)",
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "mefcc-2027",
+        "export_id": "mefcc-2027",
+        "field": "booth_detail",
+        "curated": "Exhibitor and sponsor enquiries: sales@mefcc.com (Prijesh Pillai and Bhumika Bhinde). Artist Alley: artistalley@mefcc.com (Fizza Batool).",
+        "incoming": "Exhibitor and sponsor packages on request (sales@mefcc.com; Prijesh Pillai and Bhumika Bhinde). Artist Alley: artistalley@mefcc.com (Fizza Batool). 2027 prices not published.",
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "cardcon3",
+        "export_id": "cardcon3",
+        "field": "vendor_deadline",
+        "curated": "General booking opens 30 Nov 2026 at 23:00 Saigon time (1 Dec at 00:00 Singapore time), first come, first served.",
+        "incoming": "Booking opens 1 Dec 2026, 00:00 SGT, first come first served (Card Con 2 exhibitors first)",
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "cardcon3",
+        "export_id": "cardcon3",
+        "field": "booth_detail",
+        "curated": "Empty 6 × 6 m pavilions are available by enquiry.",
+        "incoming": "S$350 standard table, S$680 L-booth, +S$150 for a 13A power point, S$150 off the first table for Card Con 2 exhibitors, GST included, max 10 tables. Booking opens 1 Dec 2026 at midnight SGT, Card Con 2 exhibitors first.",
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "cardcon3",
+        "export_id": "cardcon3",
+        "field": "fit",
+        "curated": "Clear 2027 pricing, game zones, and a central venue.",
+        "incoming": "Clear 2027 pricing, game zones, and a central venue. Book on 1 Dec 2026.",
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "zubculture",
+        "export_id": "zubculture",
+        "field": "booth_detail",
+        "curated": "General ACG merch booths are open to TCG vendors.",
+        "incoming": "Merch booths; rates not published.",
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "def-gameexpo",
+        "export_id": "def-gameexpo",
+        "field": "vendor_application",
+        "curated": "DFRE said on 28 Sep 2026 that sponsor and exhibitor interest registration was already open. No 2027 registration link was verified.",
+        "incoming": "DFRE said on 28 Sep 2026 that sponsor and exhibitor interest registration was already open. 2026 Narrows tables: uprizing.ae/the-narrows",
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "def-gameexpo",
+        "export_id": "def-gameexpo",
+        "field": "contact",
+        "curated": "DFRE / Dubai DET",
+        "incoming": "DFRE / Dubai DET; 2026 Narrows via Uprizing (uprizing.ae/the-narrows)",
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "def-gameexpo",
+        "export_id": "def-gameexpo",
+        "field": "source_urls",
+        "curated": [
+          "https://www.dubaiesportsfestival.com/en/home",
+          "https://uprizing.ae/the-narrows"
+        ],
+        "incoming": [
+          "https://www.dubaiesportsfestival.com/en/home"
+        ],
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "sgcard-mid",
+        "export_id": "sgcard-mid",
+        "field": "expected_size",
+        "curated": "550+ vendors, 30,000+ visitors (organizer claim)",
+        "incoming": "Dec 2026 edition: 600+ vendor booths on 8,500 sqm (2 EXPO halls) and 30,000–45,000 visitors expected (organizer, official site); earlier claim 550+ vendors, 30,000+ visitors",
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "sgcard-mid",
+        "export_id": "sgcard-mid",
+        "field": "size_note",
+        "curated": "550+ vendors and 30,000+ visitors (organizer claim, cited by The Smart Local for the June 2026 / SG Card World context). Treat as an organizer claim.",
+        "incoming": "Organizer (sgcardshow.com, checked 23 Nov 2026): Dec 2026 show has 600+ vendor booths on 49 islands over 8,500 sqm in Halls 4A and 4B, 30,000–45,000 visitors expected; June 2026 was 5,000+ sqm; first show in 2024 had 60 tables. Organizer claims.",
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "sgcard-mid",
+        "export_id": "sgcard-mid",
+        "field": "vendor_count",
+        "curated": 550,
+        "incoming": 600,
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "fndm-2027",
+        "export_id": "fndm-2027",
+        "field": "start_date",
+        "curated": null,
+        "incoming": "2027-09-25",
+        "reason": "incompatible with curated schedule"
+      },
+      {
+        "event_id": "fndm-2027",
+        "export_id": "fndm-2027",
+        "field": "end_date",
+        "curated": null,
+        "incoming": "2027-09-26",
+        "reason": "incompatible with curated schedule"
+      },
+      {
+        "event_id": "fndm-2027",
+        "export_id": "fndm-2027",
+        "field": "date_status",
+        "curated": "estimated",
+        "incoming": "confirmed",
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "fndm-2027",
+        "export_id": "fndm-2027",
+        "field": "date_note",
+        "curated": "2027 dates TBA; est. Oct or early Nov from the last two editions (4–5 Oct 2025; 31 Oct–1 Nov 2026) — estimate only, not a booking date. Official site confirms a 2027 return.",
+        "incoming": null,
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "fndm-2027",
+        "export_id": "fndm-2027",
+        "field": "estimated_month",
+        "curated": "2027-10",
+        "incoming": null,
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "fndm-2027",
+        "export_id": "fndm-2027",
+        "field": "venue",
+        "curated": "The Concourse Convention Center, 1st Floor, Dubai Outlet Mall, Madinat Hind 1, Dubai, UAE (venue stated on the official 2027 pages; dates not yet announced)",
+        "incoming": "The Concourse Convention Center, 1st Floor, Dubai Outlet Mall, Madinat Hind 1, Dubai, UAE (venue of both prior editions and stated on the official 2027 pages; confirm hall when tickets open)",
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "fndm-2027",
+        "export_id": "fndm-2027",
+        "field": "vendor_score",
+        "curated": 48,
+        "incoming": 51,
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "fndm-2027",
+        "export_id": "fndm-2027",
+        "field": "description",
+        "curated": "MEFCC's fan-first Dubai sister event. Official site says 'Join us in 2027' and 'tickets coming soon' but has not named the weekend. Powered by the same Informa team as MEFCC.",
+        "incoming": "MEFCC's fan-first Dubai sister event. The official site now shows 25–26 September 2027 (checked 23 Nov 2026). Powered by the same Informa team as MEFCC.",
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "fndm-2027",
+        "export_id": "fndm-2027",
+        "field": "fit",
+        "curated": "Best dedicated Dubai pop-culture vendor floor already confirmed for 2027, even though the weekend is TBA. Smaller and more community-focused than MEFCC, with an explicit TCG Zone. Same sales team as MEFCC, so a combined enquiry is practical.",
+        "incoming": "3rd FNDM, now dated 25–26 Sep 2027 on the official site. Smaller and more community-focused than MEFCC, with an explicit TCG Zone. Same Informa sales team as MEFCC, so a combined enquiry is practical.",
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "paperworld",
+        "export_id": "paperworld",
+        "field": "source_urls",
+        "curated": [
+          "https://paperworld-middle-east.ae.messefrankfurt.com/dubai/en.html",
+          "https://paperworld-middle-east.ae.messefrankfurt.com/dubai/en/exhibitors/faq.html"
+        ],
+        "incoming": [
+          "https://paperworld-middle-east.ae.messefrankfurt.com/dubai/en.html"
+        ],
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "comfest-kw",
+        "export_id": "comfest-kw",
+        "field": "website",
+        "curated": null,
+        "incoming": "https://playvault.ae/pages/tcg-event-calendar-2026-gcc",
+        "reason": "website is already listed as a reference and the official site is unconfirmed"
+      },
+      {
+        "event_id": "cardslah",
+        "export_id": "cardslah",
+        "field": "fit",
+        "curated": "Live Triangle is also launching a 'KL Card Show'.",
+        "incoming": "LahLahLand (the festival CardsLAH sits inside) posted 'See you all next year for LahLahLand 2027' on 10 Nov 2026; dates not announced. Live Triangle is also launching a 'KL Card Show'.",
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "cardslah",
+        "export_id": "cardslah",
+        "field": "source_urls",
+        "curated": [
+          "https://thelivetriangle.com/"
+        ],
+        "incoming": [
+          "https://www.instagram.com/p/DfjtJZgzC0X/"
+        ],
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "cardshow-dxb",
+        "export_id": "cardshow-dxb",
+        "field": "name",
+        "curated": "CardShow Exhibition / Dubai International Card Show — next edition",
+        "incoming": "CardShow Dubai / Dubai International Card Show 2027",
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "cardshow-dxb",
+        "export_id": "cardshow-dxb",
+        "field": "start_date",
+        "curated": null,
+        "incoming": "2027-10-22",
+        "reason": "incompatible with curated schedule"
+      },
+      {
+        "event_id": "cardshow-dxb",
+        "export_id": "cardshow-dxb",
+        "field": "end_date",
+        "curated": null,
+        "incoming": "2027-10-23",
+        "reason": "incompatible with curated schedule"
+      },
+      {
+        "event_id": "cardshow-dxb",
+        "export_id": "cardshow-dxb",
+        "field": "date_status",
+        "curated": "estimated",
+        "incoming": "confirmed",
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "cardshow-dxb",
+        "export_id": "cardshow-dxb",
+        "field": "date_note",
+        "curated": "Est. Oct 2027 from the last two autumn editions (24–25 Oct 2025 at Dusit Thani; 23–24 Oct 2026 at Dubai Studio City) — estimate only",
+        "incoming": "22–23 Oct 2027, 12pm–8pm",
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "cardshow-dxb",
+        "export_id": "cardshow-dxb",
+        "field": "estimated_month",
+        "curated": "2027-10",
+        "incoming": null,
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "cardshow-dxb",
+        "export_id": "cardshow-dxb",
+        "field": "venue",
+        "curated": "TBA for the next edition. 2026: Sound Stage 3, Dubai Studio City, Dubai, UAE. 2025: Dusit Thani Ballroom.",
+        "incoming": "Not yet published for 2027. 2026: Sound Stage 3, Dubai Studio City, Dubai, UAE. 2025: Dusit Thani Ballroom.",
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "cardshow-dxb",
+        "export_id": "cardshow-dxb",
+        "field": "vendor_score",
+        "curated": 40,
+        "incoming": 43,
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "cardshow-dxb",
+        "export_id": "cardshow-dxb",
+        "field": "description",
+        "curated": "Dedicated Dubai card expo. Official site still showed a countdown and 12pm–8pm hours when fetched, but no 2027 date was stated. Free parking and all-ages entry in 2026 listings.",
+        "incoming": "Dedicated Dubai card expo. The official site's countdown now reads 'CardShow Dubai October 22–23 2027, 12pm–8pm' (checked 23 Nov 2026); venue not stated yet. Free parking and all-ages entry in 2026 listings.",
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "sgcard-ye",
+        "export_id": "sgcard-ye",
+        "field": "expected_size",
+        "curated": "550+ vendors, 30,000+ visitors (organizer claim)",
+        "incoming": "Dec 2026 edition: 600+ vendor booths on 8,500 sqm (2 EXPO halls) and 30,000–45,000 visitors expected (organizer, official site); earlier claim 550+ vendors, 30,000+ visitors",
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "sgcard-ye",
+        "export_id": "sgcard-ye",
+        "field": "size_note",
+        "curated": "550+ vendors and 30,000+ visitors (organizer claim for the series / prior June 2026 context). Treat as an organizer claim.",
+        "incoming": "Organizer (sgcardshow.com, checked 23 Nov 2026): Dec 2026 show has 600+ vendor booths on 49 islands over 8,500 sqm in Halls 4A and 4B, 30,000–45,000 visitors expected; June 2026 was 5,000+ sqm; first show in 2024 had 60 tables. Organizer claims.",
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "sgcard-ye",
+        "export_id": "sgcard-ye",
+        "field": "vendor_count",
+        "curated": 550,
+        "incoming": 600,
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "sgcard-ye",
+        "export_id": "sgcard-ye",
+        "field": "booth_detail",
+        "curated": "Same vendor process as the mid-year edition.",
+        "incoming": "Up to 6 booths per applicant; island bookings plus an à la carte section; Booth Selection costs S$100 per booth and is allocated first. Applications processed only after full payment; confirmed by WhatsApp.",
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "amazing-cardnival",
+        "export_id": "amazing-cardnival",
+        "field": "venue",
+        "curated": "Hong Kong Convention and Exhibition Centre, 1 Expo Drive, Wan Chai, Hong Kong (2026; hall not announced for 2026 at the time of coverage)",
+        "incoming": "Hong Kong Convention and Exhibition Centre, Hall 3DE, 1 Expo Drive, Wan Chai, Hong Kong (2026, per Bastille Post)",
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "amazing-cardnival",
+        "export_id": "amazing-cardnival",
+        "field": "size_note",
+        "curated": "100+ dealer and player booths billed for the Dec 2026 inaugural (ShadowZo, Lifenews HK, BAW VAULT). Attendance not published. M est. from that booth count at HKCEC, not a visitor figure. 'Largest in Hong Kong' is organizer marketing for a first edition.",
+        "incoming": "100+ dealer and player booths billed for the Dec 2026 inaugural (ShadowZo, Lifenews HK, BAW VAULT); the wider AMAZING TOY SHOW 2026 it sits inside expects 300+ exhibitors (Bastille Post). Attendance not published. M est. from booth count, not a visitor figure.",
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "amazing-cardnival",
+        "export_id": "amazing-cardnival",
+        "field": "vendor_score",
+        "curated": 52,
+        "incoming": 53,
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "amazing-cardnival",
+        "export_id": "amazing-cardnival",
+        "field": "description",
+        "curated": "New HKCEC card carnival organised by AMAZ COMPANY, 11–13 Dec 2026, with play zones, grading, and 100+ booths. A 2027 return is not announced; December placement is an estimate from the inaugural dates only. Official event Instagram was not identified in this pass (AMAZ site has an Instagram link without a captured handle).",
+        "incoming": "New HKCEC card carnival by AMAZ COMPANY, 11–13 Dec 2026 in Hall 3DE alongside AMAZING TOY SHOW 2026 (title sponsor JTCC, Japan Trading Card Center). A 2027 return is not announced; December placement is an estimate from the inaugural dates only.",
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "tcg-con-arabia",
+        "export_id": "tcg-con-arabia",
+        "field": "vendor_cost",
+        "curated": "Prior-edition rates from December 2026 (Riyadh, VAT included): Artist Alley SAR 1,500 (1.8×1.8 m); Standard SAR 3,500 (3.6×1.8 m); Standard PLUS+ SAR 5,500; Premium SAR 7,500; Premium PLUS+ SAR 10,000; Elite Vendor SAR 20,000. Extra staff pass SAR 150; display case SAR 260. These are 2026 prices, not 2027.",
+        "incoming": "December 2026 Riyadh packages, inc. VAT: Artist Alley SAR 1,500 (1.8×1.8 m); Standard SAR 3,500 (3.6×1.8 m); Standard PLUS+ SAR 5,500; Premium SAR 7,500; Premium PLUS+ SAR 10,000; Elite Vendor SAR 20,000. Extra staff pass SAR 150; display case SAR 260. These are 2026 prices, not 2027.",
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "bahrain-cs",
+        "export_id": "bahrain-cs",
+        "field": "website",
+        "curated": null,
+        "incoming": "https://playvault.ae/pages/tcg-event-calendar-2026-gcc",
+        "reason": "website is already listed as a reference and the official site is unconfirmed"
+      },
+      {
+        "event_id": "r-tradeting",
+        "export_id": "r-tradeting",
+        "field": "date_note",
+        "curated": "2027 dates: 2–3 Jan, 13–14 Mar, 24–25 Apr, 22–23 May, 19–20 Jun, 24–25 Jul, 21–22 Aug, 18–19 Sep, 23–24 Oct, 27–28 Nov. start_date/end_date = first 2027 occurrence; all listed in occurrences.",
+        "incoming": "2027 dates: 2–3 Jan, 13–14 Mar, 24–25 Apr, 22–23 May, 19–20 Jun, 24–25 Jul, 21–22 Aug, 18–19 Sep, 23–24 Oct, 27–28 Nov, 25–26 Dec. start_date/end_date = first 2027 occurrence; all listed in occurrences.",
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "r-tradeting",
+        "export_id": "r-tradeting",
+        "field": "occurrences",
+        "curated": [
+          {
+            "start_date": "2027-01-02",
+            "end_date": "2027-01-03"
+          },
+          {
+            "start_date": "2027-03-13",
+            "end_date": "2027-03-14"
+          },
+          {
+            "start_date": "2027-04-24",
+            "end_date": "2027-04-25"
+          },
+          {
+            "start_date": "2027-05-22",
+            "end_date": "2027-05-23"
+          },
+          {
+            "start_date": "2027-06-19",
+            "end_date": "2027-06-20"
+          },
+          {
+            "start_date": "2027-07-24",
+            "end_date": "2027-07-25"
+          },
+          {
+            "start_date": "2027-08-21",
+            "end_date": "2027-08-22"
+          },
+          {
+            "start_date": "2027-09-18",
+            "end_date": "2027-09-19"
+          },
+          {
+            "start_date": "2027-10-23",
+            "end_date": "2027-10-24"
+          },
+          {
+            "start_date": "2027-11-27",
+            "end_date": "2027-11-28"
+          }
+        ],
+        "incoming": [
+          {
+            "start_date": "2027-01-02",
+            "end_date": "2027-01-03"
+          },
+          {
+            "start_date": "2027-03-13",
+            "end_date": "2027-03-14"
+          },
+          {
+            "start_date": "2027-04-24",
+            "end_date": "2027-04-25"
+          },
+          {
+            "start_date": "2027-05-22",
+            "end_date": "2027-05-23"
+          },
+          {
+            "start_date": "2027-06-19",
+            "end_date": "2027-06-20"
+          },
+          {
+            "start_date": "2027-07-24",
+            "end_date": "2027-07-25"
+          },
+          {
+            "start_date": "2027-08-21",
+            "end_date": "2027-08-22"
+          },
+          {
+            "start_date": "2027-09-18",
+            "end_date": "2027-09-19"
+          },
+          {
+            "start_date": "2027-10-23",
+            "end_date": "2027-10-24"
+          },
+          {
+            "start_date": "2027-11-27",
+            "end_date": "2027-11-28"
+          },
+          {
+            "start_date": "2027-12-25",
+            "end_date": "2027-12-26"
+          }
+        ],
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "r-tradeting",
+        "export_id": "r-tradeting",
+        "field": "source_urls",
+        "curated": [
+          "https://cardian.sg/market/calendar"
+        ],
+        "incoming": [
+          "https://cardian.sg/market/calendar",
+          "https://www.instagram.com/p/Df3x8uoT3ia/"
+        ],
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "r-nexus",
+        "export_id": "r-nexus",
+        "field": "date_note",
+        "curated": "2027 dates: 30–31 Jan, 13–14 Feb, 20–21 Mar. start_date/end_date = first 2027 occurrence; all listed in occurrences.",
+        "incoming": "2027 dates: 30–31 Jan, 13–14 Feb, 20–21 Mar (still listed by Cardian, ZaynTCG and CaseLink, but NEXUS called 19–20 Dec 2026 its final tradeshow at Centrepoint on Instagram, 17 Nov 2026; confirm before booking). start_date/end_date = first 2027 occurrence; all listed in occurrences.",
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "r-nexus",
+        "export_id": "r-nexus",
+        "field": "source_urls",
+        "curated": [
+          "https://cardian.sg/market/calendar"
+        ],
+        "incoming": [
+          "https://cardian.sg/market/calendar",
+          "https://www.instagram.com/p/Df1h4fkSEHG/"
+        ],
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "r-caps",
+        "export_id": "r-caps",
+        "field": "date_note",
+        "curated": "2027 dates: 12–14 Feb (Junction 8); 27–28 Feb and 8–9 May (City Square Mall). start_date/end_date = first 2027 occurrence; all listed in occurrences.",
+        "incoming": "2027 dates: 12–14 Feb (Junction 8; online booth booking opened 22 Nov 2026); 27–28 Feb and 8–9 May (City Square Mall). start_date/end_date = first 2027 occurrence; all listed in occurrences.",
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "r-caps",
+        "export_id": "r-caps",
+        "field": "source_urls",
+        "curated": [
+          "https://cardian.sg/market/calendar"
+        ],
+        "incoming": [
+          "https://cardian.sg/market/calendar",
+          "https://www.instagram.com/p/DgCiok5khJZ/"
+        ],
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "watch-card-fest",
+        "export_id": "watch-card-fest",
+        "field": "date_note",
+        "curated": "2027 dates not found in the 13 Nov 2026 sweep (show was active in 2026). Watch organizer IG and BAW VAULT's HK calendar.",
+        "incoming": "2027 dates not found in the 13 Nov or 23 Nov 2026 sweeps (show was active in 2026). Watch organizer IG and BAW VAULT's HK calendar.",
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "watch-collect-trading-card-show",
+        "export_id": "watch-collect-trading-card-show",
+        "field": "date_note",
+        "curated": "2027 dates not found in the 13 Nov 2026 sweep (show was active in 2026). Watch organizer IG and BAW VAULT's HK calendar.",
+        "incoming": "2027 dates not found in the 13 Nov or 23 Nov 2026 sweeps (show was active in 2026). Watch organizer IG and BAW VAULT's HK calendar.",
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "watch-pokefest",
+        "export_id": "watch-pokefest",
+        "field": "date_note",
+        "curated": "2027 dates not found in the 13 Nov 2026 sweep (show was active in 2026). Watch organizer IG and BAW VAULT's HK calendar.",
+        "incoming": "2027 dates not found in the 13 Nov or 23 Nov 2026 sweeps (show was active in 2026). Watch organizer IG and BAW VAULT's HK calendar.",
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "watch-card-festa-asia",
+        "export_id": "watch-card-festa-asia",
+        "field": "date_note",
+        "curated": "2027 dates not found in the 13 Nov 2026 sweep (show was active in 2026). Watch organizer IG and BAW VAULT's HK calendar.",
+        "incoming": "2027 dates not found in the 13 Nov or 23 Nov 2026 sweeps (show was active in 2026). Watch organizer IG and BAW VAULT's HK calendar.",
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "lorcana-sg",
+        "export_id": "lorcana-sg",
+        "field": "logo_kind",
+        "curated": "logo",
+        "incoming": "poster_or_photo",
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "lorcana-hk",
+        "export_id": "lorcana-hk",
+        "field": "logo_kind",
+        "curated": "logo",
+        "incoming": "poster_or_photo",
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "tte-2027",
+        "export_id": "tte-2027",
+        "field": "logo_kind",
+        "curated": "logo",
+        "incoming": "poster_or_photo",
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "acghk28",
+        "export_id": "acghk28",
+        "field": "logo_kind",
+        "curated": "logo",
+        "incoming": "poster_or_photo",
+        "reason": "curated value kept"
+      },
+      {
+        "event_id": "ycs-wcs",
+        "export_id": "ycs-wcs",
+        "field": "logo_kind",
+        "curated": "logo",
+        "incoming": "poster_or_photo",
+        "reason": "curated value kept"
+      }
+    ],
+    "logos_added": 3,
+    "logos_rejected": 84,
+    "logo_rejections": [
+      {
+        "event_id": "mtg-sea-r2",
+        "export_id": "mtg-sea-r2",
+        "logo": "logos/mtg.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "urban",
+        "export_id": "urban",
+        "logo": "logos/urban.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "color18",
+        "export_id": "color18",
+        "logo": "logos/colorfiesta.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "poke-showdown-my",
+        "export_id": "poke-showdown-my",
+        "logo": "logos/showdown26.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "hktdc",
+        "export_id": "hktdc",
+        "logo": "logos/hktdc.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "bandai-asia",
+        "export_id": "bandai-asia",
+        "logo": "logos/bandaiasia2.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "nexus-suntec",
+        "export_id": "nexus-suntec",
+        "logo": "logos/nexus.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "ycs-hk",
+        "export_id": "ycs-hk",
+        "logo": "logos/ygo_hk.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "connectcon2",
+        "export_id": "connectcon2",
+        "logo": "logos/connectcon.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "lioncity",
+        "export_id": "lioncity",
+        "logo": "logos/lioncity.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "jkt-toys-22",
+        "export_id": "jkt-toys-22",
+        "logo": "logos/jkttoys.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "bcs-sg",
+        "export_id": "bcs-sg",
+        "logo": "logos/bcs.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "lorcana-sg",
+        "export_id": "lorcana-sg",
+        "logo": "logos/lorcana.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "jet-2027",
+        "export_id": "jet-2027",
+        "logo": "logos/jet.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "grade10-2027",
+        "export_id": "grade10-2027",
+        "logo": "logos/grade10.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "hobbycon-sg-2027",
+        "export_id": "hobbycon-sg-2027",
+        "logo": "logos/hobbycon.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "bcs-my",
+        "export_id": "bcs-my",
+        "logo": "logos/bcs.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "bkk-card-show",
+        "export_id": "bkk-card-show",
+        "logo": "logos/bkkcardshow.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "cq-bkk",
+        "export_id": "cq-bkk",
+        "logo": "logos/cq10.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "hktcs-spring",
+        "export_id": "hktcs-spring",
+        "logo": "logos/hktcs.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "bcs-jkt",
+        "export_id": "bcs-jkt",
+        "logo": "logos/bcs.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "ics-vol6",
+        "export_id": "ics-vol6",
+        "logo": "logos/ics.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "nexus-suntec-mar",
+        "export_id": "nexus-suntec-mar",
+        "logo": "logos/nexus.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "mefcc-2027",
+        "export_id": "mefcc-2027",
+        "logo": "logos/mefcc.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "cardcon3",
+        "export_id": "cardcon3",
+        "logo": "logos/cardconfav.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "lorcana-hk",
+        "export_id": "lorcana-hk",
+        "logo": "logos/lorcana.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "zubculture",
+        "export_id": "zubculture",
+        "logo": "logos/zub.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "tte-2027",
+        "export_id": "tte-2027",
+        "logo": "logos/tte.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "caps-apr",
+        "export_id": "caps-apr",
+        "logo": "logos/caps.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "def-gameexpo",
+        "export_id": "def-gameexpo",
+        "logo": "logos/def.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "mbl-hk",
+        "export_id": "mbl-hk",
+        "logo": "logos/mbl.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "icp3",
+        "export_id": "icp3",
+        "logo": "logos/icp.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "mbl-my",
+        "export_id": "mbl-my",
+        "logo": "logos/mbl.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "comifuro24",
+        "export_id": "comifuro24",
+        "logo": "logos/comifuro.webp",
+        "reason": "existing logo file kept but unusable: image is 238×49, minimum side is 64px"
+      },
+      {
+        "event_id": "mbl-th",
+        "export_id": "mbl-th",
+        "logo": "logos/mbl.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "tcc",
+        "export_id": "tcc",
+        "logo": "logos/tcc.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "mbl-sg",
+        "export_id": "mbl-sg",
+        "logo": "logos/mbl.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "crb-wcs-2027",
+        "export_id": "crb-wcs-2027",
+        "logo": "logos/crbwcs.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "sgcard-mid",
+        "export_id": "sgcard-mid",
+        "logo": "logos/sgcard.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "mbl-id",
+        "export_id": "mbl-id",
+        "logo": "logos/mbl.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "hobby-horizon",
+        "export_id": "hobby-horizon",
+        "logo": "logos/hobbykv.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "acghk28",
+        "export_id": "acghk28",
+        "logo": "logos/acghk.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "playgrounds",
+        "export_id": "playgrounds",
+        "logo": "logos/sandbox.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "worlds-2027",
+        "export_id": "worlds-2027",
+        "logo": "logos/worlds.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "caps-worlds",
+        "export_id": "caps-worlds",
+        "logo": "logos/caps.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "funslah",
+        "export_id": "funslah",
+        "logo": "logos/funslah.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "ycs-wcs",
+        "export_id": "ycs-wcs",
+        "logo": "logos/ygo_wcs.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "fndm-2027",
+        "export_id": "fndm-2027",
+        "logo": "logos/fndm.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "hktcs-autumn",
+        "export_id": "hktcs-autumn",
+        "logo": "logos/hktcs.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "paperworld",
+        "export_id": "paperworld",
+        "logo": "logos/paperworld.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "comfest-kw",
+        "export_id": "comfest-kw",
+        "logo": "logos/comfestkw.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "caps-expo",
+        "export_id": "caps-expo",
+        "logo": "logos/caps.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "bkk-cardcon",
+        "export_id": "bkk-cardcon",
+        "logo": "logos/bkkcardcon.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "icc-2027",
+        "export_id": "icc-2027",
+        "logo": "logos/icclogo.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "cardslah",
+        "export_id": "cardslah",
+        "logo": "logos/cardslah.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "bandai-fest-jkt",
+        "export_id": "bandai-fest-jkt",
+        "logo": "logos/bcgfest.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "icp4",
+        "export_id": "icp4",
+        "logo": "logos/icp.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "cardzcon",
+        "export_id": "cardzcon",
+        "logo": "logos/cardzcon.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "cardshow-dxb",
+        "export_id": "cardshow-dxb",
+        "logo": "logos/cardshowdxb.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "tcgkl-2027",
+        "export_id": "tcgkl-2027",
+        "logo": "logos/tcgkl.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "bandai-fest-bkk",
+        "export_id": "bandai-fest-bkk",
+        "logo": "logos/bcgfest.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "afa-sg",
+        "export_id": "afa-sg",
+        "logo": "logos/afa.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "bandai-fest-hk",
+        "export_id": "bandai-fest-hk",
+        "logo": "logos/bcgfest.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "sgcc-2027",
+        "export_id": "sgcc-2027",
+        "logo": "logos/sgcc.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "bandai-fest-sg",
+        "export_id": "bandai-fest-sg",
+        "logo": "logos/bcgfest.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "sgcard-ye",
+        "export_id": "sgcard-ye",
+        "logo": "logos/sgcard.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "amazing-cardnival",
+        "export_id": "amazing-cardnival",
+        "logo": "logos/amaz.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "bandai-fest-kl",
+        "export_id": "bandai-fest-kl",
+        "logo": "logos/bcgfest.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "vn-tcg-fest",
+        "export_id": "vn-tcg-fest",
+        "logo": "logos/vntcg.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "comic-fiesta",
+        "export_id": "comic-fiesta",
+        "logo": "logos/comicfiesta.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "saudi-collectors",
+        "export_id": "saudi-collectors",
+        "logo": "logos/saudi.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "sandbox-cts",
+        "export_id": "sandbox-cts",
+        "logo": "logos/sandboxphoto.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "comicave-tcm",
+        "export_id": "comicave-tcm",
+        "logo": "logos/comicave.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "speedy",
+        "export_id": "speedy",
+        "logo": "logos/speedy.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "sandbox-vol9",
+        "export_id": "sandbox-vol9",
+        "logo": "logos/sandbox.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "tcg-con-arabia",
+        "export_id": "tcg-con-arabia",
+        "logo": "logos/tcgconarabia.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "bahrain-cs",
+        "export_id": "bahrain-cs",
+        "logo": "logos/bahrain.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "cca-2027",
+        "export_id": "cca-2027",
+        "logo": "logos/cca.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "geekend",
+        "export_id": "geekend",
+        "logo": "logos/geekend.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "r-awardx",
+        "export_id": "r-awardx",
+        "logo": "logos/awardx.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "r-tradeting",
+        "export_id": "r-tradeting",
+        "logo": "logos/tradeting.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "r-kip",
+        "export_id": "r-kip",
+        "logo": "logos/kipvenue.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "r-nexus",
+        "export_id": "r-nexus",
+        "logo": "logos/nexus.webp",
+        "reason": "existing logo file kept"
+      },
+      {
+        "event_id": "r-caps",
+        "export_id": "r-caps",
+        "logo": "logos/caps.webp",
+        "reason": "existing logo file kept"
+      }
+    ]
+  }
 }

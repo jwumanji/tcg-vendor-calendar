@@ -115,13 +115,15 @@ export function CompareTable({ pins, entries, scores, budgets, defaults, homeBas
   const tableId = useId();
   const allDatesUnannounced = pins.every(({ event }) =>
     event.date_status === "tba" && !event.estimated_month && !event.event_status);
-  const columns = pins.map((pin) => {
+  const plannedBudgets = pins.map(({ event }) => budgets[event.id] ?? event.trip_budget);
+  const showSalesTargets = plannedBudgets.some((budget) => budget?.contributionMarginBps !== undefined);
+  const columns = pins.map((pin, index) => {
     const { event, occurrences, range } = pin;
     const entry = entries[event.id] ?? emptyEntry;
     const score = scores[event.id];
-    const plannedCosts = budgets[event.id] ?? event.trip_budget;
+    const plannedCosts = plannedBudgets[index];
     const budget = calculateTripBudget(event, now, today, homeBase, occurrences.length ? range : undefined, plannedCosts, defaults);
-    const { tableFee, total, subtotal, perDay, days } = budget;
+    const { tableFee, total, subtotal, perDay, days, salesTarget } = budget;
     const travelReview = travelCostReview(plannedCosts, homeBase);
     const conflicts = compareOverlaps(pin, pins);
     const milestone = upcomingMilestones([event], now)[0]?.milestone;
@@ -183,10 +185,24 @@ export function CompareTable({ pins, entries, scores, budgets, defaults, homeBas
       )],
       ["Break-even per selling day", perDay ? <><BudgetValue value={perDay} /><small>{days} selling {days === 1 ? "day" : "days"}</small></>
         : days === null ? "Selling days are unconfirmed." : "Available when the trip total is known."],
+    ];
+    if (showSalesTargets) {
+      rows.push(["Sales target at your margin", salesTarget ? (
+        <>
+          {salesTarget.total && <BudgetValue value={salesTarget.total} />}
+          <small>{salesTarget.label}</small>
+          {salesTarget.perDay && <small>
+            {formatVendorAmount(Math.round(salesTarget.perDay.vnd), "VND")} · {formatVendorUsd(salesTarget.perDay.usd)} per selling day
+          </small>}
+          {salesTarget.message && <small>{salesTarget.message}</small>}
+        </>
+      ) : "No margin entered."]);
+    }
+    rows.push(
       ["Next verified milestone", milestone ? <><strong>{milestone.label}</strong><MilestoneTimes milestone={milestone} /></>
         : "No upcoming verified milestone"],
       ["Vendor application", application ? <ApplyLink action={application} name={event.name} /> : "No application link available"],
-    ];
+    );
     return { event, rows };
   });
   return (

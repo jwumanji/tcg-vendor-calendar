@@ -136,8 +136,9 @@ it("updates overlaps and computes selling days and break-even for the chosen pub
   const shows = [pricedCaps, overlapShow];
   const initial = shows.reduce((pins, show) => toggleComparePin(pins, show, today), [] as ComparePin[]);
   const defaults = { meals: { amount: 30, currency: "USD" } };
+  const budgets = { [pricedCaps.id]: { contributionMarginBps: 5_000 } };
   const render = (pins: ComparePin[]) => renderComparison(shows, {
-    defaults, pins: resolveComparePins(pins, shows, shows, shows, today),
+    budgets, defaults, pins: resolveComparePins(pins, shows, shows, shows, today),
   });
   const $before = render(initial);
   expect(cell($before, "Venue", 0).text()).toBe("Junction 8Singapore");
@@ -146,6 +147,9 @@ it("updates overlaps and computes selling days and break-even for the chosen pub
   expect(cell($before, "Trip total for entered costs", 0).text()).toContain("USD 390.00");
   expect(cell($before, "Break-even per selling day", 0).find("small").map((_, el) => $before(el).text()).get())
     .toEqual(["USD 130.00", "3 selling days"]);
+  expect(cell($before, "Sales target at your margin", 0).text()).toContain("USD 780.00");
+  expect(cell($before, "Sales target at your margin", 0).text()).toContain("USD 260.00 per selling day");
+  expect(cell($before, "Sales target at your margin", 1).text()).toBe("No margin entered.");
   const selected = occurrenceKey(pricedCaps.occurrences![1]);
   const $after = render(selectCompareOccurrence(initial, pricedCaps.id, selected));
   expect($after("select option[selected]").attr("value")).toBe(selected);
@@ -155,6 +159,27 @@ it("updates overlaps and computes selling days and break-even for the chosen pub
   expect(cell($after, "Trip total for entered costs", 0).text()).toContain("USD 360.00");
   expect(cell($after, "Break-even per selling day", 0).find("small").map((_, el) => $after(el).text()).get())
     .toEqual(["USD 180.00", "2 selling days"]);
+  expect(cell($after, "Sales target at your margin", 0).text()).toContain("USD 720.00");
+  expect(cell($after, "Sales target at your margin", 0).text()).toContain("USD 360.00 per selling day");
+});
+
+it("shows zero and pending margin targets while omitting the row when all margins are unset", () => {
+  const shows = [award, urban, color];
+  const $ = renderComparison(shows, {
+    budgets: {
+      [award.id]: { costs: { travel: { amount: 80, currency: "USD" } }, contributionMarginBps: 5_000 },
+      [urban.id]: { costs: { travel: { amount: 8_000, currency: "JPY" } }, contributionMarginBps: 5_000 },
+      [color.id]: { contributionMarginBps: 0 },
+    },
+  });
+  for (const index of [0, 1]) {
+    const target = cell($, "Sales target at your margin", index);
+    expect(target.text()).toContain("Sales target pending until the trip total is known.");
+    expect(target.find("strong")).toHaveLength(0);
+    expect(cell($, "Trip total for entered costs", index).text()).toContain("Known costs subtotal");
+  }
+  expect(cell($, "Sales target at your margin", 2).text()).toBe("0% contribution marginNo finite sales target.");
+  expect(renderComparison(shows)("tbody").text()).not.toContain("Sales target at your margin");
 });
 
 it("flags travel saved for a different home base and meal defaults missing a day count", () => {

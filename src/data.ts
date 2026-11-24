@@ -229,6 +229,12 @@ export function normalizeTripBudget(value: unknown): TripBudget {
     if (!amount(count) || !Number.isSafeInteger(count)) throw new Error("Enter whole nights and meal days.");
     budget[key] = count;
   }
+  const margin = value.contributionMarginBps;
+  if (margin !== undefined) {
+    if (!amount(margin) || !Number.isInteger(margin) || margin > 10_000)
+      throw new Error("Enter a contribution margin from 0% to 100% with up to two decimal places.");
+    budget.contributionMarginBps = margin;
+  }
   return budget;
 }
 

@@ -29,6 +29,7 @@ import {
   saveValue,
   importEntries,
   importOutreach,
+  importTripBudget,
   unknownIds,
   STORAGE_KEY,
 } from "./storage";
@@ -40,6 +41,59 @@ const entry = {
   noteUpdatedAt: "2026-11-16T10:00:00.000Z",
 };
 describe("versioned pipeline backup validation", () => {
+  it("round trips per-event margins through a version 1 export, on-device load, and pre-Replace stash", () => {
+    const budgets = { events: {
+      zero: { contributionMarginBps: 0 },
+      half: { contributionMarginBps: 5_000, nights: 2 },
+      full: { contributionMarginBps: 10_000 },
+      unset: { nights: 1 },
+    } };
+    const snapshot = backup({}, undefined, undefined, undefined, undefined, budgets);
+    const raw = JSON.stringify(snapshot);
+    expect(snapshot.version).toBe(1);
+    expect(validateBackup(JSON.parse(raw)).tripBudget).toEqual(budgets);
+    const getItem = vi.fn(() => raw);
+    expect(loadEntries({ getItem }).tripBudget).toEqual(budgets);
+    expect(getItem).toHaveBeenCalledWith(STORAGE_KEY);
+
+    const setItem = vi.fn();
+    vi.stubGlobal("localStorage", { setItem });
+    try {
+      const key = stashBeforeReplace({}, undefined, undefined, undefined, undefined, budgets);
+      expect(setItem).toHaveBeenCalledWith(key, expect.any(String));
+      expect(validateBackup(JSON.parse(setItem.mock.calls[0][1])).tripBudget).toEqual(budgets);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("keeps event-level Merge and Replace behavior for older backups", () => {
+    const local = { events: { urban: { contributionMarginBps: 5_000 }, other: { contributionMarginBps: 0 } } };
+    const old = backup({}, undefined, undefined, undefined, undefined, { events: { urban: { nights: 2 } } });
+    const incoming = validateBackup(old).tripBudget;
+    expect(incoming?.events.urban).toEqual({ nights: 2 });
+    expect(loadEntries({ getItem: () => JSON.stringify(old) }).tripBudget).toEqual(incoming);
+    expect(importTripBudget(local, incoming, "merge").events).toEqual({ urban: { nights: 2 }, other: local.events.other });
+    expect(importTripBudget(local, incoming, "replace")).toEqual(incoming);
+    const beforeTripBudgets = validateBackup(backup({})).tripBudget;
+    expect(importTripBudget(local, beforeTripBudgets, "merge")).toBe(local);
+    expect(importTripBudget(local, beforeTripBudgets, "replace")).toBe(local);
+  });
+
+  it.each([-1, 10_001, 0.5, "5000", null])("rejects and recovers around an invalid stored margin (%j)", (contributionMarginBps) => {
+    const value = { ...backup({}), tripBudget: { events: {
+      valid: { contributionMarginBps: 5_000 },
+      invalid: { contributionMarginBps },
+    } } };
+    expect(() => validateBackup(value)).toThrow(/Invalid trip budget for invalid.*contribution margin/);
+    const raw = JSON.stringify(value);
+    const setItem = vi.fn();
+    const recovered = loadEntries({ getItem: () => raw, setItem });
+    expect(recovered.tripBudget.events).toEqual({ valid: value.tripBudget.events.valid });
+    expect(recovered.dropped).toBe(1);
+    expect(setItem).toHaveBeenCalledWith(recovered.recoveryKey, raw);
+  });
+
   it("round trips first-run, reminder and timeline preferences alongside planner records", () => {
     const listPreferences = { firstRunDismissed: true, deadlinesExpanded: false, followUpsExpanded: true, showPast: false };
     const value = backup({ event: entry }, undefined, undefined, undefined, undefined, undefined, listPreferences);

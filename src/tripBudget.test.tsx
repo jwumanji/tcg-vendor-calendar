@@ -9,6 +9,7 @@ import { emptyOutreach, type Event, type TripBudget as Budget } from "./model";
 import { backup, importTripBudget, loadEntries, stashBeforeReplace, unknownIds, validateBackup } from "./storage";
 import { budgetOrigin, calculateTripBudget, convertBudgetAmount, readTripBudgetForm, sellingDays, walkAwayPrice } from "./tripBudget";
 import { occurrenceOn } from "./utils";
+import { budgetFxDate } from "./vendorPricing";
 
 const events = normalizeEvents(raw);
 const find = (id: string) => events.find((event) => event.id === id)!;
@@ -41,6 +42,96 @@ it("adds payable booth fees, travel and custom costs, and divides the unrounded 
   expect(budget.total?.vnd).toBeCloseTo(usd * 25729.721904, 7);
   expect(budget.perDay?.usd).toBeCloseTo(usd / 2, 10);
   expect(budget.perDay?.vnd).toBeCloseTo(usd * 25729.721904 / 2, 7);
+});
+
+function renderBudget(event: Event, local?: Budget) {
+  return load(renderToStaticMarkup(<TripBudget event={event} now={now} today={today} local={local} />));
+}
+
+it.each([
+  [5_000, "50%", "USD 600.00", "USD 300.00", 2],
+  [10_000, "100%", "USD 300.00", "USD 150.00", 1],
+])("uses a margin of %i basis points alongside the existing trip target", (contributionMarginBps, label, total, daily, multiplier) => {
+  const event = { ...urban, vendor_options: [], vendor_cost: "USD 250" };
+  const local = { costs: { travel: money(50, "USD") }, travelHomeBase: "th-bangkok", contributionMarginBps };
+  const budget = budgetFor(event, local);
+  expect(budget.total?.usd).toBe(300);
+  expect(budget.perDay?.usd).toBe(150);
+  expect(budget.salesTarget?.total).toEqual({ usd: 300 * multiplier, vnd: budget.total!.vnd * multiplier });
+  expect(budget.salesTarget?.perDay).toEqual({ usd: 150 * multiplier, vnd: budget.perDay!.vnd * multiplier });
+
+  const $ = renderBudget(event, local);
+  const target = $(".trip-budget-totals dt").filter((_, row) => $(row).text() === "Sales target at your margin").next();
+  expect(target.find("strong").text()).toMatch(/^VND .* · USD /);
+  expect(target.find("strong").text()).toContain(total);
+  expect(target.text()).toContain(`${label} contribution margin`);
+  expect(target.text()).toContain(`${daily} per selling day`);
+  expect($(".trip-budget-totals strong").first().text()).toContain("USD 300.00");
+  expect($(".trip-budget-fx").text()).toContain(budgetFxDate);
+  expect($(".trip-budget-costs").text()).toContain("Saved for Bangkok. Review this travel amount for Ho Chi Minh City.");
+});
+
+it("keeps the trip target visible at 0% and explains why the sales target is unavailable", () => {
+  const local = { contributionMarginBps: 0 };
+  const budget = budgetFor(urban, local);
+  expect(budget.total).not.toBeNull();
+  expect(budget.salesTarget).toMatchObject({ total: null, perDay: null });
+  const $ = renderBudget(urban, local);
+  expect($(".trip-budget-totals").text()).toContain("0% contribution margin");
+  expect($(".trip-budget-totals").text()).toContain("No finite sales target.");
+  expect($(".trip-budget-totals strong")).toHaveLength(2);
+});
+
+it("shows the margin target without a daily amount when selling days are unknown", () => {
+  const event = { ...urban, date_status: "tba" as const };
+  const local = { contributionMarginBps: 5_000 };
+  expect(budgetFor(event, local).salesTarget?.total).not.toBeNull();
+  expect(budgetFor(event, local).salesTarget?.perDay).toBeNull();
+  const $ = renderBudget(event, local);
+  expect($(".trip-budget-totals").text()).toContain("Sales target at your margin");
+  expect($(".trip-budget-totals").text()).toContain("Selling days are unknown");
+  expect($(".trip-budget-totals").text()).not.toContain("per selling day");
+});
+
+it("leaves the trip total intact when a very small margin would overflow the sales target", () => {
+  const result = budgetFor(urban, { costs: { freight: money(Number.MAX_VALUE / 2) }, contributionMarginBps: 1 });
+  expect(result.total).not.toBeNull();
+  expect(result.salesTarget).toMatchObject({
+    total: null, perDay: null, message: "Sales target exceeds the supported amount.",
+  });
+});
+
+it("clears the margin without clearing the costs or bringing back a shared margin", () => {
+  const event = { ...urban, trip_budget: { contributionMarginBps: 10_000 } };
+  const budget = { costs: { travel: money(200) }, contributionMarginBps: 5_000 };
+  const fields = new FormData();
+  fields.set("travel-amount", "200");
+  fields.set("contributionMargin", "");
+  const cleared = readTripBudgetForm(fields, [], budgetFor(event, budget).extraCosts, "vn-ho-chi-minh-city", budget);
+  expect(cleared.costs).toEqual(budget.costs);
+  expect(cleared).not.toHaveProperty("contributionMarginBps");
+  expect(budgetFor(event, cleared).salesTarget).toBeNull();
+  const $ = renderBudget(event, cleared);
+  expect($(".trip-budget-totals").text()).not.toContain("Sales target at your margin");
+  expect($(".trip-budget-totals").text()).toContain("Break-even sales per selling day");
+  expect(budgetFor(urban).salesTarget).toBeNull();
+});
+
+it.each([["0", 0], ["28.99", 2_899], ["50", 5_000], ["100", 10_000]])(
+  "saves %s percent as %i basis points",
+  (value, expected) => {
+    const fields = new FormData();
+    fields.set("contributionMargin", value);
+    const budget = readTripBudgetForm(fields, [], budgetFor(urban).extraCosts, "vn-ho-chi-minh-city");
+    expect(budget.contributionMarginBps).toBe(expected);
+  },
+);
+
+it.each(["-1", "100.01", "12.345", "invalid"])("rejects an invalid margin of %s percent", (value) => {
+  const fields = new FormData();
+  fields.set("contributionMargin", value);
+  expect(() => readTripBudgetForm(fields, [], budgetFor(urban).extraCosts, "vn-ho-chi-minh-city"))
+    .toThrow(/Enter a contribution margin/);
 });
 
 it("uses VAT-inclusive prices and recalculates conversions from payable amounts, ignoring cached USD", () => {
@@ -179,13 +270,30 @@ it("retains known extras as a subtotal and withholds break-even for a cancelled 
 });
 
 it("keeps unsupported nonzero expenses visible without reporting a misleading complete total", () => {
-  const local = { costs: { freight: money(100, "JPY"), travel: money(0, "JPY") } };
+  const local = { costs: { freight: money(100, "JPY"), travel: money(0, "JPY") }, contributionMarginBps: 5_000 };
   const $ = load(renderToStaticMarkup(<TripBudget event={urban} now={now} today={today} local={local} />));
   expect($(".trip-budget").text()).toContain("No snapshot FX rate for JPY.");
   expect($(".trip-budget-totals").text()).toContain("Known costs subtotal");
+  expect($(".trip-budget-totals").text()).toContain("Sales target pending until the trip total is known.");
+  expect(budgetFor(urban, local).salesTarget).toMatchObject({ total: null, perDay: null });
   expect($(".trip-budget-costs").text()).toContain("TravelJPY 0");
   expect($(".trip-budget-costs dd").filter((_, row) => $(row).text().includes("No snapshot FX rate"))).toHaveLength(1);
   expect(budgetFor(urban, { costs: { travel: money(0, "JPY") } }).total).not.toBeNull();
+});
+
+it("keeps the entered costs subtotal and leaves sales pending without an applicable booth fee", () => {
+  const event = { ...urban, vendor_options: [], vendor_cost: null };
+  const local = { costs: { travel: money(200, "USD") }, contributionMarginBps: 5_000 };
+  const result = budgetFor(event, local);
+  expect(result.subtotal?.usd).toBe(200);
+  expect(result.total).toBeNull();
+  expect(result.salesTarget).toMatchObject({ total: null, perDay: null });
+  const $ = renderBudget(event, local);
+  expect($(".trip-budget-totals").text()).toContain("Total pending an applicable table fee.");
+  expect($(".trip-budget-totals").text()).toContain("Sales target pending until the trip total is known.");
+  expect($(".trip-budget-totals strong").map((_, row) => $(row).text()).get()).toEqual([
+    expect.stringContaining("USD 200.00"),
+  ]);
 });
 
 it("uses the home-base city in the budget and suggests zero nights there", () => {

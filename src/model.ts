@@ -131,6 +131,7 @@ export interface TripBudget {
   walkAway?: BudgetAmount;
   nights?: number;
   mealDays?: number;
+  contributionMarginBps?: number;
 }
 
 export interface BudgetDefaults {

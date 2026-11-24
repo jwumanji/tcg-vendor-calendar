@@ -46,7 +46,7 @@ export function TripBudget({
   const base = resolveHomeBase(homeBase);
   const travelReview = travelCostReview(budget, homeBase);
   const result = calculateTripBudget(event, now, today, homeBase, occurrence, budget, defaults);
-  const { tableFee, total, perDay, subtotal, days, extraCosts, nights, mealDays } = result;
+  const { tableFee, total, perDay, subtotal, days, extraCosts, nights, mealDays, salesTarget } = result;
   const { ceiling, basis, quote, above } = walkAwayPrice(event, now, budget?.walkAway);
   const [editing, setEditing] = useState(false);
   const editButton = useRef<HTMLButtonElement>(null);
@@ -109,6 +109,14 @@ export function TripBudget({
             <BudgetRow label="Break-even sales per selling day">
               <strong><Converted value={perDay} /></strong>
               <small>{days} selling {days === 1 ? "day" : "days"}</small>
+            </BudgetRow>
+          )}
+          {salesTarget && (
+            <BudgetRow label="Sales target at your margin">
+              {salesTarget.total && <strong><Converted value={salesTarget.total} /></strong>}
+              <small>{salesTarget.label}</small>
+              {salesTarget.perDay && <small><Converted value={salesTarget.perDay} /> per selling day</small>}
+              {salesTarget.message && <small>{salesTarget.message}</small>}
             </BudgetRow>
           )}
         </dl>
@@ -191,6 +199,14 @@ function BudgetEditor({ budget, result, defaults, base, travelNeedsReview, close
     <Modal title="Edit trip budget" titleId="trip-budget-editor-title" closeLabel="Close trip budget editor"
       close={close} className="money-editor trip-budget-editor">
       <form className="outreach-form" onSubmit={submit}>
+        <div className="outreach-wide">
+          <label>Contribution margin (%)
+            <input name="contributionMargin" type="number" inputMode="decimal" min="0" max="100" step="0.01"
+              aria-describedby="trip-budget-margin-hint"
+              defaultValue={budget?.contributionMarginBps === undefined ? undefined : budget.contributionMarginBps / 100} />
+          </label>
+          <p id="trip-budget-margin-hint">The share of sales left after stock cost and variable selling fees. Leave blank to clear.</p>
+        </div>
         <fieldset className="outreach-wide">
           <legend>Walk-away table fee</legend>
           <p>Leave the amount blank to use the applicable published or listed price. A blank currency uses VND.</p>

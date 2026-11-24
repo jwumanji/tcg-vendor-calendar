@@ -148,7 +148,15 @@ it("updates overlaps and computes selling days and break-even for the chosen pub
   expect(cell($before, "Break-even per selling day", 0).find("small").map((_, el) => $before(el).text()).get())
     .toEqual(["USD 130.00", "3 selling days"]);
   expect(cell($before, "Sales target at your margin", 0).text()).toContain("USD 780.00");
-  expect(cell($before, "Sales target at your margin", 0).text()).toContain("USD 260.00 per selling day");
+  const dailyTarget = cell($before, "Sales target at your margin", 0).find(".compare-sales-per-day");
+  expect(dailyTarget.children("strong").text()).toMatch(/^VND /);
+  expect(dailyTarget.children("small").map((_, el) => $before(el).text()).get())
+    .toEqual(["USD 260.00", "Per selling day"]);
+  const labels = $before("tbody th").map((_, el) => $before(el).text()).get();
+  expect(labels.slice(labels.indexOf("Eligible table fee"), labels.indexOf("Pipeline stage") + 1)).toEqual([
+    "Eligible table fee", "Trip total for entered costs", "Break-even per selling day", "Sales target at your margin",
+    "Venue", "Pipeline stage",
+  ]);
   expect(cell($before, "Sales target at your margin", 1).text()).toBe("No margin entered.");
   const selected = occurrenceKey(pricedCaps.occurrences![1]);
   const $after = render(selectCompareOccurrence(initial, pricedCaps.id, selected));
@@ -160,7 +168,8 @@ it("updates overlaps and computes selling days and break-even for the chosen pub
   expect(cell($after, "Break-even per selling day", 0).find("small").map((_, el) => $after(el).text()).get())
     .toEqual(["USD 180.00", "2 selling days"]);
   expect(cell($after, "Sales target at your margin", 0).text()).toContain("USD 720.00");
-  expect(cell($after, "Sales target at your margin", 0).text()).toContain("USD 360.00 per selling day");
+  expect(cell($after, "Sales target at your margin", 0).find(".compare-sales-per-day small").first().text())
+    .toBe("USD 360.00");
 });
 
 it("shows zero and pending margin targets while omitting the row when all margins are unset", () => {
@@ -178,14 +187,15 @@ it("shows zero and pending margin targets while omitting the row when all margin
     expect(target.find("strong")).toHaveLength(0);
     expect(cell($, "Trip total for entered costs", index).text()).toContain("Known costs subtotal");
   }
-  expect(cell($, "Sales target at your margin", 2).text()).toBe("0% contribution marginNo finite sales target.");
+  expect(cell($, "Sales target at your margin", 2).text())
+    .toBe("0% sales marginAt 0% margin, no sales revenue goes toward trip costs. Enter a margin above 0%.");
   expect(renderComparison(shows)("tbody").text()).not.toContain("Sales target at your margin");
 });
 
 it("uses a shared margin unless the event has a local budget that clears it", () => {
   const shared = { ...urban, id: "constructor", trip_budget: { contributionMarginBps: 5_000 } };
   const shows = [shared, award];
-  expect(cell(renderComparison(shows), "Sales target at your margin", 0).text()).toContain("50% contribution margin");
+  expect(cell(renderComparison(shows), "Sales target at your margin", 0).text()).toContain("50% sales margin");
   const cleared = renderComparison(shows, { budgets: { [shared.id]: {} } });
   expect(cleared("tbody").text()).not.toContain("Sales target at your margin");
 });

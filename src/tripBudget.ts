@@ -37,11 +37,11 @@ function calculateSalesTarget(
 ) {
   if (marginBps === undefined) return null;
   const margin = marginBps / 10_000;
-  const label = `${marginPercent.format(margin)} contribution margin`;
+  const label = `${marginPercent.format(margin)} sales margin`;
   const sales = total && margin > 0 ? { usd: total.usd / margin, vnd: total.vnd / margin } : null;
   const target = sales && Number.isFinite(sales.vnd) ? sales : null;
   const pending = "Sales target pending until the trip total is known.";
-  const message = margin === 0 ? `${total ? "" : `${pending} `}No finite sales target.`
+  const message = margin === 0 ? `${total ? "" : `${pending} `}At 0% margin, no sales revenue goes toward trip costs. Enter a margin above 0%.`
     : !total ? pending
     : !target ? "Sales target exceeds the supported amount." : null;
   return {
@@ -140,6 +140,15 @@ export function readBudgetMoney(fields: FormData, name: string, currency = "VND"
   });
 }
 
+export function readBudgetMargin(value: string) {
+  if (!value.trim()) return undefined;
+  const percent = Number(value);
+  const basisPoints = Math.round(percent * 100);
+  if (!(percent >= 0 && percent <= 100) || percent !== basisPoints / 100)
+    throw new Error("Enter a margin from 0% to 100% with up to two decimal places.");
+  return basisPoints;
+}
+
 export function readTripBudgetForm(
   fields: FormData, customIds: string[], extraCosts: ReturnType<typeof calculateTripBudget>["extraCosts"],
   homeBaseId: string, previous?: TripBudget,
@@ -155,18 +164,13 @@ export function readTripBudgetForm(
   const travel = costs.travel;
   const previousTravel = previous?.costs?.travel;
   const travelChanged = travel?.amount !== previousTravel?.amount || travel?.currency !== previousTravel?.currency;
-  const enteredMargin = String(fields.get("contributionMargin") ?? "").trim();
-  const percent = Number(enteredMargin);
-  const marginBps = Math.round(percent * 100);
-  if (enteredMargin && percent !== marginBps / 100)
-    throw new Error("Enter a contribution margin with up to two decimal places.");
   return normalizeTripBudget({
     costs: Object.keys(costs).length ? costs : undefined,
     travelHomeBase: travel && (travelChanged || fields.has("confirm-travel-base") ? homeBaseId : previous?.travelHomeBase),
     walkAway: readBudgetMoney(fields, "walkAway"),
     nights: count("nights"),
     mealDays: count("mealDays"),
-    contributionMarginBps: enteredMargin ? marginBps : undefined,
+    contributionMarginBps: readBudgetMargin(String(fields.get("contributionMargin") ?? "")),
     custom: customIds.length ? customIds.map((id) => ({
       id, label: fields.get(`custom-${id}-label`), ...readBudgetMoney(fields, `custom-${id}`),
     })) : undefined,

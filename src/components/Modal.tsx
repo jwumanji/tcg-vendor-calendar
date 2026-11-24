@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode, type RefObject } from "react";
 import { X } from "lucide-react";
 
 export function Modal({
@@ -9,6 +9,7 @@ export function Modal({
   children,
   className = "",
   id,
+  initialFocus,
   returnFocus,
 }: {
   title: ReactNode;
@@ -18,6 +19,7 @@ export function Modal({
   children: ReactNode;
   className?: string;
   id?: string;
+  initialFocus?: RefObject<HTMLElement | null>;
   returnFocus?: () => HTMLElement | null;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -25,12 +27,14 @@ export function Modal({
     const dialog = ref.current!;
     const trigger = returnFocus?.() ?? document.activeElement;
     dialog.showModal();
+    initialFocus?.current?.focus({ preventScroll: true });
     return () => {
       dialog.close();
-      if (trigger instanceof HTMLElement)
-        trigger.focus({ preventScroll: true });
+      const target = trigger?.isConnected ? trigger : returnFocus?.();
+      if (target instanceof HTMLElement)
+        target.focus({ preventScroll: true });
     };
-  }, [returnFocus]);
+  }, [initialFocus, returnFocus]);
   return (
     <dialog
       ref={ref}

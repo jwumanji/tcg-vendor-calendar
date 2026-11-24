@@ -44,9 +44,20 @@ it("adds payable booth fees, travel and custom costs, and divides the unrounded 
   expect(budget.perDay?.vnd).toBeCloseTo(usd * 25729.721904 / 2, 7);
 });
 
-function renderBudget(event: Event, local?: Budget) {
-  return load(renderToStaticMarkup(<TripBudget event={event} now={now} today={today} local={local} />));
+function renderBudget(event: Event, local?: Budget, onSave?: (value?: Budget) => void) {
+  return load(renderToStaticMarkup(<TripBudget event={event} now={now} today={today} local={local} onSave={onSave} />));
 }
+
+it("offers to add a margin when the trip total is known and the budget can be edited", () => {
+  const onSave = vi.fn();
+  const $ = renderBudget(urban, undefined, onSave);
+  expect($(".trip-budget-totals button[aria-haspopup='dialog']").text()).toBe("Add margin");
+  expect($(".trip-budget-totals").text()).toContain("Add your sales margin to calculate a target.");
+  expect(renderBudget(urban)(".trip-budget-totals button")).toHaveLength(0);
+  expect(renderBudget(urban, { contributionMarginBps: 0 }, onSave)(".trip-budget-totals button")).toHaveLength(0);
+  const unpriced = { ...urban, vendor_options: [], vendor_cost: null };
+  expect(renderBudget(unpriced, undefined, onSave)(".trip-budget-totals button")).toHaveLength(0);
+});
 
 it.each([
   [5_000, "50%", "USD 600.00", "USD 300.00", 2],
@@ -62,9 +73,9 @@ it.each([
 
   const $ = renderBudget(event, local);
   const target = $(".trip-budget-totals dt").filter((_, row) => $(row).text() === "Sales target at your margin").next();
-  expect(target.find("strong").text()).toMatch(/^VND .* · USD /);
-  expect(target.find("strong").text()).toContain(total);
-  expect(target.text()).toContain(`${label} contribution margin`);
+  expect(target.find("strong.trip-budget-sales-target").text()).toMatch(/^VND .* · USD /);
+  expect(target.find("strong.trip-budget-sales-target").text()).toContain(total);
+  expect(target.text()).toContain(`${label} sales margin`);
   expect(target.text()).toContain(`${daily} per selling day`);
   expect($(".trip-budget-totals strong").first().text()).toContain("USD 300.00");
   expect($(".trip-budget-fx").text()).toContain(budgetFxDate);
@@ -77,8 +88,9 @@ it("keeps the trip target visible at 0% and explains why the sales target is una
   expect(budget.total).not.toBeNull();
   expect(budget.salesTarget).toMatchObject({ total: null, perDay: null });
   const $ = renderBudget(urban, local);
-  expect($(".trip-budget-totals").text()).toContain("0% contribution margin");
-  expect($(".trip-budget-totals").text()).toContain("No finite sales target.");
+  expect($(".trip-budget-totals").text()).toContain("0% sales margin");
+  expect($(".trip-budget-totals").text())
+    .toContain("At 0% margin, no sales revenue goes toward trip costs. Enter a margin above 0%.");
   expect($(".trip-budget-totals strong")).toHaveLength(2);
 });
 
@@ -127,11 +139,11 @@ it.each([["0", 0], ["28.99", 2_899], ["50", 5_000], ["100", 10_000]])(
   },
 );
 
-it.each(["-1", "100.01", "12.345", "invalid"])("rejects an invalid margin of %s percent", (value) => {
+it.each(["-1", "100.01", "120", "12.345", "invalid"])("rejects an invalid margin of %s percent", (value) => {
   const fields = new FormData();
   fields.set("contributionMargin", value);
   expect(() => readTripBudgetForm(fields, [], budgetFor(urban).extraCosts, "vn-ho-chi-minh-city"))
-    .toThrow(/Enter a contribution margin/);
+    .toThrow("Enter a margin from 0% to 100% with up to two decimal places.");
 });
 
 it("uses VAT-inclusive prices and recalculates conversions from payable amounts, ignoring cached USD", () => {
@@ -291,7 +303,7 @@ it.each([0, 5_000])("keeps the subtotal and leaves sales pending without a booth
   const $ = renderBudget(event, local);
   expect($(".trip-budget-totals").text()).toContain("Total pending an applicable table fee.");
   expect($(".trip-budget-totals").text()).toContain("Sales target pending until the trip total is known.");
-  if (contributionMarginBps === 0) expect($(".trip-budget-totals").text()).toContain("No finite sales target.");
+  if (contributionMarginBps === 0) expect($(".trip-budget-totals").text()).toContain("Enter a margin above 0%.");
   expect($(".trip-budget-totals strong").map((_, row) => $(row).text()).get()).toEqual([
     expect.stringContaining("USD 200.00"),
   ]);
@@ -446,7 +458,7 @@ it("shows the original booth rate, VND first for totals, gross sales wording, an
   expect($(".trip-budget-totals").text()).toContain("Trip total for entered costs");
   expect($(".trip-budget-totals strong").first().text()).toMatch(/^VND .* · USD /);
   expect($(".trip-budget-totals").text()).toContain("gross sales to cover trip costs, before cost of goods.");
-  expect($('button[aria-haspopup="dialog"]').text()).toBe("Edit trip budget");
+  expect($('.money-item-actions button[aria-haspopup="dialog"]').text()).toBe("Edit trip budget");
 });
 
 it("uses a device budget over the shared record and exposes reset to shared", () => {

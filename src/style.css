@@ -3452,7 +3452,9 @@ body:has(.compare-tray[data-pinned="true"]) .going-toast:not(:empty) {
 
 .compare-dialog {
   width: min(1120px, calc(100% - 24px));
+  max-width: none;
   padding: 0 16px 16px;
+  container-type: inline-size;
   overflow: hidden;
 }
 .compare-dialog[open] { display: flex; flex-direction: column; }
@@ -3493,6 +3495,7 @@ body:has(.compare-tray[data-pinned="true"]) .going-toast:not(:empty) {
 .compare-table tbody tr:nth-child(even) { background: var(--surface-2); }
 .compare-table tbody th { color: var(--muted); }
 .compare-table small { display: block; color: var(--muted); font-size: 12px; }
+.compare-sales-per-day { margin-top: 6px; }
 .compare-table .badge { justify-self: start; max-width: 100%; white-space: normal; }
 .compare-table .apply-cta { white-space: normal; text-align: center; padding-inline: 10px; }
 .compare-dates { display: grid; align-items: start; gap: 5px; }
@@ -3520,6 +3523,13 @@ body:has(.compare-tray[data-pinned="true"]) .going-toast:not(:empty) {
   .compare-table thead th:first-child { z-index: 3; }
   .compare-table tbody th { z-index: 1; background: var(--surface); }
   .compare-table tbody tr:nth-child(even) th { background: var(--surface-2); }
+  @container (min-width: 338px) {
+    .compare-scroll[data-columns="2"] {
+      --compare-field-width: 88px;
+      --compare-column-width: 124px;
+    }
+    .compare-scroll-hint[data-columns="2"] { display: none; }
+  }
 }
 @media (max-width: 720px) {
   html:has(.bulk-bar) {
@@ -3981,6 +3991,12 @@ body:has(.compare-tray[data-pinned="true"]) .going-toast:not(:empty) {
   border-radius: 10px;
 }
 .trip-budget-totals p { padding-bottom: 8px; }
+.trip-budget-sales-target {
+  color: var(--accent);
+  font-size: 1.25em;
+  line-height: 1.3;
+}
+.trip-budget-totals .text-button { padding-inline: 0; }
 .trip-budget-fx { margin: 9px 0; }
 .trip-budget-inputs {
   display: grid;
@@ -3989,6 +4005,20 @@ body:has(.compare-tray[data-pinned="true"]) .going-toast:not(:empty) {
 }
 .trip-budget-defaults { margin-block: 16px; }
 .trip-budget-defaults [role="status"]:empty { margin: 0; }
+.trip-budget-editor { overflow: hidden; }
+.trip-budget-editor[open] { display: flex; flex-direction: column; }
+.trip-budget-editor .settings-head { flex: none; }
+.trip-budget-editor .settings-head .icon-button { flex: none; }
+.trip-budget-editor .outreach-form {
+  min-height: 0;
+  margin-inline: -4px;
+  padding: 4px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.trip-budget-editor #trip-budget-margin-error { color: var(--ink); font-weight: 700; }
+#trip-budget-margin-error:empty { margin: 0; }
+.trip-budget-editor [aria-invalid="true"] { border-color: var(--accent); }
 .trip-budget-editor fieldset, .trip-budget-defaults fieldset {
   min-inline-size: 0;
   border: 1px solid var(--line);
@@ -4004,6 +4034,12 @@ body:has(.compare-tray[data-pinned="true"]) .going-toast:not(:empty) {
 
 /* Touch controls and iOS form text. */
 @media (pointer: coarse) {
+  .event-page :is(a[href], select, textarea, input:not([type="checkbox"], [type="radio"]),
+    label:has(> :is(input[type="checkbox"], input[type="radio"]))) {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  .event-page a[href] { display: inline-flex; align-items: center; }
   .tabs { padding-block: 1px; }
   .tabs button { min-height: 44px; min-width: 44px; }
   :is(.tabs, .quick-filters) button:focus-visible { outline-offset: -3px; }

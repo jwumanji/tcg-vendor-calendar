@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { resolveHomeBase } from "../homeBase";
 import { type BudgetAmount, type BudgetDefaults, type Event, type TripBudget as Budget } from "../model";
-import { budgetLabels, budgetOrigin, calculateTripBudget, convertBudgetAmount, pendingTripTotal, readBudgetMoney, readTripBudgetForm, travelCostReview, tripDefaultsNeedDays, walkAwayPrice } from "../tripBudget";
+import { budgetLabels, budgetOrigin, calculateTripBudget, convertBudgetAmount, pendingTripTotal, readBudgetMargin, readBudgetMoney, readTripBudgetForm, travelCostReview, tripDefaultsNeedDays, walkAwayPrice } from "../tripBudget";
 import { budgetFxDate, formatVendorAmount, formatVendorUsd, missingPriceMessage, snapshotCurrencies, snapshotFx, vendorPriceBasisLabels } from "../vendorPricing";
 import { Modal } from "./Modal";
 
@@ -48,8 +48,11 @@ export function TripBudget({
   const result = calculateTripBudget(event, now, today, homeBase, occurrence, budget, defaults);
   const { tableFee, total, perDay, subtotal, days, extraCosts, nights, mealDays, salesTarget } = result;
   const { ceiling, basis, quote, above } = walkAwayPrice(event, now, budget?.walkAway);
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState<"budget" | "margin">();
   const editButton = useRef<HTMLButtonElement>(null);
+  const marginButton = useRef<HTMLButtonElement>(null);
+  const returnFocus = useCallback(() =>
+    (editing === "margin" ? marginButton.current : null) ?? editButton.current, [editing]);
   const localNights = result.localEvent && budget?.nights === undefined;
   return (
     <section className="trip-budget" aria-labelledby="trip-budget-title">
@@ -113,10 +116,17 @@ export function TripBudget({
           )}
           {salesTarget && (
             <BudgetRow label="Sales target at your margin">
-              {salesTarget.total && <strong><Converted value={salesTarget.total} /></strong>}
+              {salesTarget.total && <strong className="trip-budget-sales-target"><Converted value={salesTarget.total} /></strong>}
               <small>{salesTarget.label}</small>
               {salesTarget.perDay && <small><Converted value={salesTarget.perDay} /> per selling day</small>}
               {salesTarget.message && <small>{salesTarget.message}</small>}
+            </BudgetRow>
+          )}
+          {!salesTarget && total && onSave && (
+            <BudgetRow label="Sales target">
+              <small>Add your sales margin to calculate a target.</small>
+              <button ref={marginButton} type="button" className="text-button" aria-haspopup="dialog"
+                onClick={() => setEditing("margin")}>Add margin</button>
             </BudgetRow>
           )}
         </dl>
@@ -127,7 +137,7 @@ export function TripBudget({
       </div>
       <p className="trip-budget-fx">Conversions use the {budgetFxDate} research FX snapshot.</p>
       {onSave && <div className="money-item-actions">
-        <button ref={editButton} type="button" className="button" aria-haspopup="dialog" onClick={() => setEditing(true)}>
+        <button ref={editButton} type="button" className="button" aria-haspopup="dialog" onClick={() => setEditing("budget")}>
           Edit trip budget
         </button>
         {local && <button type="button" className="button" onClick={() => {
@@ -137,10 +147,10 @@ export function TripBudget({
       </div>}
       {editing && onSave && (
         <BudgetEditor budget={budget} result={result} defaults={defaults} base={base} travelNeedsReview={!!travelReview}
-          close={() => setEditing(false)}
+          focusMargin={editing === "margin"} returnFocus={returnFocus} close={() => setEditing(undefined)}
           save={(value) => {
             onSave(event.trip_budget || Object.keys(value).length ? value : undefined);
-            setEditing(false);
+            setEditing(undefined);
           }} />
       )}
     </section>
@@ -164,17 +174,21 @@ function MoneyInputs({ name, value, estimate, required = false }: {
   );
 }
 
-function BudgetEditor({ budget, result, defaults, base, travelNeedsReview, close, save }: {
+function BudgetEditor({ budget, result, defaults, base, travelNeedsReview, focusMargin, returnFocus, close, save }: {
   budget?: Budget;
   result: ReturnType<typeof calculateTripBudget>;
   defaults?: BudgetDefaults;
   base: ReturnType<typeof resolveHomeBase>;
   travelNeedsReview: boolean;
+  focusMargin: boolean;
+  returnFocus: () => HTMLElement | null;
   close: () => void;
   save: (value: Budget) => void;
 }) {
   const [custom, setCustom] = useState(() => (budget?.custom ?? []).map(({ id }) => id));
   const [error, setError] = useState<{ message: string }>();
+  const [marginError, setMarginError] = useState("");
+  const marginInput = useRef<HTMLInputElement>(null);
   const saveError = useRef<HTMLParagraphElement>(null);
   useEffect(() => {
     if (error) saveError.current?.scrollIntoView({ block: "nearest" });
@@ -190,23 +204,41 @@ function BudgetEditor({ budget, result, defaults, base, travelNeedsReview, close
   }, [custom]);
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const form = event.currentTarget;
+    const margin = marginInput.current!;
+    setError(undefined);
     try {
-      save(readTripBudgetForm(new FormData(event.currentTarget), custom, result.extraCosts, base.id, budget));
+      if (margin.validity.badInput) throw new Error("Enter a number for the sales margin.");
+      readBudgetMargin(margin.value);
+    } catch (error) {
+      setMarginError((error as Error).message);
+      form.scrollTop = 0;
+      margin.focus({ preventScroll: true });
+      return;
+    }
+    setMarginError("");
+    if (!form.reportValidity()) return;
+    try {
+      save(readTripBudgetForm(new FormData(form), custom, result.extraCosts, base.id, budget));
     } catch (error) {
       setError({ message: (error as Error).message });
     }
   }
   return (
     <Modal title="Edit trip budget" titleId="trip-budget-editor-title" closeLabel="Close trip budget editor"
-      close={close} className="money-editor trip-budget-editor">
-      <form className="outreach-form" onSubmit={submit}>
+      close={close} className="money-editor trip-budget-editor" initialFocus={focusMargin ? marginInput : undefined}
+      returnFocus={returnFocus}>
+      <form className="outreach-form" noValidate onSubmit={submit}>
         <div className="outreach-wide">
-          <label>Contribution margin (%)
-            <input name="contributionMargin" type="number" inputMode="decimal" min="0" max="100" step="0.01"
-              aria-describedby="trip-budget-margin-hint"
+          <label>Sales margin (%)
+            <input ref={marginInput} name="contributionMargin" type="number" inputMode="decimal" min="0" max="100" step="0.01"
+              placeholder="e.g. 35" aria-invalid={marginError ? true : undefined}
+              aria-describedby={marginError ? "trip-budget-margin-error trip-budget-margin-hint" : "trip-budget-margin-hint"}
+              onChange={() => setMarginError("")}
               defaultValue={budget?.contributionMarginBps === undefined ? undefined : budget.contributionMarginBps / 100} />
           </label>
-          <p id="trip-budget-margin-hint">The share of sales left after stock cost and variable selling fees. Leave blank to clear.</p>
+          <p id="trip-budget-margin-error" role="alert">{marginError}</p>
+          <p id="trip-budget-margin-hint">Of every 100 you sell, how much is left after stock costs and variable selling fees? Enter 35 if 35 is left. Leave blank to skip.</p>
         </div>
         <fieldset className="outreach-wide">
           <legend>Walk-away table fee</legend>

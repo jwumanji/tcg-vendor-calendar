@@ -107,8 +107,9 @@ export function CompareEvents({ close, returnFocus, ...fields }: CompareFields &
   );
 }
 
-function BudgetValue({ value }: { value: { usd: number; vnd: number } }) {
-  return <><strong>{formatVendorAmount(Math.round(value.vnd), "VND")}</strong><small>{formatVendorUsd(value.usd)}</small></>;
+function BudgetValue({ value, caption }: { value: { usd: number; vnd: number }; caption?: string }) {
+  return <><strong>{formatVendorAmount(Math.round(value.vnd), "VND")}</strong><small>{formatVendorUsd(value.usd)}</small>
+    {caption && <small>{caption}</small>}</>;
 }
 
 export function CompareTable({ pins, entries, scores, budgets, defaults, homeBase, today, now, onOccurrence }: CompareFields) {
@@ -161,15 +162,6 @@ export function CompareTable({ pins, entries, scores, budgets, defaults, homeBas
             : <small>{tableFee.option.name}</small>}
         </>
       ) : missingPriceMessage(event, now)],
-      ["Venue", venue || location ? <>{venue || "Venue not announced"}{location && <small>{location}</small>}</> : "Venue not announced"],
-      ["Pipeline stage", <>{entry.stage}{entry.stageSuggested && <small>Suggested from vendor updates</small>}</>],
-      ["Confirmed overlap", conflicts.length ? (
-        <ul className="compare-overlaps">
-          {conflicts.map(({ event: other, overlap }) => <li key={other.id}>
-            {other.name}<small>{formatDateRange(overlap.start_date, overlap.end_date)}</small>
-          </li>)}
-        </ul>
-      ) : confirmedCompareRange(pin) ? "No confirmed overlap" : "No confirmed dates to check"],
       ["Trip total for entered costs", pendingTotal && !subtotal && !travelReview && !needsBudgetDays ? pendingTotal : (
         <>
           {total ? <BudgetValue value={total} /> : (
@@ -184,7 +176,7 @@ export function CompareTable({ pins, entries, scores, budgets, defaults, homeBas
             <small>Enter lodging nights or meal days to apply the corresponding Tools default.</small>}
         </>
       )],
-      ["Break-even per selling day", perDay ? <><BudgetValue value={perDay} /><small>{days} selling {days === 1 ? "day" : "days"}</small></>
+      ["Break-even per selling day", perDay ? <BudgetValue value={perDay} caption={`${days} selling ${days === 1 ? "day" : "days"}`} />
         : days === null ? "Selling days are unconfirmed." : "Available when the trip total is known."],
     ];
     if (showSalesTargets) {
@@ -192,14 +184,23 @@ export function CompareTable({ pins, entries, scores, budgets, defaults, homeBas
         <>
           {salesTarget.total && <BudgetValue value={salesTarget.total} />}
           <small>{salesTarget.label}</small>
-          {salesTarget.perDay && <small>
-            {formatVendorAmount(Math.round(salesTarget.perDay.vnd), "VND")} · {formatVendorUsd(salesTarget.perDay.usd)} per selling day
-          </small>}
+          {salesTarget.perDay && <div className="compare-sales-per-day">
+            <BudgetValue value={salesTarget.perDay} caption="Per selling day" />
+          </div>}
           {salesTarget.message && <small>{salesTarget.message}</small>}
         </>
       ) : "No margin entered."]);
     }
     rows.push(
+      ["Venue", venue || location ? <>{venue || "Venue not announced"}{location && <small>{location}</small>}</> : "Venue not announced"],
+      ["Pipeline stage", <>{entry.stage}{entry.stageSuggested && <small>Suggested from vendor updates</small>}</>],
+      ["Confirmed overlap", conflicts.length ? (
+        <ul className="compare-overlaps">
+          {conflicts.map(({ event: other, overlap }) => <li key={other.id}>
+            {other.name}<small>{formatDateRange(overlap.start_date, overlap.end_date)}</small>
+          </li>)}
+        </ul>
+      ) : confirmedCompareRange(pin) ? "No confirmed overlap" : "No confirmed dates to check"],
       ["Next verified milestone", milestone ? <><strong>{milestone.label}</strong><MilestoneTimes milestone={milestone} /></>
         : "No upcoming verified milestone"],
       ["Vendor application", application ? <ApplyLink action={application} name={event.name} /> : "No application link available"],
@@ -208,8 +209,8 @@ export function CompareTable({ pins, entries, scores, budgets, defaults, homeBas
   });
   return (
     <>
-      <p className="compare-scroll-hint">Swipe across to see more events.</p>
-      <div className="compare-scroll" role="region" aria-label="Comparison fields" tabIndex={0}>
+      <p className="compare-scroll-hint" data-columns={columns.length}>Swipe across to see more events.</p>
+      <div className="compare-scroll" data-columns={columns.length} role="region" aria-label="Comparison fields" tabIndex={0}>
         <table className="compare-table" aria-label="Pinned event comparison"
           style={{ "--compare-columns": columns.length } as CSSProperties}>
           <thead role="rowgroup">

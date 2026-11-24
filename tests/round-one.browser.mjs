@@ -743,6 +743,95 @@ test("shows the same quote and effective stage in comparison and Detail", async 
   assert.equal(await pinButton(page, "urban").getAttribute("aria-pressed"), "true");
 });
 
+test("opens the sales margin from its result, shows inline validation, and keeps the title visible", async t => {
+  for (const options of [desktop, iPhone]) {
+    const page = await open(t, options);
+    await page.goto(origin + "/event/urban");
+    const add = button(page, "Add margin");
+    const dialog = page.getByRole("dialog", { name: "Edit trip budget" });
+    const margin = dialog.getByLabel("Sales margin (%)");
+    const title = dialog.getByRole("heading", { name: "Edit trip budget" });
+    const save = dialog.getByRole("button", { name: "Save trip budget" });
+
+    await add.click();
+    assert.equal(await margin.evaluate(el => el === document.activeElement), true);
+    assert.equal(await margin.getAttribute("placeholder"), "e.g. 35");
+    assert.match(await dialog.locator("#trip-budget-margin-hint").innerText(), /stock costs and variable selling fees/);
+    await page.keyboard.press("Escape");
+    await dialog.waitFor({ state: "hidden" });
+    assert.equal(await add.evaluate(el => el === document.activeElement), true);
+    await add.click();
+    const titleTop = (await title.boundingBox()).y;
+
+    for (const value of ["120", "12.345"]) {
+      await margin.fill(value);
+      await save.click();
+      assert.match(await dialog.getByRole("alert").innerText(), /0% to 100% with up to two decimal places/);
+      assert.equal(await margin.getAttribute("aria-invalid"), "true");
+      assert.match(await margin.getAttribute("aria-describedby"), /trip-budget-margin-error/);
+      assert.equal(await margin.evaluate(el => el === document.activeElement), true);
+      assert.ok((await title.boundingBox()).y >= titleTop - 1);
+    }
+
+    await margin.fill("0");
+    await save.click();
+    await dialog.waitFor({ state: "hidden" });
+    const totals = page.locator(".trip-budget-totals");
+    assert.match(await totals.innerText(), /At 0% margin[\s\S]*Enter a margin above 0%/);
+    const edit = button(page, "Edit trip budget");
+    assert.equal(await edit.evaluate(el => el === document.activeElement), true);
+    await edit.click();
+    await margin.fill("35");
+    await save.click();
+    await dialog.waitFor({ state: "hidden" });
+    const target = totals.locator(".trip-budget-sales-target");
+    assert.match(await target.innerText(), /VND .+USD /);
+    assert.equal(await target.evaluate(el =>
+      parseFloat(getComputedStyle(el).fontSize) > parseFloat(getComputedStyle(el.closest("dl").querySelector("strong")).fontSize)
+    ), true);
+
+    if (options.hasTouch) {
+      const undersized = await page.locator(".event-page").evaluate(root => {
+        for (const details of root.querySelectorAll("details")) details.open = true;
+        return [...root.querySelectorAll("a[href], button, summary, select, textarea, input")].flatMap(el => {
+          const { width, height } = el.getBoundingClientRect();
+          return width > 0 && height > 0 && (width < 44 || height < 44)
+            ? [el.getAttribute("aria-label") || el.textContent.trim()] : [];
+        });
+      });
+      assert.deepEqual(undersized, []);
+    }
+  }
+});
+
+test("shows the budget rows and both pinned events in the initial 390px comparison from either layout", async t => {
+  const page = await open(t, iPhone);
+  await page.goto(origin + "/event/urban");
+  await button(page, "Add margin").click();
+  await page.getByLabel("Sales margin (%)").fill("35");
+  await button(page, "Save trip budget").click();
+  await page.goto(origin);
+  await pinButton(page, "urban").press("Space");
+  await pinButton(page, "hktdc").press("Space");
+  for (const layout of ["Rows", "Grid"]) {
+    await button(page, layout).click();
+    await button(page, "Compare").tap();
+    const dialog = compareDialog(page);
+    const scroller = dialog.getByRole("region", { name: "Comparison fields" });
+    const { y, height } = await scroller.boundingBox();
+    const target = dialog.getByRole("row", { name: /Sales target at your margin/ });
+    const targetBounds = await target.boundingBox();
+    const venue = await dialog.getByRole("rowheader", { name: "Venue" }).boundingBox();
+    assert.ok(targetBounds.y + targetBounds.height <= y + height);
+    assert.ok(targetBounds.y < venue.y);
+    assert.equal(await scroller.evaluate(el => el.scrollWidth <= el.clientWidth), true);
+    assert.equal(await dialog.locator(".compare-scroll-hint").isVisible(), false);
+    assert.match(await target.locator(".compare-sales-per-day").innerText(), /VND [\s\S]*USD [\s\S]*Per selling day/);
+    assert.equal(await target.getByText("No margin entered.").isVisible(), true);
+    await dialog.getByRole("button", { name: "Close comparison" }).tap();
+  }
+});
+
 test("reveals a margin-only budget on save and restores the setup section after clearing it", async t => {
   const page = await open(t, iPhone);
   await button(page, award).click();
@@ -750,7 +839,7 @@ test("reveals a margin-only budget on save and restores the setup section after 
   const setup = page.locator("summary").filter({ hasText: "Set up trip budget" });
   await setup.click();
   const edit = button(page, "Edit trip budget");
-  const margin = page.getByLabel("Contribution margin (%)");
+  const margin = page.getByLabel("Sales margin (%)");
   const save = button(page, "Save trip budget");
   await edit.click();
   await margin.fill("50");

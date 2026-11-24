@@ -641,6 +641,14 @@ export function loadEntries(
               result.tripBudget.events[id] = validateBudgetEntry(id, budget);
             } catch {
               result.dropped++;
+              if (!object(budget) || budget.contributionMarginBps === undefined) continue;
+              const { contributionMarginBps: _margin, ...remainingBudget } = budget;
+              try {
+                const recovered = validateBudgetEntry(id, remainingBudget);
+                if (Object.keys(recovered).length) result.tripBudget.events[id] = recovered;
+              } catch {
+                // The budget still contains invalid data without the margin.
+              }
             }
           }
           if (storedBudget.defaults !== undefined) {
@@ -684,7 +692,7 @@ export function loadEntries(
   const recovered = Object.keys(result.entries).length + Object.keys(result.outreach).length +
     Object.keys(result.milestones).length + Object.keys(result.vendorPricing).length +
     Object.keys(result.tripBudget.events).length + Number(result.tripBudget.defaults !== undefined);
-  result.error = `Saved planner data needs recovery. Recovered ${recovered} saved records. Dropped ${result.dropped} invalid records. Automatic saving is paused. ${result.recoveryKey ? "The original is preserved on this device." : "Export the original before continuing."}`;
+  result.error = `Saved planner data needs recovery. Recovered ${recovered} saved records. Dropped ${result.dropped} invalid records or fields. Automatic saving is paused. ${result.recoveryKey ? "The original is preserved on this device." : "Export the original before continuing."}`;
   return result;
 }
 export function stashBeforeReplace(

@@ -233,6 +233,8 @@ export function Detail({
   const outreachEditor = useRef<HTMLDetailsElement>(null);
   const planningPanel = useRef<HTMLDetailsElement>(null);
   const schedulePanel = useRef<HTMLDetailsElement>(null);
+  const budgetPanel = useRef<HTMLDetailsElement>(null);
+  const budgetPlacementBeforeSave = useRef<boolean | null>(null);
   function revealPanel(panel: HTMLDetailsElement | null) {
     if (!panel) return;
     panel.open = true;
@@ -285,6 +287,13 @@ export function Detail({
   const budgetHasCosts = Boolean(budgetResult.tableFee || budgetResult.extraCosts.some(({ cost }) => cost) ||
     budget?.custom?.length);
   const hasBudget = budgetHasCosts || Boolean(budget && Object.keys(budget).length);
+  useEffect(() => {
+    const previousPlacement = budgetPlacementBeforeSave.current;
+    budgetPlacementBeforeSave.current = null;
+    if (previousPlacement === null || previousPlacement === hasBudget) return;
+    if (!hasBudget && planningPanel.current) planningPanel.current.open = true;
+    revealPanel(budgetPanel.current);
+  }, [hasBudget, localBudget]);
   const budgetHint = budgetResult.total ? `Trip total · ${formatVendorAmount(budgetResult.total.vnd, "VND")}`
     : budgetResult.subtotal ? `Known costs · ${formatVendorAmount(budgetResult.subtotal.vnd, "VND")}` : "Trip costs and walk-away fee";
   const hasOutreach = Boolean(outreach && (outreach.status !== "not_contacted" || outreach.contacted_at ||
@@ -315,7 +324,10 @@ export function Detail({
   const money = <VendorMoney event={e} now={now} shared={sharedVendorPricing} local={localVendorPricing}
     onSave={onVendorPricing} onRemove={onRemoveVendorPricing} terms={terms} />;
   const trip = <TripBudget event={e} now={now} today={today} occurrence={occurrence} homeBase={homeBase}
-    local={localBudget} defaults={budgetDefaults} onSave={onTripBudget} />;
+    local={localBudget} defaults={budgetDefaults} onSave={onTripBudget && ((value) => {
+      budgetPlacementBeforeSave.current = hasBudget;
+      onTripBudget(value);
+    })} />;
   const milestones = <BookingMilestones event={e} sharedMilestones={sharedMilestones} localMilestones={localMilestones}
     onSave={onMilestone} onRemove={onRemoveMilestone} featuredId={timing.milestone?.id} hideEmptyNotice />;
 
@@ -430,7 +442,8 @@ export function Detail({
         </DetailDisclosure>
         {hasMoney && <DetailDisclosure label="Money" hint={priceAmount || "Rates and booth documents"}
           disclosureRef={moneyPanel} defaultOpen={desktop || moneyHasPricesOrDocs}>{money}</DetailDisclosure>}
-        {hasBudget && <DetailDisclosure label="Budget / break-even" hint={budgetHint} defaultOpen={desktop || budgetHasCosts}>{trip}</DetailDisclosure>}
+        {hasBudget && <DetailDisclosure label="Budget / break-even" hint={budgetHint} defaultOpen={desktop || budgetHasCosts}
+          disclosureRef={budgetPanel}>{trip}</DetailDisclosure>}
         {hasSchedule && (
           <DetailDisclosure label="When and where" hint="Schedule and venue details" disclosureRef={schedulePanel}
             defaultOpen={desktop || recurring || Boolean(e.vendor_milestones?.length)}>
@@ -513,7 +526,7 @@ export function Detail({
           </span>
           </div>
           {!hasMoney && onVendorPricing && <DetailDisclosure label="Add booth options or documents" hint="Booth rates and documents">{money}</DetailDisclosure>}
-          {!hasBudget && onTripBudget && <DetailDisclosure label="Set up trip budget" hint={budgetHint}>{trip}</DetailDisclosure>}
+          {!hasBudget && onTripBudget && <DetailDisclosure label="Set up trip budget" hint={budgetHint} disclosureRef={budgetPanel}>{trip}</DetailDisclosure>}
           {!hasSchedule && milestones}
         </DetailDisclosure>
         {(e.description || e.games.length > 0 || aboutRows.length > 0) && (

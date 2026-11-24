@@ -68,6 +68,8 @@ import meta from "../data/meta.json";
 import type { Event } from "./model";
 import { emptyFilters } from "./model";
 import {
+  dateLabel,
+  dateSortRange,
   nextMonth,
   seasonEvents,
   countryOptions,
@@ -287,10 +289,13 @@ export default function App() {
   const [groupByStage, setGroupByStage] = useState(listContext?.groupByStage ?? false);
   const { search, from, to } = filters;
   const open = useCallback((event: Event, occurrence?: string, focusFallback?: () => HTMLElement | null) => {
-    openEvent(event.id, occurrence, {
+    const shownRange = !occurrence && event.date_status === "confirmed" && event.occurrences?.length
+      ? dateSortRange(event, today) : undefined;
+    const shownOccurrence = occurrence ?? (shownRange && dateLabel({ ...event, ...shownRange }));
+    openEvent(event.id, shownOccurrence, {
       view, month, filterOpen, groupByStage, sessionFilters: { search, from, to },
     }, focusFallback);
-  }, [openEvent, view, month, filterOpen, groupByStage, search, from, to]);
+  }, [openEvent, view, month, filterOpen, groupByStage, search, from, to, today]);
   const [theme, setTheme] = useState(
     () =>
       ["light", "dark"].includes(String(stored("tcg-theme")))

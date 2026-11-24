@@ -40,8 +40,9 @@ function calculateSalesTarget(
   const label = `${marginPercent.format(margin)} contribution margin`;
   const sales = total && margin > 0 ? { usd: total.usd / margin, vnd: total.vnd / margin } : null;
   const target = sales && Number.isFinite(sales.vnd) ? sales : null;
-  const message = margin === 0 ? "No finite sales target."
-    : !total ? "Sales target pending until the trip total is known."
+  const pending = "Sales target pending until the trip total is known.";
+  const message = margin === 0 ? `${total ? "" : `${pending} `}No finite sales target.`
+    : !total ? pending
     : !target ? "Sales target exceeds the supported amount." : null;
   return {
     label, total: target, message,
@@ -160,14 +161,14 @@ export function readTripBudgetForm(
   if (enteredMargin && percent !== marginBps / 100)
     throw new Error("Enter a contribution margin with up to two decimal places.");
   return normalizeTripBudget({
-    costs,
+    costs: Object.keys(costs).length ? costs : undefined,
     travelHomeBase: travel && (travelChanged || fields.has("confirm-travel-base") ? homeBaseId : previous?.travelHomeBase),
     walkAway: readBudgetMoney(fields, "walkAway"),
     nights: count("nights"),
     mealDays: count("mealDays"),
     contributionMarginBps: enteredMargin ? marginBps : undefined,
-    custom: customIds.map((id) => ({
+    custom: customIds.length ? customIds.map((id) => ({
       id, label: fields.get(`custom-${id}-label`), ...readBudgetMoney(fields, `custom-${id}`),
-    })),
+    })) : undefined,
   });
 }

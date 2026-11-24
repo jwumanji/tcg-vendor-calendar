@@ -120,7 +120,8 @@ export function TripBudget({
             </BudgetRow>
           )}
         </dl>
-        <p>Break-even is the gross sales to cover trip costs, before cost of goods. It uses the costs shown above, including any Tools defaults.</p>
+        <p>{salesTarget ? "The trip total includes the costs shown above and any Tools defaults. The sales target accounts for stock cost and variable selling fees at your assumed margin."
+          : "Break-even is the gross sales to cover trip costs, before cost of goods. It uses the costs shown above, including any Tools defaults."}</p>
         {days === null && <p>Selling days are unknown for this schedule.</p>}
         {tripDefaultsNeedDays(result, budget, defaults) && <p>Enter lodging nights or meal days to apply the corresponding Tools default.</p>}
       </div>
@@ -138,7 +139,7 @@ export function TripBudget({
         <BudgetEditor budget={budget} result={result} defaults={defaults} base={base} travelNeedsReview={!!travelReview}
           close={() => setEditing(false)}
           save={(value) => {
-            onSave(value);
+            onSave(event.trip_budget || Object.keys(value).length ? value : undefined);
             setEditing(false);
           }} />
       )}

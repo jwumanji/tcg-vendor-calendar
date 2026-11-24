@@ -115,7 +115,8 @@ export function CompareTable({ pins, entries, scores, budgets, defaults, homeBas
   const tableId = useId();
   const allDatesUnannounced = pins.every(({ event }) =>
     event.date_status === "tba" && !event.estimated_month && !event.event_status);
-  const plannedBudgets = pins.map(({ event }) => budgets[event.id] ?? event.trip_budget);
+  const plannedBudgets = pins.map(({ event }) =>
+    Object.hasOwn(budgets, event.id) ? budgets[event.id] : event.trip_budget);
   const showSalesTargets = plannedBudgets.some((budget) => budget?.contributionMarginBps !== undefined);
   const columns = pins.map((pin, index) => {
     const { event, occurrences, range } = pin;
@@ -236,7 +237,9 @@ export function CompareTable({ pins, entries, scores, budgets, defaults, homeBas
             })}
           </tbody>
         </table>
-        <p className="compare-budget-note">Break-even covers entered trip costs and any Tools defaults before cost of goods.
+        <p className="compare-budget-note">{showSalesTargets
+          ? "The trip total includes entered costs and any Tools defaults. Sales targets account for stock cost and variable selling fees at the entered margins."
+          : "Break-even covers entered trip costs and any Tools defaults before cost of goods."}{" "}
           Conversions use the {budgetFxDate} research FX snapshot.</p>
       </div>
     </>

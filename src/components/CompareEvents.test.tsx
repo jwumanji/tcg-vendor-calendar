@@ -182,6 +182,14 @@ it("shows zero and pending margin targets while omitting the row when all margin
   expect(renderComparison(shows)("tbody").text()).not.toContain("Sales target at your margin");
 });
 
+it("uses a shared margin unless the event has a local budget that clears it", () => {
+  const shared = { ...urban, id: "constructor", trip_budget: { contributionMarginBps: 5_000 } };
+  const shows = [shared, award];
+  expect(cell(renderComparison(shows), "Sales target at your margin", 0).text()).toContain("50% contribution margin");
+  const cleared = renderComparison(shows, { budgets: { [shared.id]: {} } });
+  expect(cleared("tbody").text()).not.toContain("Sales target at your margin");
+});
+
 it("flags travel saved for a different home base and meal defaults missing a day count", () => {
   const estimated = { ...urban, date_status: "estimated", estimated_month: "2027-01" } as const;
   const $ = renderComparison([estimated, color], {

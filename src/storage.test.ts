@@ -81,15 +81,16 @@ describe("versioned pipeline backup validation", () => {
   });
 
   it.each([-1, 10_001, 0.5, "5000", null])("rejects and recovers around an invalid stored margin (%j)", (contributionMarginBps) => {
+    const savedCosts = { costs: { travel: { amount: 200, currency: "USD" } }, nights: 2 };
     const value = { ...backup({}), tripBudget: { events: {
       valid: { contributionMarginBps: 5_000 },
-      invalid: { contributionMarginBps },
+      invalid: { ...savedCosts, contributionMarginBps },
     } } };
     expect(() => validateBackup(value)).toThrow(/Invalid trip budget for invalid.*contribution margin/);
     const raw = JSON.stringify(value);
     const setItem = vi.fn();
     const recovered = loadEntries({ getItem: () => raw, setItem });
-    expect(recovered.tripBudget.events).toEqual({ valid: value.tripBudget.events.valid });
+    expect(recovered.tripBudget.events).toEqual({ valid: value.tripBudget.events.valid, invalid: savedCosts });
     expect(recovered.dropped).toBe(1);
     expect(setItem).toHaveBeenCalledWith(recovered.recoveryKey, raw);
   });

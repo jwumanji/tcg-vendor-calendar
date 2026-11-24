@@ -281,9 +281,9 @@ it("keeps unsupported nonzero expenses visible without reporting a misleading co
   expect(budgetFor(urban, { costs: { travel: money(0, "JPY") } }).total).not.toBeNull();
 });
 
-it("keeps the entered costs subtotal and leaves sales pending without an applicable booth fee", () => {
+it.each([0, 5_000])("keeps the subtotal and leaves sales pending without a booth fee at %i basis points", (contributionMarginBps) => {
   const event = { ...urban, vendor_options: [], vendor_cost: null };
-  const local = { costs: { travel: money(200, "USD") }, contributionMarginBps: 5_000 };
+  const local = { costs: { travel: money(200, "USD") }, contributionMarginBps };
   const result = budgetFor(event, local);
   expect(result.subtotal?.usd).toBe(200);
   expect(result.total).toBeNull();
@@ -291,6 +291,7 @@ it("keeps the entered costs subtotal and leaves sales pending without an applica
   const $ = renderBudget(event, local);
   expect($(".trip-budget-totals").text()).toContain("Total pending an applicable table fee.");
   expect($(".trip-budget-totals").text()).toContain("Sales target pending until the trip total is known.");
+  if (contributionMarginBps === 0) expect($(".trip-budget-totals").text()).toContain("No finite sales target.");
   expect($(".trip-budget-totals strong").map((_, row) => $(row).text()).get()).toEqual([
     expect.stringContaining("USD 200.00"),
   ]);

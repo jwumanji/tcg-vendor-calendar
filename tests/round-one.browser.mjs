@@ -743,6 +743,61 @@ test("shows the same quote and effective stage in comparison and Detail", async 
   assert.equal(await pinButton(page, "urban").getAttribute("aria-pressed"), "true");
 });
 
+test("reveals a margin-only budget on save and restores the setup section after clearing it", async t => {
+  const page = await open(t, iPhone);
+  await button(page, award).click();
+  await page.getByText("Your planning", { exact: true }).click();
+  const setup = page.locator("summary").filter({ hasText: "Set up trip budget" });
+  await setup.click();
+  const edit = button(page, "Edit trip budget");
+  const margin = page.getByLabel("Contribution margin (%)");
+  const save = button(page, "Save trip budget");
+  await edit.click();
+  await margin.fill("50");
+  await save.click();
+
+  const budget = page.locator("summary").filter({ hasText: "Budget / break-even" });
+  assert.equal(await budget.evaluate(el => el === document.activeElement), true);
+  const target = page.getByText("Sales target at your margin", { exact: true });
+  assert.equal(await target.isVisible(), true);
+  assert.equal(await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("tcg-pipeline-v1")).tripBudget.events["r-awardx"].contributionMarginBps), 5_000);
+
+  await edit.click();
+  assert.equal(await margin.inputValue(), "50");
+  await margin.fill("");
+  await save.click();
+  assert.equal(await setup.evaluate(el => el === document.activeElement), true);
+  assert.equal(await edit.isVisible(), true);
+  assert.equal(await target.count(), 0);
+  assert.equal(await page.evaluate(() =>
+    Object.hasOwn(JSON.parse(localStorage.getItem("tcg-pipeline-v1")).tripBudget.events, "r-awardx")), false);
+});
+
+test("opens the filtered recurring weekend from Grid and Rows and budgets for its published days", async t => {
+  const page = await open(t);
+  await page.evaluate(() => {
+    const planner = JSON.parse(localStorage.getItem("tcg-pipeline-v1"));
+    planner.tripBudget = {
+      defaults: { meals: { amount: 30, currency: "USD" } },
+      events: { "r-caps": { contributionMarginBps: 5_000 } },
+    };
+    localStorage.setItem("tcg-pipeline-v1", JSON.stringify(planner));
+  });
+  await page.reload();
+  await button(page, "Filters").click();
+  await page.getByLabel("From", { exact: true }).fill("2027-02-28");
+  await page.getByLabel("To", { exact: true }).fill("2027-02-28");
+  for (const layout of ["Rows", "Grid"]) {
+    await button(page, layout).click();
+    await page.getByRole("button", { name: /^CAPS mall editions\b/ }).click();
+    assert.equal(await page.locator(".detail-date").innerText(), "27–28 Feb 2027");
+    assert.match(await page.locator(".trip-budget-costs").innerText(), /2 meal days assumed from 2 selling days/);
+    await button(page, "← Back to events").click();
+    assert.equal(await page.getByLabel("From", { exact: true }).inputValue(), "2027-02-28");
+  }
+});
+
 test("opens the weekly digest from every main tab and restores focus to the header", async t => {
   for (const options of [desktop, iPhone, ...[320, 366].map(width => ({ ...iPhone, viewport: { width, height: 844 } }))]) {
     const page = await open(t, options);
